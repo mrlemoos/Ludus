@@ -79,6 +79,15 @@ test('3D board renders, switches to keyboard board, stays within mobile viewport
   await expect(page.locator('canvas')).toBeVisible();
   await page.waitForTimeout(1500);
   await page.screenshot({ path: 'test-results/game-3d.png', fullPage: true });
+  await page.getByRole('button', { name: 'Flip board', exact: true }).click();
+  await expect(page.locator('canvas')).toBeVisible();
+  await page.waitForTimeout(1000);
+  await page.screenshot({ path: 'test-results/game-3d-white.png', fullPage: true });
+  await page.setViewportSize({ width: 360, height: 800 });
+  await expect(page.locator('canvas')).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/game-3d-mobile.png', fullPage: true });
   await page.getByRole('button', { name: 'Reset camera' }).click();
   await page.getByRole('button', { name: '2D board', exact: true }).click();
   await page.setViewportSize({ width: 360, height: 800 });
