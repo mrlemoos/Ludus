@@ -1,0 +1,12 @@
+# 08: Play on the 3D café board
+
+**What to build:** Players use the default 3D café board and switch presentation without losing match state.
+
+**Blocked by:** 05: Complete a timed computer match in 2D; 07: Select licensed café assets and mobile test devices.
+
+**Status:** ready-for-agent
+
+- [ ] Use Three.js through React Three Fiber, Drei and React Spring with approved licensed assets and attribution.
+- [ ] Provide constrained rotation/zoom/reset, stable orientation, readable selection and legal destinations. Camera gestures must not submit moves.
+- [ ] Switch between 3D and accessible 2D while preserving match, clocks, controls and replay state; handle unsupported graphics safely.
+- [ ] Meet approved named-device budgets, at least 30 FPS during interaction, automatic quality reduction and reduced-motion behaviour. Record actual device results.
