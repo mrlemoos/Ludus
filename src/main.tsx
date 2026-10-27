@@ -9,11 +9,12 @@ import '@fontsource/manrope/latin-600.css';
 import './i18n';
 import './styles.css';
 import { App, NotFound } from './App';
+import { Play } from './Play';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <Routes><Route path="/" element={<App />} /><Route path="*" element={<NotFound />} /></Routes>
+      <Routes><Route path="/" element={<App />} /><Route path="/play" element={<Play />} /><Route path="*" element={<NotFound />} /></Routes>
     </BrowserRouter>
   </React.StrictMode>,
 );

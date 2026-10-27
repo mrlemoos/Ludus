@@ -126,7 +126,7 @@ The following safeguards remain proposed unless covered by the confirmed decisio
 
 ## Testing Decisions
 
-Vitest and Playwright are confirmed. Waitlist validation and browser/API journeys are implemented; coverage for later slices remains proposed.
+Vitest and Playwright are confirmed. Waitlist and local computer-match validation and browser/API journeys are implemented. Multiplayer, rated-play, coaching and billing coverage remains proposed.
 
 - Prefer external behaviour through browser journeys backed by the real application API. Use two browser sessions for human matches and reconnect scenarios. Avoid testing component structure or internal call sequences.
 - Add focused deterministic domain tests where real-time browser tests cannot reliably cover clocks, rating updates, timezone transitions and concurrency. Control time at the application boundary rather than waiting in tests.
@@ -159,6 +159,7 @@ Vitest and Playwright are confirmed. Waitlist validation and browser/API journey
 
 ## Further Notes
 
+- A local playable computer-match slice is implemented at `/play`: real seeded account, Better Auth magic-link sessions, Drizzle/D1 records, authoritative SQLite match Durable Objects and WebSockets, Stockfish lite browser opponent, both controls and colours, four provisional strengths, switchable procedural 3D/accessible 2D, promotion, saved results and private linear replay/PGN export. Public multiplayer, ratings, activity, coaching, subscriptions, operator invitations and full onboarding remain outstanding. Casual draw/timeout handling and starter art are provisional; relevant ticket acceptance gates remain open.
 - The waitlist slice is implemented with a Vite/React interface, Worker API, Drizzle schema and local D1. Type, build, validation and browser/API checks run locally. Remote service provisioning and deployment require refreshed Cloudflare authentication.
 - Local Markdown tickets and triage states are configured in docs/agents/issue-tracker.md and docs/agents/triage-labels.md. The revised breakdown is published as 26 dependency-ordered tickets under .scratch/ludus/issues/.
 - Confirmed first online delivery: working waitlist. Subsequent slices follow the published ticket dependencies; unresolved policies have explicit decision tickets. Open beta only once online play works.

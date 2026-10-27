@@ -11,3 +11,9 @@
 - [ ] Support both controls and increments, keyboard/touch play, promotion, castling, en passant, checkmate, stalemate, approved draws, resignation and timeout.
 - [ ] Persist moves and finished result, recover accepted state after reload and finalise once. Browser engine requires active execution and may vary by device.
 - [ ] Test illegal/out-of-turn/stale actions, clock boundaries, terminal outcomes, reload recovery and duplicate finalisation. No external language model is required.
+
+## Implementation progress
+
+Playable at `/play` with a real seeded account. Implemented server/browser chess.js, SQLite match Durable Objects, WebSocket snapshots, timestamp clocks, 5+3/10+5, both colours, browser Stockfish lite worker, keyboard/touch board, promotion, castling, en passant, resignation, terminal results, reload recovery and a cumulative 60-second disconnect pause. Unit and production-browser tests cover rule enforcement, stale actions, clock boundaries, checkmate, underpromotion, disconnect/reconnect and repeated finalisation.
+
+Remaining acceptance gates: production onboarding; approved draw/timeout policy. Casual computer games currently apply automatic threefold/fifty-move draws and a documented simplified timeout-material rule. These defaults do not authorise rated human play. Computer moves remain untrusted browser input, validated for legality by the server.

@@ -65,3 +65,58 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
+
+@layer components {
+  .game-shell { @apply max-w-330; }
+  .game-primary { @apply inline-block min-h-12 rounded-xl bg-ink px-5 py-3 text-sm text-paper hover:bg-olive disabled:cursor-wait disabled:opacity-50; }
+  .game-secondary { @apply inline-flex min-h-11 items-center justify-center rounded-lg border border-ink/20 px-4 py-2 text-xs hover:bg-ink/5 disabled:opacity-50; }
+  .game-input { @apply min-h-12 w-full rounded-lg border border-ink/25 bg-white/30 px-4 text-sm; }
+  .entry-panel { @apply mx-auto max-w-116 py-7; }
+  .entry-panel h1 { @apply mt-5 mb-5 leading-[0.95]; }
+  .game-notice { @apply rounded-lg border border-olive/30 bg-olive/10 p-4 leading-6; }
+  .lobby-grid { @apply grid gap-10 md:grid-cols-[0.85fr_1.15fr] md:gap-16; }
+  .setup-card { @apply rounded-2xl border border-ink/15 bg-white/20 p-6 sm:p-8; }
+  .setup-label { @apply mb-5 grid gap-2 text-xs font-semibold; }
+  .history-panel { @apply min-w-0 py-3; }
+  .history-row { @apply flex min-h-22 items-center justify-between gap-4 border-t border-ink/15 py-5 hover:text-olive; }
+  .match-heading { @apply mb-6 flex items-end justify-between gap-4; }
+  .match-grid { @apply grid items-start gap-7 lg:grid-cols-[minmax(0,1.65fr)_minmax(17rem,1fr)] lg:gap-10; }
+  .board-frame { @apply relative overflow-hidden rounded-sm border-8 border-[#624735] bg-[#624735] shadow-xl sm:border-12; }
+  .play-board { @apply grid aspect-square w-full grid-cols-8; }
+  .board-cell { @apply relative flex aspect-square min-w-0 touch-manipulation items-center justify-center p-0; }
+  .board-cell:focus-visible { outline: 3px solid #ebe56b; outline-offset: -4px; z-index: 2; }
+  .cell-light { background: #d9c59e; }
+  .cell-dark { background: #747c5b; }
+  .cell-last.cell-light { background: #d7cb8e; }
+  .cell-last.cell-dark { background: #939563; }
+  .cell-selected { background: #bdbe68 !important; box-shadow: inset 0 0 0 3px #525d33; }
+  .chess-glyph { font-family: 'Arial Unicode MS', 'DejaVu Sans', serif; font-size: clamp(1.9rem, 7vw, 4.9rem); line-height: 1; transform: translateY(-2%); }
+  .piece-w { color: #fff5da; text-shadow: 1px 1px 0 #483327, -1px -1px 0 #483327, -1px 1px 0 #483327, 1px -1px 0 #483327, 0 3px 2px #0004; }
+  .piece-b { color: #37291f; text-shadow: 0 1px 1px #e5cfaa99; }
+  .rank-label, .file-label { @apply absolute text-[9px] leading-none font-semibold sm:text-[11px]; color: #302c24; }
+  .rank-label { top: 5%; left: 5%; }
+  .file-label { bottom: 4%; right: 5%; }
+  .move-dot { @apply absolute size-[25%] rounded-full bg-ink/30 pointer-events-none; }
+  .capture-ring { @apply absolute inset-[5%] rounded-full border-4 border-ink/35 pointer-events-none; }
+  .player-bar { @apply flex min-h-19 items-center justify-between gap-3 py-3; }
+  .player-bar > div { @apply flex items-center gap-3 text-sm; }
+  .player-bar small { @apply mt-1 block text-[10px] text-muted; }
+  .player-avatar { @apply grid size-10 place-items-center rounded-full bg-olive font-display text-xl text-paper; }
+  .player-avatar-you { @apply bg-[#82634a]; }
+  .clock { @apply min-w-26 rounded-lg border border-ink/15 px-4 py-2 text-center font-mono text-2xl tabular-nums; }
+  .clock-active { @apply bg-ink text-paper border-ink; }
+  .board-tools { @apply flex flex-wrap gap-2; }
+  .match-sidebar { @apply rounded-xl border border-ink/15 bg-white/15 p-5 sm:p-6 lg:mt-19; }
+  .match-status { @apply border-b border-ink/15 pb-5 mb-5; }
+  .moves-panel { @apply mt-5 max-h-72 overflow-y-auto; }
+  .move-row { @apply grid grid-cols-[2rem_1fr_1fr] items-center text-sm; }
+  .move-row > span { @apply text-muted text-xs; }
+  .move-notation { @apply rounded px-3 py-2 text-left font-mono aria-pressed:bg-olive/20 enabled:hover:bg-ink/5; }
+  .replay-controls { @apply flex rounded-lg border border-ink/20; }
+  .replay-controls button { @apply min-h-11 flex-1 text-xl hover:bg-ink/5; }
+  .three-board { @apply aspect-square w-full; touch-action: none; }
+  .accessible-board { @apply sr-only; }
+  .accessible-board:focus-within { @apply not-sr-only absolute inset-0 z-10; }
+  .promotion-overlay { @apply fixed inset-0 z-50 grid place-items-center bg-ink/50 p-5; }
+  .promotion-panel { @apply w-full max-w-90 rounded-2xl bg-paper p-7 shadow-2xl; }
+}

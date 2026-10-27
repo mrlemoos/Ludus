@@ -1,3 +1,5 @@
+import { gameApi } from './game-api';
+export { Match } from './match';
 import { drizzle } from 'drizzle-orm/d1';
 import { parseWaitlist } from '../shared/waitlist';
 import { waitlist } from './schema';
@@ -10,7 +12,7 @@ const reply = (status: number, error?: string) => Response.json(error ? { error 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname !== '/api/waitlist') return reply(404, 'not_found');
+    if (url.pathname !== '/api/waitlist') return gameApi(request, env);
     if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST', 'Cache-Control': 'no-store' } });
     const origin = request.headers.get('Origin');
     if ((origin && origin !== url.origin) || request.headers.get('Sec-Fetch-Site') === 'cross-site') return reply(403, 'forbidden');

@@ -1,6 +1,6 @@
 # Ludus
 
-Chess in a Madrid-inspired café. First slice: an invite-only beta waitlist in British English, European Spanish and European French.
+Playable computer chess in a Madrid-inspired café, with switchable 3D and accessible 2D boards. British English, European Spanish and European French. The public waitlist remains at `/`; the game is at `/play`.
 
 ## Development
 
@@ -8,18 +8,26 @@ Use Node 24 and the pnpm version pinned in the package manifest.
 
 ```sh
 pnpm install
-pnpm db:migrate
+pnpm seed
 pnpm dev
 ```
 
-Local development uses real Worker code and local D1 through Cloudflare's Vite plugin. No Cloudflare login or external AI service is needed locally.
+Open `/play` and choose **Sign in as Leo**. `pnpm seed` creates a real local account and invitation for `leo.lemos.ds@icloud.com`, plus an ignored `.dev.vars` file with a random authentication secret and explicit local mode. It preserves an existing secret and account. Local sign-in requires both `LOCAL_DEV=true` and a loopback hostname; deployed hosts cannot use it. Do not put local mode in production configuration.
+
+Local development uses real Worker code, local D1 and a SQLite-backed Durable Object per match. No Cloudflare login, email delivery or external AI service is needed locally. Stockfish lite single-threaded runs in a browser Web Worker. The build copies its JavaScript, WASM and licence from the pinned dependency into generated static assets; no runtime CDN is needed.
+
+Choose either colour, 5+3 or 10+5, and one of four provisional difficulty levels. Moves, clocks and results are server-owned; computer move selection is untrusted browser input and never earns rank. Reloads recover accepted state. Disconnects pause clocks for up to 60 seconds total; keep the tab active for computer play. Completed games support private replay and PGN download. Both board presentations use the same match and controls. Keyboard users can select squares with Enter and move focus with arrows, including through the accessible board accompanying 3D.
+
+This is a local playable slice, not an open beta. Human multiplayer, ranks, streaks, coaching, operator invitations and subscriptions remain unimplemented. Full onboarding and the beta admission/retention policies remain gated. The café and traditional pieces are project-authored procedural starter assets; final art and named-device performance acceptance are outstanding. Graphics reduce resolution and shadows when measured frame rate falls below 30 FPS, but real iPhone/Android performance has not been verified.
+
+Casual computer games currently end automatically on threefold repetition, fifty moves, stalemate or chess.js insufficient material. On timeout, a bare king or a lone bishop/knight against a bare king draws; other positions award the opponent. This simplified timeout policy and automatic draw handling are provisional and must be resolved before rated human play. No simultaneous human disconnect policy is implied.
 
 ```sh
 pnpm exec playwright install chromium
 pnpm check
 ```
 
-Checks cover types, input validation, production build and browser/API journeys against local D1. Browser tests submit synthetic emails to the local database. Screenshots are written to the ignored test-results directory. Apply new schema changes through `pnpm db:generate`, review the generated SQL, then `pnpm db:migrate`. Regenerate binding types with `pnpm cf:types` after changing Worker configuration.
+Checks cover types, deterministic chess/clocks, authentication, production build and browser/API journeys against local D1 and match Durable Objects. Browser tests seed Leo locally and create computer games and synthetic waitlist emails. Screenshots are written to the ignored test-results directory. Apply new schema changes through `pnpm db:generate`, review the generated SQL, then `pnpm db:migrate`. Regenerate binding types with `pnpm cf:types` after changing Worker configuration.
 
 ## First deployment
 
@@ -33,6 +41,8 @@ Replace the all-zero local placeholder `database_id` in Wrangler configuration w
 ```sh
 pnpm deploy
 ```
+
+Before deploying game access, set Worker secrets `BETTER_AUTH_SECRET` and `RESEND_API_KEY` with `wrangler secret put`, and configure `AUTH_EMAIL_FROM` with a verified Resend sender. Runtime secrets belong in Cloudflare, never source control. Insert approved emails into the remote `invitations` table; only invited addresses can create accounts or receive sign-in links. The operator batch page is still outstanding. The seeded local account is not copied to remote D1. Resend emails currently use English; translated invitation delivery remains part of account onboarding.
 
 This runs all checks, applies remote migrations, then deploys the Worker and static assets. Verify an actual submission on the returned workers.dev URL before marking ticket 01 complete. Do not publish a placeholder database binding.
 
@@ -49,3 +59,7 @@ Before admitting invitation batches, inspect Worker request/error usage, D1 read
 Fonts are self-hosted from Fontsource packages. Cormorant Garamond and Manrope use the SIL Open Font License; licence files ship under /licences/. The waiting-page chess illustration is project-authored SVG/CSS, not the final playable 3D assets.
 
 Product specification and dependency-ordered local tickets remain in the project documentation and `.scratch/ludus/issues/`.
+
+## Engine licence
+
+Stockfish.js is GPLv3. The generated engine directory includes its complete licence. Source for the pinned 19.0.1 distribution is available at https://github.com/nmrugg/stockfish.js/tree/v19.0.1. Before public distribution, provide the corresponding source alongside the shipped engine and review the distribution obligations; the current local slice is not a public release. The engine is isolated in its own browser worker and communicates through UCI messages. Project-authored 3D geometry and procedural grain use no external artwork.

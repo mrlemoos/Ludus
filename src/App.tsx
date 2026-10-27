@@ -7,12 +7,13 @@ import { Link } from 'react-router';
 import { isLanguage, languages, parseWaitlist } from '../shared/waitlist';
 import { languageNames } from './i18n';
 import { ChessScene } from './ChessScene';
+import { gameCopy } from './game-copy';
 
 function Arrow() {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6" stroke="currentColor" strokeWidth="1.5" /></svg>;
 }
 
-function Header() {
+export function Header() {
   const { t, i18n } = useTranslation();
   useEffect(() => {
     document.documentElement.lang = i18n.language;
@@ -22,7 +23,8 @@ function Header() {
   }, [i18n.language, t]);
   return <header className="flex items-center justify-between gap-4 border-b border-ink/15 py-6 sm:py-8">
     <Link to="/" className="wordmark" aria-label="Ludus">ludus<span aria-hidden="true">.</span></Link>
-    <div className="flex items-center gap-7">
+    <div className="flex items-center gap-4 sm:gap-7">
+      <Link to="/play" className="text-xs font-semibold underline underline-offset-4">{gameCopy[isLanguage(i18n.language) ? i18n.language : 'en-GB'].play}</Link>
       <span className="hidden text-xs tracking-wide text-muted sm:block">{t('location')}</span>
       <Select.Root value={i18n.language} items={languageNames} onValueChange={(value) => { if (isLanguage(value)) void i18n.changeLanguage(value); }}>
         <Select.Trigger aria-label={t('language')} className="flex min-h-11 min-w-28 items-center justify-between gap-3 rounded-full border border-ink/20 px-4 text-xs hover:bg-ink/5">
