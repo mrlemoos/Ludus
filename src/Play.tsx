@@ -6,6 +6,10 @@ import { Input } from '@base-ui/react/input';
 import { Dialog } from '@base-ui/react/dialog';
 import { Chess, type Square } from 'chess.js';
 import { Header } from './App';
+import { Tabs } from '@base-ui/react/tabs';
+import { AppleMailTabs } from './components/apple-mail-tabs';
+import { SlidingPanel } from './components/sliding-panel';
+import { ChessScene } from './ChessScene';
 import { Board } from './Board';
 import { gameCopy } from './game-copy';
 import { isLanguage } from '../shared/waitlist';
@@ -32,6 +36,8 @@ export function Play() {
   const [identity, setIdentity] = useState<{ user: { id: string; name: string } | null; local: boolean } | null>(null);
   const [history, setHistory] = useState<History>([]);
   const [game, setGame] = useState<Game | null>(null);
+  const lobbyTab = params.get('tab') === 'history' ? 'history' : 'play';
+  const setLobbyTab = (tab: 'play' | 'history') => setParams(tab === 'history' ? { tab } : {});
   const [email, setEmail] = useState('');
   const [adult, setAdult] = useState(false);
   const [sent, setSent] = useState(false);
@@ -151,9 +157,9 @@ export function Play() {
     const url = URL.createObjectURL(new Blob([chess.pgn()], { type: 'application/x-chess-pgn' }));
     const a = document.createElement('a'); a.href = url; a.download = `ludus-${game.id}.pgn`; a.click(); URL.revokeObjectURL(url);
   }
-  return <div className="site-shell game-shell"><Header /><main id="main" className="py-8 sm:py-12">
+  return <div className="site-shell game-shell"><a className="skip-link" href="#main">{c.play}</a><Header /><main id="main" className="game-main">
     {error && <div role="alert" className="game-notice mb-5">{c.error} <Button onClick={() => location.reload()}>{c.retry}</Button></div>}
-    {!identity ? <p>{c.loading}</p> : !identity.user ? <section className="entry-panel">
+    {!identity ? <p>{c.loading}</p> : !identity.user ? <div className="entry-layout"><div className="entry-scene" aria-hidden="true"><ChessScene /><span className="cafe-caption">Ludus · Madrid</span></div><section className="entry-panel">
       <p className="eyebrow">Ludus · Madrid</p><h1 className="font-display text-6xl sm:text-7xl">{c.title}</h1><p className="text-muted">{c.subtitle}</p>
       <form className="grid gap-5 mt-8" onSubmit={(e) => { e.preventDefault(); if (adult) void signIn(false); }}>
         <label className="grid gap-2 text-sm">{c.email}<Input type="email" required maxLength={254} autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="game-input" /></label>
@@ -163,21 +169,31 @@ export function Play() {
       {sent && <p role="status" className="mt-4 text-sm">{c.sent}</p>}
       <p className="mt-4 text-xs text-muted leading-6">{c.invitation} <Link className="underline" to="/">{c.waitlist}</Link></p>
       {identity.local && <div className="mt-8 border-t border-ink/15 pt-5"><p className="eyebrow mb-3">{c.localNote}</p><Button disabled={pending} className="game-secondary w-full" onClick={() => void signIn(true)}>{c.local}</Button></div>}
-    </section> : !gameId ? <>
+    </section></div> : !gameId ? <>
       <div className="flex justify-between gap-4 items-start mb-10"><div><p className="eyebrow mb-3">{identity.user.name} · Ludus</p><h1 className="font-display text-5xl sm:text-7xl">{c.setup}.</h1></div><Button className="text-xs underline py-3" onClick={() => void api('/api/auth/sign-out', {}).then(() => location.assign('/play'))}>{c.signOut}</Button></div>
-      <div className="lobby-grid"><section className="setup-card"><p className="eyebrow text-olive">{c.opponent}</p><h2 className="font-display text-4xl mt-3 mb-7">{c.play}</h2>
+      <div className="lobby-grid"><figure className="lobby-scene"><ChessScene /><figcaption><span>{c.opponent}</span><span>{c.subtitle}</span></figcaption></figure>
+        <div className="lobby-controls"><AppleMailTabs value={lobbyTab} onValueChange={setLobbyTab} label={c.play} tabs={[
+          { value: 'play', label: c.newGame, icon: '♞' }, { value: 'history', label: c.history, icon: '↺' },
+        ]}>
+          <SlidingPanel activeKey={lobbyTab} direction={lobbyTab === 'play' ? -1 : 1}>
+            <Tabs.Panel value={lobbyTab} className="lobby-tab-panel">
+              {lobbyTab === 'play' ? <section className="setup-card"><p className="eyebrow text-olive">{c.opponent}</p><h2 className="font-display text-4xl mt-3 mb-7">{c.play}</h2>
         <label className="setup-label">{c.control}<select className="game-input" value={control} onChange={(e) => setControl(e.target.value as Control)}><option>5+3</option><option>10+5</option></select></label>
         <label className="setup-label">{c.difficulty}<select className="game-input" value={difficulty} onChange={(e) => setDifficulty(Number(e.target.value) as Difficulty)}>{c.levels.map((name, i) => <option key={name} value={i + 1}>{name}</option>)}</select></label>
         <label className="setup-label">{c.colour}<select className="game-input" value={colour} onChange={(e) => setColour(e.target.value as 'w' | 'b')}><option value="w">{c.white}</option><option value="b">{c.black}</option></select></label>
         <Button className="game-primary mt-4 w-full" disabled={pending} onClick={() => void start()}>{history.some((g) => !g.result) ? c.resume : c.start} ↗</Button><p className="text-xs text-muted mt-4 leading-6">{c.provisional}</p>
-      </section><section className="history-panel"><h2 className="font-display text-3xl mb-6">{c.history}</h2>{history.length ? <ul>{history.map((entry) => <li key={entry.id}><Link className="history-row" to={`/play?game=${entry.id}`}><span><span className="block text-sm">{c.opponent}</span><span className="text-xs text-muted">{new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }).format(entry.createdAt)}</span></span><span className="text-xs">{entry.result ? c.replay : c.resume} →</span></Link></li>)}</ul> : <p className="text-muted text-sm">{c.noHistory}</p>}</section></div>
+      </section> : <section className="history-panel"><h2 className="font-display text-3xl mb-6">{c.history}</h2>{history.length ? <ul>{history.map((entry) => <li key={entry.id}><Link className="history-row" to={`/play?game=${entry.id}`}><span><span className="block text-sm">{c.opponent}</span><span className="text-xs text-muted">{new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }).format(entry.createdAt)}</span></span><span className="text-xs">{entry.result ? c.replay : c.resume} →</span></Link></li>)}</ul> : <p className="text-muted text-sm">{c.noHistory}</p>}</section>}
+            </Tabs.Panel>
+          </SlidingPanel>
+        </AppleMailTabs></div>
+      </div>
     </> : !game ? <p>{c.loading}</p> : <>
-      <div className="match-heading"><div><Link to="/play" className="eyebrow text-muted">← {c.history}</Link><h1 className="font-display text-4xl mt-2">{c.opponent}</h1></div><span className="text-xs text-muted">{game.control} · {c.levels[game.difficulty - 1]}</span></div>
+      <div className="match-heading"><div><Link to="/play?tab=history" className="eyebrow text-muted">← {c.history}</Link><h1 className="font-display text-4xl mt-2">{c.opponent}</h1></div><span className="match-badge"><span aria-hidden="true">◷</span>{game.control} · {c.levels[game.difficulty - 1]}</span></div>
       <div className="match-grid"><section className="min-w-0">
         <div className="player-bar"><div><span className="player-avatar">L</span><span>{topIsYou ? c.you : 'Lucía'}<small>{topIsYou ? identity.user.name : c.computer}</small></span></div><span className={`clock ${boardChess.turn() === topColour && !game.result ? 'clock-active' : ''}`}>{clock(clocks[flipped ? 'w' : 'b'])}</span></div>
         <div className="board-frame">{view === '3d' ? <GraphicsBoundary key={resetKey} fallback={<><p role="status" className="text-sm p-3">{c.unavailable3d}</p><Board {...boardProps} /></>}><Suspense fallback={<div className="aspect-square grid place-items-center">{c.loading}</div>}><Board3D {...boardProps} resetKey={resetKey} /></Suspense><Board {...boardProps} concealed /></GraphicsBoundary> : <Board {...boardProps} />}</div>
         <div className="player-bar"><div><span className="player-avatar player-avatar-you">{topIsYou ? 'L' : identity.user.name[0]}</span><span>{topIsYou ? 'Lucía' : c.you}<small>{topIsYou ? c.computer : identity.user.name}</small></span></div><span className={`clock ${boardChess.turn() === (flipped ? 'b' : 'w') && !game.result ? 'clock-active' : ''}`}>{clock(clocks[flipped ? 'b' : 'w'])}</span></div>
-        <div className="board-tools"><Button className="game-secondary" onClick={() => { const next = view === '3d' ? '2d' : '3d'; setView(next); try { localStorage.setItem('ludus-board', next); } catch { /* Preference is optional. */ } }}>{view === '3d' ? c.view2d : c.view3d}</Button><Button className="game-secondary" onClick={() => setFlipped(!flipped)}>{c.flip}</Button>{view === '3d' && <Button className="game-secondary" onClick={() => setResetKey(resetKey + 1)}>{c.reset}</Button>}</div>
+        <div className="board-tools" role="group" aria-label={c.board}><Button className="game-secondary" onClick={() => { const next = view === '3d' ? '2d' : '3d'; setView(next); try { localStorage.setItem('ludus-board', next); } catch { /* Preference is optional. */ } }}>{view === '3d' ? c.view2d : c.view3d}</Button><Button className="game-secondary" onClick={() => setFlipped(!flipped)}>{c.flip}</Button>{view === '3d' && <Button className="game-secondary" onClick={() => setResetKey(resetKey + 1)}>{c.reset}</Button>}</div>
       </section><aside className="match-sidebar">
         <p className="eyebrow text-muted mb-3">{c.casual}</p><div role="status" className="match-status"><h2 className="font-display text-3xl">{status}</h2>{!game.result && boardChess.isCheck() && <p className="text-sm mt-2">{c.check}</p>}</div>
         {!connected && !game.result && <p className="game-notice text-xs">{c.reconnecting}</p>}{pause > 0 && !game.result && <p role="status" className="game-notice text-xs">{c.paused} · {pause} {c.allowance}</p>}

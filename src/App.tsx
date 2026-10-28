@@ -21,13 +21,13 @@ export function Header() {
     document.querySelector('meta[name="description"]')?.setAttribute('content', t('description'));
     try { localStorage.setItem('ludus-language', i18n.language); } catch { /* Language still works without storage. */ }
   }, [i18n.language, t]);
-  return <header className="flex items-center justify-between gap-4 border-b border-ink/15 py-6 sm:py-8">
+  return <header className="site-header">
     <Link to="/" className="wordmark" aria-label="Ludus">ludus<span aria-hidden="true">.</span></Link>
     <div className="flex items-center gap-4 sm:gap-7">
-      <Link to="/play" className="text-xs font-semibold underline underline-offset-4">{gameCopy[isLanguage(i18n.language) ? i18n.language : 'en-GB'].play}</Link>
+      <Link to="/play" className="header-play" aria-label={gameCopy[isLanguage(i18n.language) ? i18n.language : 'en-GB'].play}><span className="hidden sm:inline">{gameCopy[isLanguage(i18n.language) ? i18n.language : 'en-GB'].play}</span><span aria-hidden="true" className="text-xl sm:hidden">♞</span></Link>
       <span className="hidden text-xs tracking-wide text-muted sm:block">{t('location')}</span>
       <Select.Root value={i18n.language} items={languageNames} onValueChange={(value) => { if (isLanguage(value)) void i18n.changeLanguage(value); }}>
-        <Select.Trigger aria-label={t('language')} className="flex min-h-11 min-w-28 items-center justify-between gap-3 rounded-full border border-ink/20 px-4 text-xs hover:bg-ink/5">
+        <Select.Trigger aria-label={t('language')} className="language-trigger">
           <Select.Value /><Select.Icon aria-hidden="true">⌄</Select.Icon>
         </Select.Trigger>
         <Select.Portal><Select.Positioner sideOffset={8}><Select.Popup className="z-50 min-w-36 rounded-xl border border-ink/15 bg-paper p-1 shadow-lg">
@@ -92,8 +92,8 @@ export function App() {
                 <Input id="email" name="email" type="email" autoComplete="email" required maxLength={254} value={email}
                   onChange={(event) => { setEmail(event.target.value); setError(null); }} placeholder={t('placeholder')}
                   aria-invalid={error === 'invalid'} aria-describedby={error ? 'form-error invitation-language email-use' : 'invitation-language email-use'}
-                  className="min-h-14 min-w-0 flex-1 rounded-xl border border-ink/25 bg-white/35 px-4 text-sm placeholder:text-muted/70 aria-invalid:border-red-800" />
-                <Button type="submit" disabled={state === 'pending'} className="flex min-h-14 items-center justify-center gap-5 rounded-xl bg-ink px-5 text-sm font-medium text-paper transition-colors hover:bg-olive disabled:cursor-wait disabled:opacity-70">
+                  className="game-input min-h-14 min-w-0 flex-1 placeholder:text-muted/70 aria-invalid:border-red-800" />
+                <Button type="submit" disabled={state === 'pending'} className="game-primary flex min-h-14 items-center justify-center gap-5">
                   {t(state === 'pending' ? 'pending' : 'submit')}<Arrow />
                 </Button>
               </div>
