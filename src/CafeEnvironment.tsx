@@ -1,6 +1,6 @@
 import { createContext, memo, useContext, useEffect, useMemo } from 'react';
 import { CubeCamera, ContactShadows, RoundedBox } from '@react-three/drei';
-import { CanvasTexture, RepeatWrapping, SRGBColorSpace, Shape, ExtrudeGeometry, BoxGeometry, MeshStandardMaterial, Vector2, type Texture } from 'three';
+import { CanvasTexture, RepeatWrapping, SRGBColorSpace, Shape, ExtrudeGeometry, BoxGeometry, MeshStandardMaterial, Vector2, Vector3, CubicBezierCurve3, type Texture } from 'three';
 
 type Point = [number, number, number];
 const CafeResources = createContext<{ box: BoxGeometry; materials: Map<string, MeshStandardMaterial> } | null>(null);
@@ -77,6 +77,10 @@ function Cup({ at }: { at: Point }) {
     [.065, .103], [.064, .108], [.060, .110], [.056, .107], [.055, .101],
     [.051, .078], [.043, .035], [.035, .023], [0, .023],
   ].map(([radius, height]) => new Vector2(radius, height)), []);
+  const handle = useMemo(() => new CubicBezierCurve3(
+    new Vector3(.059, .091, 0), new Vector3(.123, .112, 0),
+    new Vector3(.123, .026, 0), new Vector3(.047, .036, 0),
+  ), []);
   return <group position={at}>
     <mesh receiveShadow><cylinderGeometry args={[.105, .09, .013, 48]} /><meshPhysicalMaterial color="#e8dfca" roughness={.24} clearcoat={.6} /></mesh>
     <mesh castShadow receiveShadow><latheGeometry args={[profile, 64]} /><meshPhysicalMaterial color="#eee5d3" roughness={.2} clearcoat={.8} clearcoatRoughness={.16} /></mesh>
@@ -86,7 +90,7 @@ function Cup({ at }: { at: Point }) {
         <meshPhysicalMaterial color="#29130a" roughness={.075} metalness={0} ior={1.333} envMap={texture} envMapIntensity={1.4} clearcoat={1} clearcoatRoughness={.04} />
       </mesh>}
     </CubeCamera>
-    <mesh position={[.066, .061, 0]} castShadow><torusGeometry args={[.029, .010, 12, 40]} /><meshPhysicalMaterial color="#eee5d3" roughness={.2} clearcoat={.8} /></mesh>
+    <mesh castShadow receiveShadow><tubeGeometry args={[handle, 48, .009, 12, false]} /><meshPhysicalMaterial color="#eee5d3" roughness={.2} clearcoat={.8} /></mesh>
     <Block at={[.065, .0105, .04]} size={[.013, .008, .15]} colour={brass} metal />
   </group>;
 }
