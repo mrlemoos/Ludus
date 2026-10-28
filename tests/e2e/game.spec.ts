@@ -110,7 +110,7 @@ test('server rejects illegal/stale actions and foreign sessions; finalises check
   await stranger.dispose();
 });
 test('3D board renders, switches to keyboard board, stays within mobile viewport and translates', async ({ page }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(150_000);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await signIn(page); await finishActive(page);
@@ -121,6 +121,15 @@ test('3D board renders, switches to keyboard board, stays within mobile viewport
   await page.getByRole('button', { name: '3D board', exact: true }).click();
   await expect(page.locator('canvas')).toBeVisible();
   await page.waitForTimeout(1500);
+  async function expectLargeScene() {
+    const viewport = page.viewportSize()!;
+    const scene = (await page.locator('canvas').boundingBox())!;
+    expect(scene.width * scene.height).toBeGreaterThan(viewport.width * viewport.height * .5);
+    expect(scene.y).toBeGreaterThanOrEqual(0);
+    expect(scene.y + scene.height).toBeLessThanOrEqual(viewport.height);
+    await expect(page.locator('.board-tools')).toBeInViewport();
+  }
+  await expectLargeScene();
   await page.screenshot({ path: 'test-results/game-3d.png', fullPage: true });
   await page.getByRole('button', { name: 'Look around', exact: true }).click();
   await expect(page.locator('.three-board')).toHaveAttribute('data-view', 'room');
@@ -145,7 +154,11 @@ test('3D board renders, switches to keyboard board, stays within mobile viewport
   await expect(page.locator('canvas')).toBeVisible();
   await page.waitForTimeout(500);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await expectLargeScene();
   await page.screenshot({ path: 'test-results/game-3d-mobile.png', fullPage: true });
+  const mobileScene = (await page.locator('canvas').boundingBox())!;
+  await page.locator('canvas').click({ position: { x: mobileScene.width * .535, y: mobileScene.height * .434 } });
+  await expect(page.locator('[data-square="e7"]')).toHaveAttribute('aria-pressed', 'true');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.getByRole('button', { name: 'Look around', exact: true }).click();
   await page.getByRole('button', { name: 'Reset camera' }).click();
@@ -176,6 +189,33 @@ test('3D board renders, switches to keyboard board, stays within mobile viewport
   await page.getByRole('button', { name: 'Abandonner', exact: true }).click();
   await page.getByRole('button', { name: 'Abandonner', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Lucía a gagné · Abandon' })).toBeVisible();
+});
+test('2D board and graphics fallback keep every square clear of player overlays', async ({ page }) => {
+  await signIn(page); await finishActive(page);
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await page.route('**/engine/stockfish*', (route) => route.abort());
+  await page.getByRole('button', { name: 'Start game' }).click();
+  async function expectClearBoard() {
+    const board = (await page.locator('.play-board').boundingBox())!;
+    const frame = (await page.locator('.board-frame').boundingBox())!;
+    const players = (await page.locator('.match-players').boundingBox())!;
+    expect(players.y + players.height).toBeLessThanOrEqual(board.y + 1);
+    expect(board.y + board.height).toBeLessThanOrEqual(frame.y + frame.height + 1);
+    await expect(page.locator('[data-square="a8"]')).toBeInViewport();
+    await expect(page.locator('[data-square="h1"]')).toBeInViewport();
+  }
+  await expect(page.locator('[data-square="e2"]')).toBeVisible();
+  await expectClearBoard();
+  await page.evaluate(() => {
+    const original = HTMLCanvasElement.prototype.getContext;
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', { value: function (this: HTMLCanvasElement, kind: string, options?: unknown) {
+      return kind.startsWith('webgl') ? null : original.call(this, kind, options);
+    } });
+  });
+  await page.getByRole('button', { name: '3D board', exact: true }).click();
+  await expect(page.getByText('3D is unavailable on this device. Use the 2D board.')).toBeVisible();
+  await expectClearBoard();
+  await page.screenshot({ path: 'test-results/game-graphics-fallback.png', fullPage: true });
 });
 test('tabletop clock and captured pieces render from both seats and follow replay', async ({ page, baseURL }) => {
   test.setTimeout(90_000);

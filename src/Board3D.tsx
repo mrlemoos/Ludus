@@ -70,9 +70,12 @@ function Camera({ flipped, looking, resetKey }: { flipped: boolean; looking: boo
   const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
   const motion = useRef<{ position: Vector3; target: Vector3; elapsed: number; finish: () => void } | null>(null);
   const initial = useRef(true);
+  const previousSize = useRef(size);
   useEffect(() => {
     const orbit = controls.current;
-    if (!orbit || !(camera instanceof PerspectiveCamera)) return;
+    if (!orbit || !(camera instanceof PerspectiveCamera) || !size.width || !size.height) return;
+    const resized = previousSize.current.width !== size.width || previousSize.current.height !== size.height;
+    previousSize.current = size;
     const side = flipped ? -1 : 1;
     camera.fov = looking ? 86 : 36; camera.updateProjectionMatrix();
     // Fit a 13-unit envelope, including the clock and captured pieces, on either viewport axis.
@@ -89,7 +92,7 @@ function Camera({ flipped, looking, resetKey }: { flipped: boolean; looking: boo
       camera.position.copy(position); orbit.target.copy(target);
       Object.assign(orbit, limits); orbit.update(); motion.current = null;
     };
-    if (initial.current || window.matchMedia('(prefers-reduced-motion: reduce)').matches) finish();
+    if (initial.current || resized || window.matchMedia('(prefers-reduced-motion: reduce)').matches) finish();
     else {
       // Destination constraints would clamp intermediate frames into a jump.
       Object.assign(orbit, { minDistance: 0, maxDistance: Infinity, minPolarAngle: 0, maxPolarAngle: Math.PI, minAzimuthAngle: -Infinity, maxAzimuthAngle: Infinity });

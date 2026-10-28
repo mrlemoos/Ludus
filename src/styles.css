@@ -142,4 +142,41 @@
   .accessible-board:focus-within { @apply not-sr-only absolute inset-0 z-10; }
   .promotion-overlay { @apply fixed inset-0 z-50 grid place-items-center bg-ink/50 p-5; }
   .promotion-panel { @apply w-full max-w-90 rounded-2xl bg-paper p-7 shadow-2xl; }
+  .match-shell { max-width: none; padding-inline: 12px; }
+  .match-shell .site-header { min-height: 52px; height: 52px; }
+  .match-shell .wordmark { font-size: 2rem; }
+  .match-shell .game-main { display: flex; flex-direction: column; gap: 8px; height: calc(100dvh - 52px); padding-block: 8px; }
+  .match-layout { display: grid; grid-template-rows: auto minmax(280px, 1fr); flex: 1; min-height: 0; gap: 8px; }
+  .match-shell .match-heading { align-items: center; min-height: 44px; margin: 0; gap: 4px 12px; }
+  .match-title { margin-top: 0; font-size: 1.5rem; line-height: 1.1; }
+  .match-shell .match-badge { padding: 6px 10px; font-size: 10px; }
+  .match-shell .match-grid { display: block; min-height: 0; }
+  .match-stage { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 6px; height: 100%; min-width: 0; }
+  .match-players { display: flex; justify-content: space-between; gap: 16px; }
+  .match-stage:has(.three-board):not(:has(.accessible-board:focus-within)) { grid-template-rows: minmax(0, 1fr) auto; }
+  .match-stage:has(.three-board):not(:has(.accessible-board:focus-within)) .match-players { position: absolute; inset: 10px 10px auto; z-index: 1; pointer-events: none; }
+  .match-players .player-bar { max-width: calc(50% - 8px); min-width: 0; min-height: 40px; gap: 12px; padding: 4px 8px; border: 1px solid #203b321a; border-radius: 12px; background: #f2f5f1eb; backdrop-filter: blur(12px); }
+  .match-players .player-bar > div { min-width: 0; gap: 8px; font-size: 12px; }
+  .match-players .player-bar > div > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .match-players .player-avatar { width: 32px; height: 32px; flex-shrink: 0; border-radius: 10px; font-size: 20px; }
+  .match-players .player-bar small { margin-top: 0; }
+  .match-players .clock { min-width: 4.5rem; padding: 4px 8px; border-radius: 8px; font-size: 20px; }
+  .match-stage .board-frame { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); place-items: center; min-width: 0; min-height: 0; border-width: 0; container-type: size; }
+  .board-fallback { background: var(--color-paper); min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); width: 100%; height: 100%; }
+  .board-fallback > div { min-width: 0; min-height: 0; display: grid; place-items: center; width: 100%; height: 100%; container-type: size; }
+  .match-stage .three-board { min-width: 0; min-height: 0; width: 100%; height: 100%; aspect-ratio: auto; }
+  .match-stage .play-board { width: min(100cqw, 100cqh); }
+  .match-stage .accessible-board:focus-within { display: grid; place-items: center; }
+  .match-stage .board-tools { width: 100%; margin: 0; padding: 3px; border-radius: 12px; box-shadow: none; }
+  .match-stage .board-tools .game-secondary { padding: 8px 10px; font-size: 11px; }
+  .match-shell .match-sidebar { margin-top: 16px; padding: 16px; border-radius: 16px; }
+  @media (width < 640px) {
+    .match-shell { padding-inline: 8px; }
+    .match-players .player-avatar { display: none; }
+  }
+  @media (width >= 1024px) {
+    .match-shell .match-grid { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 12px; align-items: stretch; }
+    .match-shell .match-sidebar { min-height: 0; height: 100%; overflow-y: auto; margin-top: 0; }
+  }
+
 }

@@ -151,6 +151,8 @@ The floor sits 15.4 scene units below the board so the 0.75 m tabletop meets the
 
 A wooden, two-sided digital chess clock sits beyond the board, showing the same remaining times as the match controls. Captured pieces stand in two columns beside the capturer's side of the board. Their identities come from move history, including en passant and captured promotions; replay shows only captures made by the selected move. Play framing includes the clock and room for all 15 opposing pieces per side.
 
+The match scene uses the remaining viewport beneath a compact header. Player clocks sit in its upper corners; desktop match details use a narrow side panel, moving below the scene on small screens. Board controls stay beneath the scene. The 2D board, keyboard overlay and graphics fallback reserve space for clocks and notices so no square is covered. Viewport resizing refits the camera immediately.
+
 The mirror captures this room once per quality setting. Floor contact shadows are also captured once; the playing station retains live piece shadows. Indirect illumination currently uses ambient and hemisphere fill. A production architectural light bake remains outstanding, as does acceptance of the procedural material and carving detail against the intended realistic finish.
 
 Browser coverage includes both seats, 360 px portrait layout, room clicks submitting no moves, return to the keyboard board, reset, reduced motion and all three control languages. Desktop Chromium screenshots support visual review only. Named iPhone and Android measurements, touch checks and the 30 FPS acceptance remain outstanding. Automatic quality reduction and the manual 2D fallback remain available.

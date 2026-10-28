@@ -13,7 +13,7 @@ function Arrow() {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6" stroke="currentColor" strokeWidth="1.5" /></svg>;
 }
 
-export function Header() {
+export function Header({ compact = false }: { compact?: boolean }) {
   const { t, i18n } = useTranslation();
   useEffect(() => {
     document.documentElement.lang = i18n.language;
@@ -24,8 +24,8 @@ export function Header() {
   return <header className="site-header">
     <Link to="/" className="wordmark" aria-label="Ludus">ludus<span aria-hidden="true">.</span></Link>
     <div className="flex items-center gap-4 sm:gap-7">
-      <Link to="/play" className="header-play" aria-label={gameCopy[isLanguage(i18n.language) ? i18n.language : 'en-GB'].play}><span className="hidden sm:inline">{gameCopy[isLanguage(i18n.language) ? i18n.language : 'en-GB'].play}</span><span aria-hidden="true" className="text-xl sm:hidden">♞</span></Link>
-      <span className="hidden text-xs tracking-wide text-muted sm:block">{t('location')}</span>
+      {!compact && <Link to="/play" className="header-play" aria-label={gameCopy[isLanguage(i18n.language) ? i18n.language : 'en-GB'].play}><span className="hidden sm:inline">{gameCopy[isLanguage(i18n.language) ? i18n.language : 'en-GB'].play}</span><span aria-hidden="true" className="text-xl sm:hidden">♞</span></Link>}
+      {!compact && <span className="hidden text-xs tracking-wide text-muted sm:block">{t('location')}</span>}
       <Select.Root value={i18n.language} items={languageNames} onValueChange={(value) => { if (isLanguage(value)) void i18n.changeLanguage(value); }}>
         <Select.Trigger aria-label={t('language')} className="language-trigger">
           <Select.Value /><Select.Icon aria-hidden="true">⌄</Select.Icon>
