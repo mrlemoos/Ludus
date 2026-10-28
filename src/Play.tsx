@@ -51,6 +51,7 @@ export function Play() {
   const [promotion, setPromotion] = useState<{ from: Square; to: Square } | null>(null);
   const [flipped, setFlipped] = useState(false);
   const [view, setView] = useState<'2d' | '3d'>(() => { try { return localStorage.getItem('ludus-board') === '2d' ? '2d' : '3d'; } catch { return '3d'; } });
+  const [looking, setLooking] = useState(false);
   const [resetKey, setResetKey] = useState(0);
   const [now, setNow] = useState(Date.now());
   const [engineError, setEngineError] = useState(false);
@@ -70,7 +71,7 @@ export function Play() {
   useEffect(() => {
     if (!gameId || !identity?.user) { setGame(null); return; }
     let cancelled = false;
-    setError(false); setReplay(null); setSelected(null);
+    setError(false); setReplay(null); setSelected(null); setLooking(false);
     void api<Snapshot>(`/api/games/${gameId}`).then((data) => { if (!cancelled) { accept(data); setFlipped(data.game.colour === 'b'); } }).catch(() => { if (!cancelled) setError(true); });
     return () => { cancelled = true; };
   }, [gameId, identity?.user?.id, accept]);
@@ -191,9 +192,9 @@ export function Play() {
       <div className="match-heading"><div><Link to="/play?tab=history" className="eyebrow text-muted">← {c.history}</Link><h1 className="font-display text-4xl mt-2">{c.opponent}</h1></div><span className="match-badge"><span aria-hidden="true">◷</span>{game.control} · {c.levels[game.difficulty - 1]}</span></div>
       <div className="match-grid"><section className="min-w-0">
         <div className="player-bar"><div><span className="player-avatar">L</span><span>{topIsYou ? c.you : 'Lucía'}<small>{topIsYou ? identity.user.name : c.computer}</small></span></div><span className={`clock ${boardChess.turn() === topColour && !game.result ? 'clock-active' : ''}`}>{clock(clocks[flipped ? 'w' : 'b'])}</span></div>
-        <div className="board-frame">{view === '3d' ? <GraphicsBoundary key={resetKey} fallback={<><p role="status" className="text-sm p-3">{c.unavailable3d}</p><Board {...boardProps} /></>}><Suspense fallback={<div className="aspect-square grid place-items-center">{c.loading}</div>}><Board3D {...boardProps} resetKey={resetKey} /></Suspense><Board {...boardProps} concealed /></GraphicsBoundary> : <Board {...boardProps} />}</div>
+        <div className="board-frame">{view === '3d' ? <GraphicsBoundary key={resetKey} fallback={<><p role="status" className="text-sm p-3">{c.unavailable3d}</p><Board {...boardProps} /></>}><Suspense fallback={<div className="aspect-square grid place-items-center">{c.loading}</div>}><Board3D {...boardProps} resetKey={resetKey} looking={looking} /></Suspense>{!looking && <Board {...boardProps} concealed />}</GraphicsBoundary> : <Board {...boardProps} />}</div>
         <div className="player-bar"><div><span className="player-avatar player-avatar-you">{topIsYou ? 'L' : identity.user.name[0]}</span><span>{topIsYou ? 'Lucía' : c.you}<small>{topIsYou ? c.computer : identity.user.name}</small></span></div><span className={`clock ${boardChess.turn() === (flipped ? 'b' : 'w') && !game.result ? 'clock-active' : ''}`}>{clock(clocks[flipped ? 'b' : 'w'])}</span></div>
-        <div className="board-tools" role="group" aria-label={c.board}><Button className="game-secondary" onClick={() => { const next = view === '3d' ? '2d' : '3d'; setView(next); try { localStorage.setItem('ludus-board', next); } catch { /* Preference is optional. */ } }}>{view === '3d' ? c.view2d : c.view3d}</Button><Button className="game-secondary" onClick={() => setFlipped(!flipped)}>{c.flip}</Button>{view === '3d' && <Button className="game-secondary" onClick={() => setResetKey(resetKey + 1)}>{c.reset}</Button>}</div>
+        <div className="board-tools" role="group" aria-label={c.board}><Button className="game-secondary" onClick={() => { const next = view === '3d' ? '2d' : '3d'; setView(next); setLooking(false); try { localStorage.setItem('ludus-board', next); } catch { /* Preference is optional. */ } }}>{view === '3d' ? c.view2d : c.view3d}</Button><Button className="game-secondary" onClick={() => setFlipped(!flipped)}>{c.flip}</Button>{view === '3d' && <><Button className="game-secondary" aria-pressed={looking} onClick={() => { setSelected(null); setLooking(!looking); }}>{looking ? c.returnToBoard : c.lookAround}</Button><Button className="game-secondary" onClick={() => setResetKey(resetKey + 1)}>{c.reset}</Button></>}</div>
       </section><aside className="match-sidebar">
         <p className="eyebrow text-muted mb-3">{c.casual}</p><div role="status" className="match-status"><h2 className="font-display text-3xl">{status}</h2>{!game.result && boardChess.isCheck() && <p className="text-sm mt-2">{c.check}</p>}</div>
         {!connected && !game.result && <p className="game-notice text-xs">{c.reconnecting}</p>}{pause > 0 && !game.result && <p role="status" className="game-notice text-xs">{c.paused} · {pause} {c.allowance}</p>}

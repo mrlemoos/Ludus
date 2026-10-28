@@ -2,7 +2,7 @@
 
 Environment art direction, 28 October 2026.
 
-The user has confirmed a Madrid café with Baroque architecture. This replaces the earlier neoclassical direction. The room, layout and treatment below are the proposed production design. They have not yet been built in the game.
+The user has confirmed a Madrid café with Baroque architecture. This replaces the earlier neoclassical direction. The room, layout and treatment below define the production design. A procedural implementation now runs in the game; the acceptance notes below distinguish implementation from remaining validation.
 
 ![Concept of the window-side chess table, carved doorway, bar and Madrid street](art/cafe-concept.png)
 
@@ -143,4 +143,12 @@ Accept the environment only when these checks pass:
 - Reduced motion, keyboard navigation, 2D switching and reset still work.
 - Performance claims name the hardware and measured result. A desktop browser emulating a phone is not mobile GPU evidence.
 
-The current procedural backdrop in `src/Board3D.tsx` is a placeholder. This document defines its replacement; it does not describe completed runtime work.
+## Implementation and remaining acceptance
+
+The room now lives in `src/CafeEnvironment.tsx`, with camera framing and board interaction in `src/Board3D.tsx`. Geometry and generated textures are original project code; no reference photographs or concept pixels are used as game assets. Repeated boxes share geometry and materials. The room stays fixed when the seat changes.
+
+The floor sits 15.4 scene units below the board so the 0.75 m tabletop meets the existing frame underside exactly. Play uses a viewport-fitted 36-degree lens; look-around uses a wider 86-degree lens to include the window, doorway and mirror. Look-around blocks pointer and keyboard square selection, preserves running clocks and provides translated return controls. Reset restores the current view. Reduced motion switches immediately; other view changes take 350 ms and accept interruption.
+
+The mirror captures this room once per quality setting. Floor contact shadows are also captured once; the playing station retains live piece shadows. Indirect illumination currently uses ambient and hemisphere fill. A production architectural light bake remains outstanding, as does acceptance of the procedural material and carving detail against the intended realistic finish.
+
+Browser coverage includes both seats, 360 px portrait layout, room clicks submitting no moves, return to the keyboard board, reset, reduced motion and all three control languages. Desktop Chromium screenshots support visual review only. Named iPhone and Android measurements, touch checks and the 30 FPS acceptance remain outstanding. Automatic quality reduction and the manual 2D fallback remain available.
