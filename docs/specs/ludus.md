@@ -6,7 +6,7 @@ Adult chess players want online competition and practice against a computer in a
 
 ## Solution
 
-Build a responsive chess website set at a table in a neoclassical café inspired by central Madrid. Players use realistic wooden pieces, play human or computer opponents, and request an interactive review and written summary after the match. A conversational coach explains engine analysis at the player's selected teaching level. Coaching is unavailable during play.
+Build a responsive chess website set at a table in a café with Baroque architecture inspired by central Madrid. Players use realistic wooden pieces, play human or computer opponents, and request an interactive review and written summary after the match. A conversational coach explains engine analysis at the player's selected teaching level. Coaching is unavailable during play.
 
 Launch through a waitlist and manually invited beta. Keep play free; sell expanded coaching and cosmetics through Plus.
 
@@ -64,7 +64,7 @@ Launch through a waitlist and manually invited beta. Keep play free; sell expand
 - Responsive web supports desktop and mobile. No native app at launch.
 - Require accounts for all play. Launch authentication uses email magic links only. Beta access is invite-only and limited to adults aged 18 and over.
 - Waitlist collects email and preferred language. Operator admits members in manual batches. Skill level is requested during onboarding.
-- Traditional realistic wooden pieces sit in a fixed neoclassical café scene inspired by central Madrid, with quiet studio lighting. The environment is not explorable.
+- Realistic Baroque wooden pieces sit in a fixed café scene with Baroque architecture inspired by central Madrid. The environment is not explorable. See `docs/cafe-environment.md` for the proposed room, materials, lighting and framing.
 - Default to 3D, with constrained rotation, zoom, reset and a stable default angle. Offer optional 2D presentation using the same matches, controls and reviews.
 - Support friend invites and public matchmaking. Friend matches are casual only. Public matches may be casual or rated.
 - Offer 5+3 and 10+5 time controls, with separate ratings. Only rated human games affect rank.

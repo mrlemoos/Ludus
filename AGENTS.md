@@ -59,7 +59,7 @@ A browser chess platform with a 3D board and chess pieces.
 
 - Offer four selectable computer difficulty levels. Suggest a level from onboarding and match history; the player chooses. Avoid Elo labels until calibrated.
 
-- Art direction: realistic wooden chess pieces in a beautiful neoclassical café inspired by central Madrid, with quiet studio lighting.
+- Art direction: realistic Baroque wooden chess pieces in a café with Baroque architecture inspired by central Madrid. See `docs/cafe-environment.md` for the proposed room, materials, lighting and framing.
 
 - Café is a fixed scene around the board, viewed through the constrained board camera, rather than an explorable environment.
 
