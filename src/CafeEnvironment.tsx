@@ -1,6 +1,6 @@
 import { createContext, memo, useContext, useEffect, useMemo } from 'react';
 import { CubeCamera, ContactShadows, RoundedBox } from '@react-three/drei';
-import { CanvasTexture, RepeatWrapping, SRGBColorSpace, Shape, ExtrudeGeometry, BoxGeometry, MeshStandardMaterial, type Texture } from 'three';
+import { CanvasTexture, RepeatWrapping, SRGBColorSpace, Shape, ExtrudeGeometry, BoxGeometry, MeshStandardMaterial, Vector2, type Texture } from 'three';
 
 type Point = [number, number, number];
 const CafeResources = createContext<{ box: BoxGeometry; materials: Map<string, MeshStandardMaterial> } | null>(null);
@@ -19,7 +19,7 @@ function Ring({ at, radius, tube, colour, arc = Math.PI * 2, rotation = [0, 0, 0
 }
 const walnut = '#493024', plaster = '#d8c9ad', carving = '#e5d8bd', brass = '#987447';
 
-function surface(kind: 'wood' | 'stone' | 'plaster' | 'floor' | 'ceiling') {
+function surface(kind: 'wood' | 'stone' | 'plaster' | 'floor' | 'ceiling' | 'paper') {
   const canvas = document.createElement('canvas'); canvas.width = canvas.height = 256;
   const c = canvas.getContext('2d')!;
   let seed = 17;
@@ -31,6 +31,18 @@ function surface(kind: 'wood' | 'stone' | 'plaster' | 'floor' | 'ceiling') {
     if (kind === 'wood') {
       c.beginPath(); c.moveTo(x, y); c.bezierCurveTo(x + 3, y + 12, x - 5, y + 28, x + random() * 6, y + 100); c.stroke();
     } else { c.fillStyle = `rgba(70,48,30,${random() * .05})`; c.fillRect(x, y, 1, 1); }
+  }
+  if (kind === 'paper') {
+    c.fillStyle = '#f4efe4'; c.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 3500; i++) {
+      c.strokeStyle = `rgba(125,112,91,${.025 + random() * .06})`;
+      const x = random() * 256, y = random() * 256;
+      c.beginPath(); c.moveTo(x, y); c.lineTo(x + random() * 5, y + random() * 2); c.stroke();
+    }
+    c.strokeStyle = '#b9ab9120';
+    for (let y = 8; y < 256; y += 16) for (let x = 8; x < 256; x += 16) {
+      c.beginPath(); c.arc(x, y, 2, 0, Math.PI * 2); c.stroke();
+    }
   }
   if (kind === 'stone') for (let i = 0; i < 8; i++) {
     c.strokeStyle = '#887c6a30'; c.beginPath(); c.moveTo(random() * 256, 0); c.bezierCurveTo(80, 90, 210, 130, random() * 256, 256); c.stroke();
@@ -60,11 +72,21 @@ function Chair({ at, angle = 0, wood }: { at: Point; angle?: number; wood: Textu
   </group>;
 }
 function Cup({ at }: { at: Point }) {
+  const profile = useMemo(() => [
+    [0, .009], [.037, .009], [.046, .015], [.052, .035], [.061, .077],
+    [.065, .103], [.064, .108], [.060, .110], [.056, .107], [.055, .101],
+    [.051, .078], [.043, .035], [.035, .023], [0, .023],
+  ].map(([radius, height]) => new Vector2(radius, height)), []);
   return <group position={at}>
-    <mesh receiveShadow><cylinderGeometry args={[.105, .09, .013, 24]} /><meshStandardMaterial color="#e8dfca" roughness={.3} /></mesh>
-    <mesh position={[0, .055, 0]} castShadow><cylinderGeometry args={[.063, .043, .1, 24, 1, true]} /><meshStandardMaterial color="#eee5d3" roughness={.25} side={2} /></mesh>
-    <mesh position={[0, .096, 0]}><cylinderGeometry args={[.058, .058, .004, 24]} /><meshStandardMaterial color="#a77c4a" roughness={.55} /></mesh>
-    <Ring at={[.066, .06, 0]} radius={.028} tube={.008} colour="#eee5d3" />
+    <mesh receiveShadow><cylinderGeometry args={[.105, .09, .013, 48]} /><meshPhysicalMaterial color="#e8dfca" roughness={.24} clearcoat={.6} /></mesh>
+    <mesh castShadow receiveShadow><latheGeometry args={[profile, 64]} /><meshPhysicalMaterial color="#eee5d3" roughness={.2} clearcoat={.8} clearcoatRoughness={.16} /></mesh>
+    <CubeCamera position={[0, .094, 0]} frames={1} resolution={64} near={.02} far={600}>
+      {(texture) => <mesh rotation-x={-Math.PI / 2}>
+        <circleGeometry args={[.0535, 64]} />
+        <meshPhysicalMaterial color="#29130a" roughness={.075} metalness={0} ior={1.333} envMap={texture} envMapIntensity={1.4} clearcoat={1} clearcoatRoughness={.04} />
+      </mesh>}
+    </CubeCamera>
+    <mesh position={[.066, .061, 0]} castShadow><torusGeometry args={[.029, .010, 12, 40]} /><meshPhysicalMaterial color="#eee5d3" roughness={.2} clearcoat={.8} /></mesh>
     <Block at={[.065, .0105, .04]} size={[.013, .008, .15]} colour={brass} metal />
   </group>;
 }
@@ -100,7 +122,7 @@ function Doorway({ front = false }: { front?: boolean }) {
 export const CafeEnvironment = memo(function CafeEnvironment({ lowQuality }: { lowQuality: boolean }) {
   const resources = useMemo(() => ({ box: new BoxGeometry(1, 1, 1), materials: new Map<string, MeshStandardMaterial>() }), []);
   useEffect(() => () => { resources.box.dispose(); resources.materials.forEach((material) => material.dispose()); }, [resources]);
-  const maps = useMemo(() => ({ wood: surface('wood'), stone: surface('stone'), plaster: surface('plaster'), floor: surface('floor'), ceiling: surface('ceiling') }), []);
+  const maps = useMemo(() => ({ wood: surface('wood'), stone: surface('stone'), plaster: surface('plaster'), floor: surface('floor'), ceiling: surface('ceiling'), paper: surface('paper') }), []);
   useEffect(() => () => Object.values(maps).forEach((map) => map.dispose()), [maps]);
   return <CafeResources.Provider value={resources}><group position={[0, -15.4, 0]} scale={20}>
     <mesh position={[1.65, -.04, -1.5]} rotation-x={-Math.PI / 2} receiveShadow><planeGeometry args={[6.3, 10.3]} /><meshStandardMaterial map={maps.floor} roughness={.85} /></mesh>
@@ -153,7 +175,9 @@ export const CafeEnvironment = memo(function CafeEnvironment({ lowQuality }: { l
     {[-.46, .46].flatMap((x) => [-.34, .34].map((z) => <Block key={`${x}-${z}`} at={[x, .32, z]} size={[.065, .64, .065]} colour={walnut} map={maps.wood} />))}
     <ContactShadows position={[1.65, .008, -1.5]} frames={1} opacity={.35} scale={10} blur={2} far={1.3} resolution={lowQuality ? 128 : 256} />
     <Chair at={[0, 0, -.94]} angle={-.14} wood={maps.wood} /><Chair at={[0, 0, 1]} angle={Math.PI} wood={maps.wood} />
-    <Cup at={[.43, .7565, .19]} /><Block at={[.43, .754, -.04]} size={[.09, .002, .17]} colour="#ded5bc" />
+    <Cup at={[.43, .7565, .19]} /><RoundedBox position={[.43, .752, -.04]} args={[.09, .003, .17]} radius={.0012} smoothness={2} receiveShadow castShadow>
+      <meshStandardMaterial color="#f4efe4" map={maps.paper} bumpMap={maps.paper} bumpScale={.0005} roughness={1} />
+    </RoundedBox>
     {[-3.7, 1.65].map((z) => <group key={z} position={[2.8, 0, z]}>
       <Block at={[0, .73, 0]} size={[.85, .05, .8]} colour="#c8bba3" map={maps.stone} />
       <Block at={[0, .36, 0]} size={[.1, .72, .1]} colour={walnut} /><Block at={[0, .05, 0]} size={[.6, .06, .5]} colour={walnut} />
