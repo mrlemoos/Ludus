@@ -177,6 +177,38 @@ test('3D board renders, switches to keyboard board, stays within mobile viewport
   await page.getByRole('button', { name: 'Abandonner', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Lucía a gagné · Abandon' })).toBeVisible();
 });
+test('tabletop clock and captured pieces render from both seats and follow replay', async ({ page, baseURL }) => {
+  test.setTimeout(90_000);
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await signIn(page); await finishActive(page);
+  await page.route('**/engine/stockfish*', (route) => route.abort());
+  await page.getByRole('button', { name: 'Start game' }).click();
+  await expect(page.getByRole('button', { name: 'Resign', exact: true })).toBeEnabled();
+  const id = new URL(page.url()).searchParams.get('game');
+  for (const [revision, uci] of ['e2e4', 'd7d5', 'e4d5', 'd8d5'].entries()) {
+    expect((await page.request.post(`/api/games/${id}`, { headers: { Origin: baseURL! }, data: { type: 'move', from: uci.slice(0, 2), to: uci.slice(2), revision } })).ok()).toBe(true);
+  }
+  await expect(page.locator('[data-square="d5"]')).toHaveAccessibleName(/Black Queen/);
+  await page.getByRole('button', { name: '3D board', exact: true }).click();
+  await expect(page.locator('canvas')).toBeVisible();
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: 'test-results/tabletop-white.png', fullPage: true });
+  await page.getByRole('button', { name: 'Flip board', exact: true }).click();
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: 'test-results/tabletop-black.png', fullPage: true });
+  await page.getByRole('button', { name: 'Resign', exact: true }).click();
+  await page.getByRole('button', { name: 'Resign', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Lucía won · Resignation' })).toBeVisible();
+  await page.getByRole('button', { name: 'Beginning', exact: true }).click();
+  await expect(page.locator('[data-square="e2"]')).toHaveAccessibleName(/White Pawn/);
+  await page.screenshot({ path: 'test-results/tabletop-replay-start.png', fullPage: true });
+  await page.getByRole('button', { name: 'Final position', exact: true }).click();
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: 'test-results/tabletop-mobile.png', fullPage: true });
+  expect(errors).toEqual([]);
+});
 test('promotion uses a keyboard-accessible choice and persists an underpromotion', async ({ page, baseURL }) => {
   await signIn(page); await finishActive(page);
   await page.route('**/engine/stockfish*', (route) => route.abort());

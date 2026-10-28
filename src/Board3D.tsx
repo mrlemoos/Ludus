@@ -7,6 +7,10 @@ import { animated, useSpring } from '@react-spring/three';
 import type { BoardProps } from './Board';
 import { createPieceGeometries } from './piece-geometry';
 import { CafeEnvironment } from './CafeEnvironment';
+import { TableClock, type TableClockProps } from './TableClock';
+import type { CapturedPiece } from './captured-pieces';
+
+type TableProps = { captured: CapturedPiece[]; tableClock: TableClockProps };
 
 function Piece({ type, colour, selected, wood, geometry }: { type: PieceSymbol; colour: 'w' | 'b'; selected: boolean; wood: Texture; geometry: BufferGeometry }) {
   const { lift } = useSpring({ lift: selected ? .2 : .02, immediate: window.matchMedia('(prefers-reduced-motion: reduce)').matches });
@@ -19,7 +23,7 @@ function Piece({ type, colour, selected, wood, geometry }: { type: PieceSymbol; 
     </mesh>)}
   </animated.group>;
 }
-function Scene({ fen, selected, destinations, lastMove, onSquare, looking, lowQuality }: BoardProps & { looking: boolean; lowQuality: boolean }) {
+function Scene({ fen, selected, destinations, lastMove, onSquare, looking, lowQuality, captured, tableClock }: BoardProps & TableProps & { looking: boolean; lowQuality: boolean }) {
   const board = useMemo(() => new Chess(fen).board(), [fen]);
   const geometries = useMemo(createPieceGeometries, []);
   useEffect(() => () => Object.values(geometries).forEach((geometry) => geometry.dispose()), [geometries]);
@@ -50,6 +54,13 @@ function Scene({ fen, selected, destinations, lastMove, onSquare, looking, lowQu
         {destinations.includes(square) && <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .035, 0]}><ringGeometry args={[piece ? .36 : .08, piece ? .42 : .14, 32]} /><meshBasicMaterial color="#38412c" transparent opacity={.7} /></mesh>}
       </group>;
     }))}
+    <TableClock {...tableClock} />
+    {(['b', 'w'] as const).flatMap((colour) => captured.filter((piece) => piece.colour === colour).map((piece, i) => {
+      const side = colour === 'b' ? -1 : 1;
+      return <group key={`${colour}-${i}`} name={`captured-${colour}-${piece.type}`} onClick={(event) => event.stopPropagation()} position={[side * (5.2 + i % 2 * .85), -.42, -side * (3.1 - Math.floor(i / 2) * .85)]}>
+        <Piece geometry={geometries[piece.type]} wood={wood} type={piece.type} colour={colour} selected={false} />
+      </group>;
+    }))}
     <CafeEnvironment lowQuality={lowQuality} />
     <ContactShadows position={[0, -.399, 0]} opacity={.45} scale={[23, 18]} blur={2.2} far={4} resolution={256} />
   </group>;
@@ -64,8 +75,8 @@ function Camera({ flipped, looking, resetKey }: { flipped: boolean; looking: boo
     if (!orbit || !(camera instanceof PerspectiveCamera)) return;
     const side = flipped ? -1 : 1;
     camera.fov = looking ? 86 : 36; camera.updateProjectionMatrix();
-    // Fit an 11-unit envelope, including pieces and a strip of table, on either viewport axis.
-    const distance = 5.5 / Math.tan(Math.PI / 10) / Math.min(1, size.width / size.height) + 3;
+    // Fit a 13-unit envelope, including the clock and captured pieces, on either viewport axis.
+    const distance = 6.5 / Math.tan(Math.PI / 10) / Math.min(1, size.width / size.height) + 3;
     const position = looking ? new Vector3(0, 8.6, side * 22) : new Vector3(0, Math.sin(.77) * distance, side * Math.cos(.77) * distance);
     const target = looking ? new Vector3(flipped ? 10 : 35, 10, side * -52) : new Vector3(0, 0, 0);
     const azimuth = looking ? Math.atan2(position.x - target.x, position.z - target.z) : flipped ? Math.PI : 0;
@@ -97,7 +108,7 @@ function Camera({ flipped, looking, resetKey }: { flipped: boolean; looking: boo
   }, -2);
   return <OrbitControls ref={controls} makeDefault enablePan={false} enableDamping={false} enableZoom={!looking} onStart={() => motion.current?.finish()} />;
 }
-export default function Board3D(props: BoardProps & { resetKey: number; looking: boolean }) {
+export default function Board3D(props: BoardProps & TableProps & { resetKey: number; looking: boolean }) {
   const [lowQuality, setLowQuality] = useState(false);
   return <div className="three-board" aria-hidden="true" data-view={props.looking ? 'room' : 'board'}>
     <Canvas shadows={!lowQuality} dpr={lowQuality ? .75 : [1, 1.5]} camera={{ position: [0, 16, 17], fov: 36, far: 600 }} onCreated={({ gl }) => { gl.setClearColor('#c5baa2'); }}>
