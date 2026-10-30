@@ -2,9 +2,9 @@ import { execFileSync } from 'node:child_process';
 import { test, expect } from '@playwright/test';
 
 const cases = [
-  { language: 'en-GB', name: 'English', title: 'A seat at', button: 'Save my seat', success: 'Your seat is on the list.' },
-  { language: 'es-ES', name: 'Español', title: 'Un sitio en', button: 'Reservar mi sitio', success: 'Ya estás en la lista.' },
-  { language: 'fr-FR', name: 'Français', title: 'Une place à', button: 'Réserver ma place', success: 'Votre place est sur la liste.' },
+  { language: 'en-GB', name: 'English', title: 'Stay for', button: 'Save my seat', success: 'Your seat is on the list.' },
+  { language: 'es-ES', name: 'Español', title: 'Quédate para', button: 'Reservar mi sitio', success: 'Ya estás en la lista.' },
+  { language: 'fr-FR', name: 'Français', title: 'Encore', button: 'Réserver ma place', success: 'Votre place est sur la liste.' },
 ];
 
 for (const locale of cases) {
@@ -88,4 +88,22 @@ test('renders desktop without browser errors', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Play first. Understand after.' })).toBeVisible();
   await page.screenshot({ path: 'test-results/waitlist-desktop.png', fullPage: true });
   expect(errors).toEqual([]);
+});
+
+
+test('switches board previews with keyboard and keeps the preview separate from play', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  const three = page.getByRole('tab', { name: '3D', exact: true });
+  const two = page.getByRole('tab', { name: '2D', exact: true });
+  await expect(three).toHaveAttribute('aria-selected', 'true');
+  await three.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(two).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.home-flat-board')).toBeVisible();
+  await expect(page.locator('.home-flat-board')).toHaveAttribute('inert', '');
+  await page.keyboard.press('ArrowLeft');
+  await expect(three).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('button', { name: 'Reset camera' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Play chess' })).toHaveAttribute('href', '/play');
 });

@@ -6,8 +6,9 @@ import { Input } from '@base-ui/react/input';
 import { Link } from 'react-router';
 import { isLanguage, languages, parseWaitlist } from '../shared/waitlist';
 import { languageNames } from './i18n';
-import { ChessScene } from './ChessScene';
+import { HomePreview } from './HomePreview';
 import { gameCopy } from './game-copy';
+import './home.css';
 
 function Arrow() {
   return <svg className="action-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6" stroke="currentColor" strokeWidth="1.5" /></svg>;
@@ -72,18 +73,17 @@ export function App() {
     }
   }
 
-  return <div className="site-shell">
+  return <div className="home-page"><div className="site-shell home-container">
     <a className="skip-link" href="#main">{t('skip')}</a>
     <Header />
     <main id="main">
-      <section className="hero-grid">
-        <div className="hero-copy">
-          <p className="eyebrow flex items-center gap-3"><span className="size-1.5 rounded-full bg-olive" />{t('beta')}</p>
-          <h1 className="headline">{t('headline')}<br /><em>{t('headlineItalic')}</em></h1>
-          <p className="intro">{t('intro')}</p>
-          <p className="mt-4 max-w-108 text-sm leading-7 text-muted">{t('detail')}</p>
-          <div className="waitlist-block">
-            {state === 'success' ? <div role="status" className="rounded-2xl border border-olive/30 bg-olive/5 p-6">
+      <section className="home-hero">
+        <div className="home-copy">
+          <p className="home-eyebrow"><span />{t('beta')}</p>
+          <h1 className="home-headline">{t('headline')}<br /><em>{t('headlineItalic')}</em></h1>
+          <p className="home-intro">{t('detail')}</p>
+          <div className="waitlist-block" id="waitlist">
+            {state === 'success' ? <div role="status" className="home-success">
               <p className="font-display text-3xl">{t('successTitle')}</p>
               <p className="mt-3 text-sm leading-6 text-muted">{t('success')}</p>
             </div> : <form onSubmit={submit} aria-label={t('waitlist')} aria-busy={state === 'pending'} noValidate>
@@ -97,31 +97,25 @@ export function App() {
                   {t(state === 'pending' ? 'pending' : 'submit')}<Arrow />
                 </Button>
               </div>
-              {error && <p id="form-error" role="alert" className="mt-3 text-sm text-red-800">{t(error)}</p>}
+              {error && <p id="form-error" role="alert" className="home-error">{t(error)}</p>}
               <p id="invitation-language" className="mt-3 text-xs leading-5 text-muted">{t('preference', { language: languageNames[isLanguage(i18n.language) ? i18n.language : 'en-GB'] })}</p>
               <p id="email-use" className="mt-1 text-xs leading-5 text-muted">{t('privacy')}</p>
             </form>}
-            <p className="mt-4 text-xs leading-5 text-muted">{t('note')}</p>
+            <p className="home-trial">{t('trial')}</p>
           </div>
         </div>
-        <figure className="hero-figure">
-          <ChessScene />
-          <figcaption className="flex items-start justify-between gap-5 pt-5">
-            <div><p className="font-display text-2xl">{t('boardCaption')}</p><p className="mt-1 text-xs text-muted">{t('boardSub')}</p></div>
-            <span className="pt-1 text-lg text-olive" aria-hidden="true">↗</span>
-          </figcaption>
-        </figure>
+        <HomePreview />
       </section>
-      <section aria-label="Ludus" className="feature-grid">
-        {(['play', 'opponents', 'coach'] as const).map((feature) => <article key={feature}><span className="feature-number" aria-hidden="true">0{['play', 'opponents', 'coach'].indexOf(feature) + 1}</span>
-          <h2 className="font-display text-[1.8rem] leading-tight">{t(`${feature}Title`)}</h2>
-          <p className="mt-3 max-w-90 text-sm leading-7 text-muted">{t(feature)}</p>
-        </article>)}
+      <section className="home-details" aria-labelledby="details-heading">
+        <div className="home-details-heading"><p className="home-eyebrow">{t('included')}</p><h2 id="details-heading">{t('intro')}</h2><p>{t('play')}</p></div>
+        <div className="home-details-copy">
+          <article><span className="home-feature-symbol" aria-hidden="true">♞</span><div><h3>{t('opponentsTitle')}</h3><p>{t('opponents')}</p></div></article>
+          <article><span className="home-feature-symbol" aria-hidden="true">↳</span><div><h3>{t('coachTitle')}</h3><p>{t('coach')}</p></div></article>
+        </div>
       </section>
-      <p className="py-7 text-center text-xs leading-6 text-muted">{t('trial')}</p>
     </main>
-    <footer className="flex flex-col justify-between gap-2 pb-7 pt-3 text-[11px] text-muted sm:flex-row"><p>{t('footer')}</p><p>{t('soon')}</p></footer>
-  </div>;
+    <footer className="home-footer"><Link to="/" className="wordmark" aria-label="Ludus">ludus.</Link><p>{t('note')}</p><p>{t('soon')}</p></footer>
+  </div></div>;
 }
 
 export function NotFound() {
