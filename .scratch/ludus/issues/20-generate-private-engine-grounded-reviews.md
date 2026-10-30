@@ -13,3 +13,7 @@
 - [ ] Enforce free three-review monthly allowance and agreed accounting, ownership and finished-match access. Retries and concurrent requests must not double-charge.
 - [ ] Model outage shows unavailable state and manual retry without quota consumption. Matches, clocks, results, engine replay and saved reviews remain usable.
 - [ ] Test language/profile matrix, malicious analysis, live/private access, retries, outage behaviour and measured costs. Record model/engine usage without exposing private records.
+
+## Completion wave
+
+Implemented finished owned computer/human match loading, browser engine analysis, untrusted-analysis validation, legal suggested lines, preserved generation language/notices, private review storage, atomic quotas/retries/spending and manual outage retry. Local engine replay/analysis and saved text work without a model. SQLite/provider/browser tests pass; live model accuracy/cost gate is still closed.
