@@ -15,7 +15,9 @@ Before deploying game access, set Worker secrets `BETTER_AUTH_SECRET` and `RESEN
 
 This runs all checks, applies remote migrations, then deploys the Worker and static assets. Verify an actual waitlist submission on the deployed URL. Do not publish a placeholder database binding.
 
-GitHub Actions checks pushes to main and pull requests. Configure repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` to deploy main only after checks pass. Without both secrets, deployment is explicitly skipped. The token needs Worker deployment and D1 migration permissions. A local commit or successful build does not prove a deployment.
+GitHub Actions checks pull requests and every push to `main`. After checks pass, `main` applies remote D1 migrations and deploys the `ludus` Worker and static assets to `ludus.mrlemoos.dev`. Pull requests never deploy. Production runs are serialised so migrations and deployments cannot overlap; running production jobs are not cancelled by newer pushes.
+
+Configure repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Missing credentials fail the workflow. The token needs Worker deployment and D1 migration permissions. See [Cloudflare's GitHub Actions setup](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/). Runtime secrets remain in Cloudflare. A local commit or successful build does not prove a deployment.
 
 ## Waitlist data and limits
 
