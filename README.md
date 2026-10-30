@@ -2,6 +2,8 @@
 
 Playable computer chess in a Madrid-inspired café, with switchable 3D and accessible 2D boards. British English, European Spanish and European French. The public waitlist remains at `/`; the game is at `/play`.
 
+Production: [ludus.mrlemoos.dev](https://ludus.mrlemoos.dev), with invited game access at [/play](https://ludus.mrlemoos.dev/play). Wrangler manages the custom domain, DNS record and HTTPS certificate.
+
 ## Development
 
 Use Node 24 and the pnpm version pinned in the package manifest.

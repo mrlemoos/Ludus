@@ -1,6 +1,13 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ludus",
+  "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "ludus.mrlemoos.dev",
+      "custom_domain": true
+    }
+  ],
   "main": "worker/index.ts",
   "compatibility_date": "2026-10-26",
   "compatibility_flags": [
