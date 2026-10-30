@@ -3,7 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 async function signIn(page: Page) {
   await page.addInitScript(() => { localStorage.setItem('ludus-language', 'en-GB'); localStorage.setItem('ludus-board', '2d'); });
   await page.goto('/play');
-  await page.getByRole('button', { name: 'Sign in as Leo' }).click();
+  await page.getByRole('button', { name: 'Sign in as dev' }).click();
   await expect(page.getByRole('heading', { name: 'Take a seat.' })).toBeVisible();
 }
 async function finishActive(page: Page) {

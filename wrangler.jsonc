@@ -16,7 +16,7 @@
     {
       "binding": "DB",
       "database_name": "ludus",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "6d63a334-f31c-4266-aba9-12db26ad563e",
       "migrations_dir": "drizzle"
     }
   ],

@@ -12,7 +12,7 @@ pnpm seed
 pnpm dev
 ```
 
-Open `/play` and choose **Sign in as Leo**. `pnpm seed` creates a real local account and invitation for `leo.lemos.ds@icloud.com`, plus an ignored `.dev.vars` file with a random authentication secret and explicit local mode. It preserves an existing secret and account. Local sign-in requires both `LOCAL_DEV=true` and a loopback hostname; deployed hosts cannot use it. Do not put local mode in production configuration.
+Open `/play` and choose **Sign in as dev**. `pnpm seed` creates a real local account and invitation for `leo.lemos.ds@icloud.com`, plus an ignored `.dev.vars` file with a random authentication secret and explicit local mode. It preserves an existing secret and account. Local sign-in requires both `LOCAL_DEV=true` and a loopback hostname; deployed hosts cannot use it. Do not put local mode in production configuration.
 
 Local development uses real Worker code, local D1 and a SQLite-backed Durable Object per match. No Cloudflare login, email delivery or external AI service is needed locally. Stockfish lite single-threaded runs in a browser Web Worker. The build copies its JavaScript, WASM and licence from the pinned dependency into generated static assets; no runtime CDN is needed.
 

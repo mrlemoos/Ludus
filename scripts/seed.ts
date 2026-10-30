@@ -8,4 +8,4 @@ if (!/^BETTER_AUTH_SECRET=/m.test(configured)) writeFileSync('.dev.vars', `${con
 execFileSync('pnpm', ['db:migrate'], { stdio: 'inherit' });
 execFileSync('pnpm', ['exec', 'wrangler', 'd1', 'execute', 'ludus', '--local', '--command',
   "INSERT INTO invitations(email) VALUES ('leo.lemos.ds@icloud.com') ON CONFLICT DO NOTHING; INSERT INTO user(id,name,email,email_verified,created_at,updated_at) VALUES ('local-leo','Leo','leo.lemos.ds@icloud.com',0,unixepoch()*1000,unixepoch()*1000) ON CONFLICT(email) DO NOTHING;"], { stdio: 'inherit' });
-console.log('Leo seeded locally. Open /play and choose Sign in as Leo. Local sign-in is disabled on deployed hosts.');
+console.log('Leo seeded locally. Open /play and choose Sign in as dev. Local sign-in is disabled on deployed hosts.');
