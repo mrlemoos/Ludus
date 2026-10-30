@@ -10,7 +10,7 @@ import { ChessScene } from './ChessScene';
 import { gameCopy } from './game-copy';
 
 function Arrow() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6" stroke="currentColor" strokeWidth="1.5" /></svg>;
+  return <svg className="action-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6" stroke="currentColor" strokeWidth="1.5" /></svg>;
 }
 
 export function Header({ compact = false }: { compact?: boolean }) {
@@ -112,8 +112,8 @@ export function App() {
           </figcaption>
         </figure>
       </section>
-      <section aria-label="Ludus" className="grid gap-9 border-y border-ink/15 py-10 md:grid-cols-3 md:gap-10 md:py-12">
-        {(['play', 'opponents', 'coach'] as const).map((feature) => <article key={feature}>
+      <section aria-label="Ludus" className="feature-grid">
+        {(['play', 'opponents', 'coach'] as const).map((feature) => <article key={feature}><span className="feature-number" aria-hidden="true">0{['play', 'opponents', 'coach'].indexOf(feature) + 1}</span>
           <h2 className="font-display text-[1.8rem] leading-tight">{t(`${feature}Title`)}</h2>
           <p className="mt-3 max-w-90 text-sm leading-7 text-muted">{t(feature)}</p>
         </article>)}

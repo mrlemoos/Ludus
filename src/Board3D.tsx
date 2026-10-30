@@ -9,6 +9,7 @@ import { createPieceGeometries } from './piece-geometry';
 import { CafeEnvironment } from './CafeEnvironment';
 import { TableClock, type TableClockProps } from './TableClock';
 import type { CapturedPiece } from './captured-pieces';
+import { pieceMotion } from './piece-motion';
 
 type TableProps = { captured: CapturedPiece[]; tableClock: TableClockProps };
 
@@ -23,8 +24,15 @@ function Piece({ type, colour, selected, wood, geometry }: { type: PieceSymbol; 
     </mesh>)}
   </animated.group>;
 }
+function MovingPiece({ from = [0, 0, 0], children }: { from?: [number, number, number]; children: React.ReactNode }) {
+  const { x, z } = useSpring({ from: { x: from[0], z: from[2] }, to: { x: 0, z: 0 }, config: { duration: 800, easing: (t) => t * t * (3 - 2 * t) }, immediate: window.matchMedia('(prefers-reduced-motion: reduce)').matches });
+  return <animated.group position-x={x} position-z={z}>{children}</animated.group>;
+}
 function Scene({ fen, selected, destinations, lastMove, onSquare, looking, lowQuality, captured, tableClock }: BoardProps & TableProps & { looking: boolean; lowQuality: boolean }) {
   const board = useMemo(() => new Chess(fen).board(), [fen]);
+  const previousFen = useRef(fen);
+  const motion = useMemo(() => pieceMotion(previousFen.current, fen, lastMove), [fen, lastMove[0], lastMove[1]]);
+  useEffect(() => { previousFen.current = fen; }, [fen]);
   const geometries = useMemo(createPieceGeometries, []);
   useEffect(() => () => Object.values(geometries).forEach((geometry) => geometry.dispose()), [geometries]);
   const wood = useMemo(() => {
@@ -50,7 +58,9 @@ function Scene({ fen, selected, destinations, lastMove, onSquare, looking, lowQu
       const colour = selected === square ? '#a6aa63' : lastMove.includes(square) ? ((rank + file) % 2 ? '#939563' : '#d7cb8e') : ((rank + file) % 2 ? '#6c7355' : '#d9c59e');
       return <group key={square} position={[file - 3.5, .02, rank - 3.5]} onClick={(e) => { e.stopPropagation(); if (!looking && e.delta < 5) onSquare(square); }}>
         <mesh receiveShadow position={[0, -.02, 0]}><boxGeometry args={[1, .04, 1]} /><meshStandardMaterial map={wood} color={colour} roughness={.5} /></mesh>
-        {piece && <Piece geometry={geometries[piece.type]} wood={wood} type={piece.type} colour={piece.color} selected={selected === square} />}
+        {piece && <MovingPiece key={motion[square] ? fen : square} from={motion[square]}>
+          <Piece geometry={geometries[piece.type]} wood={wood} type={piece.type} colour={piece.color} selected={selected === square} />
+        </MovingPiece>}
         {destinations.includes(square) && <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .035, 0]}><ringGeometry args={[piece ? .36 : .08, piece ? .42 : .14, 32]} /><meshBasicMaterial color="#38412c" transparent opacity={.7} /></mesh>}
       </group>;
     }))}
@@ -85,7 +95,7 @@ function Camera({ flipped, looking, resetKey }: { flipped: boolean; looking: boo
     const azimuth = looking ? Math.atan2(position.x - target.x, position.z - target.z) : flipped ? Math.PI : 0;
     const limits = {
       minDistance: looking ? 60 : distance, maxDistance: looking ? 88 : distance + 7,
-      minPolarAngle: looking ? 1.48 : .7, maxPolarAngle: looking ? 1.63 : .84,
+      minPolarAngle: looking ? 1.48 : .25, maxPolarAngle: looking ? 1.63 : .84,
       minAzimuthAngle: azimuth - (looking ? .3 : .4), maxAzimuthAngle: azimuth + (looking ? .3 : .4),
     };
     const finish = () => {
