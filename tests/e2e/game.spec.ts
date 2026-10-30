@@ -110,7 +110,8 @@ test('server rejects illegal/stale actions and foreign sessions; finalises check
   await stranger.dispose();
 });
 test('3D board renders, switches to keyboard board, stays within mobile viewport and translates', async ({ page }) => {
-  test.setTimeout(150_000);
+  // CI uses SwiftShader; six scene captures took 83 seconds in the failing trace.
+  test.setTimeout(process.env.CI ? 300_000 : 150_000);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await signIn(page); await finishActive(page);
