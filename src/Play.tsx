@@ -61,8 +61,10 @@ export function Play() {
   const [confirmResign, setConfirmResign] = useState(false);
   const [replay, setReplay] = useState<number | null>(null);
   const offset = useRef(0);
+  const snapshotSequence = useRef(0);
   const lock = useRef(false);
   const accept = useCallback((snapshot: Snapshot) => {
+    snapshotSequence.current += 1;
     offset.current = snapshot.serverNow - Date.now();
     setNow(snapshot.serverNow);
     setGame((previous) => previous?.id === snapshot.game.id && previous.revision > snapshot.game.revision ? previous : snapshot.game);
@@ -73,8 +75,15 @@ export function Play() {
   useEffect(() => {
     if (!gameId || !identity?.user) { setGame(null); return; }
     let cancelled = false;
+    const sequence = snapshotSequence.current;
     setError(false); setReplay(null); setSelected(null); setLooking(false);
-    void api<Snapshot>(`/api/games/${gameId}`).then((data) => { if (!cancelled) { accept(data); setFlipped(data.game.colour === 'b'); } }).catch(() => { if (!cancelled) setError(true); });
+    void api<Snapshot>(`/api/games/${gameId}`).then((data) => {
+      if (!cancelled) {
+        // A socket snapshot received during this request supersedes the initial read.
+        if (snapshotSequence.current === sequence) accept(data);
+        setFlipped(data.game.colour === 'b');
+      }
+    }).catch(() => { if (!cancelled) setError(true); });
     return () => { cancelled = true; };
   }, [gameId, identity?.user?.id, accept]);
   useEffect(() => {

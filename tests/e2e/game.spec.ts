@@ -109,6 +109,27 @@ test('server rejects illegal/stale actions and foreign sessions; finalises check
   expect((await page.request.post(path, { data: {}, headers: { Origin: 'https://elsewhere.test' } })).status()).toBe(403);
   await stranger.dispose();
 });
+test('a delayed initial read cannot restore the pause after the socket connects', async ({ page, baseURL }) => {
+  await signIn(page); await finishActive(page);
+  const response = await page.request.post('/api/games', { data: { control: '10+5', difficulty: 1, colour: 'w' }, headers: { Origin: baseURL! } });
+  expect(response.ok()).toBe(true);
+  const initial = await response.json();
+  expect(initial.game.pauseStarted).not.toBeNull();
+  const socketFrame = page.waitForEvent('websocket').then((socket) => socket.waitForEvent('framereceived'));
+  let delivered = false;
+  await page.route(`**/api/games/${initial.game.id}`, async (route) => {
+    await socketFrame;
+    await expect(page.getByRole('button', { name: 'Resign', exact: true })).toBeEnabled();
+    await expect(page.getByText(/Disconnect pause/)).toHaveCount(0);
+    await route.fulfill({ json: initial });
+    delivered = true;
+  });
+  await page.goto(`/play?game=${initial.game.id}`);
+  await expect.poll(() => delivered).toBe(true);
+  // A DOM round trip ensures React has consumed the delayed HTTP response.
+  await page.getByRole('button', { name: 'Flip board', exact: true }).click();
+  await expect(page.getByText(/Disconnect pause/)).toHaveCount(0);
+});
 test('3D board renders, switches to keyboard board, stays within mobile viewport and translates', async ({ page }) => {
   // CI uses SwiftShader; six scene captures took 83 seconds in the failing trace.
   test.setTimeout(process.env.CI ? 300_000 : 150_000);
