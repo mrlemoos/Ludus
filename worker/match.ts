@@ -50,13 +50,14 @@ export class Match extends DurableObject<Env> {
     if (!action) return { error: 'invalid' };
     const current = settle(game, Date.now());
     if (current.result) { await this.publish(current); return { game: current, serverNow: Date.now() }; }
+    let next: Game;
     try {
-      const next = applyAction(current, action, Date.now());
-      await this.publish(next);
-      return { game: next, serverNow: Date.now() };
+      next = applyAction(current, action, Date.now());
     } catch {
       return { error: 'invalid_action', game: current, serverNow: Date.now() };
     }
+    await this.publish(next);
+    return { game: next, serverNow: Date.now() };
   }
   async fetch(request: Request) {
     const game = this.load();

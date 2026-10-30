@@ -1,8 +1,10 @@
 import type { Difficulty } from '../shared/game';
+import { computerSettings } from '../shared/computer';
 
 export class Computer {
   private worker: Worker;
   private ready: Promise<void>;
+  private unavailable = false;
   private pending: { resolve: (move: string) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> } | null = null;
   constructor() {
     this.worker = new Worker('/engine/stockfish-19-lite-single.js');
@@ -23,15 +25,16 @@ export class Computer {
   }
   async move(fen: string, difficulty: Difficulty): Promise<string> {
     await this.ready;
+    if (this.unavailable) throw new Error('Engine unavailable');
     if (this.pending) throw new Error('Engine busy');
-    const settings = { 1: [0, 3, 100], 2: [4, 6, 250], 3: [10, 10, 500], 4: [20, 16, 1200] }[difficulty];
-    this.worker.postMessage(`setoption name Skill Level value ${settings[0]}`);
+    const settings = computerSettings[difficulty];
+    this.worker.postMessage(`setoption name Skill Level value ${settings.skill}`);
     this.worker.postMessage(`position fen ${fen}`);
     return new Promise((resolve, reject) => {
       this.pending = { resolve, reject, timer: setTimeout(() => this.fail(), 15_000) };
-      this.worker.postMessage(`go depth ${settings[1]} movetime ${settings[2]}`);
+      this.worker.postMessage(`go depth ${settings.depth} movetime ${settings.moveTimeMs}`);
     });
   }
-  private fail() { if (this.pending) { clearTimeout(this.pending.timer); this.pending.reject(new Error('Engine unavailable')); this.pending = null; } }
-  dispose() { this.fail(); this.worker.terminate(); }
+  private fail() { this.unavailable = true; this.worker.terminate(); if (this.pending) { clearTimeout(this.pending.timer); this.pending.reject(new Error('Engine unavailable')); this.pending = null; } }
+  dispose() { this.fail(); }
 }
