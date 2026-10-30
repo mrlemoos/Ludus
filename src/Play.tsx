@@ -14,6 +14,8 @@ import { ChessScene } from './ChessScene';
 import { Board } from './Board';
 import { capturedPieces } from './captured-pieces';
 import { gameCopy } from './game-copy';
+import { replayCopy } from './replay-copy';
+import { replayMove, replayPosition, savedReplay, stepReplay, type Replay } from '../shared/replay';
 import { isLanguage } from '../shared/waitlist';
 import { chessFrom, remaining, type Action, type Control, type Difficulty, type Game } from '../shared/game';
 
@@ -33,6 +35,7 @@ class GraphicsBoundary extends Component<{ children: ReactNode; fallback: ReactN
 export function Play() {
   const { i18n } = useTranslation();
   const c = gameCopy[isLanguage(i18n.language) ? i18n.language : 'en-GB'];
+  const rc = replayCopy[isLanguage(i18n.language) ? i18n.language : 'en-GB'];
   const [params, setParams] = useSearchParams();
   const gameId = params.get('game');
   const [identity, setIdentity] = useState<{ user: { id: string; name: string } | null; local: boolean } | null>(null);
@@ -59,7 +62,7 @@ export function Play() {
   const [engineError, setEngineError] = useState(false);
   const [engineRetry, setEngineRetry] = useState(0);
   const [confirmResign, setConfirmResign] = useState(false);
-  const [replay, setReplay] = useState<number | null>(null);
+  const [replay, setReplay] = useState<Replay | null>(null);
   const offset = useRef(0);
   const snapshotSequence = useRef(0);
   const lock = useRef(false);
@@ -76,7 +79,7 @@ export function Play() {
     if (!gameId || !identity?.user) { setGame(null); return; }
     let cancelled = false;
     const sequence = snapshotSequence.current;
-    setError(false); setReplay(null); setSelected(null); setLooking(false);
+    setError(false); setReplay(null); setSelected(null); setPromotion(null); setLooking(false);
     void api<Snapshot>(`/api/games/${gameId}`).then((data) => {
       if (!cancelled) {
         // A socket snapshot received during this request supersedes the initial read.
@@ -136,22 +139,31 @@ export function Play() {
       accept(snapshot); setFlipped(snapshot.game.colour === 'b'); setParams({ game: snapshot.game.id });
     } catch { setError(true); } finally { setPending(false); }
   }
+  function navigateReplay(next: Replay | null) {
+    setReplay(next); setSelected(null); setPromotion(null);
+  }
+  function playVariation(move: { from: Square; to: Square; promotion?: string }) {
+    if (!game?.result) return;
+    setReplay(replayMove(game, replay ?? savedReplay(game), move));
+    setSelected(null); setPromotion(null);
+  }
   function chooseSquare(square: Square) {
-    if (!game || game.result || replay !== null || !connected || pending || game.fen.split(' ')[1] !== game.colour) return;
-    const chess = new Chess(game.fen);
-    if (chess.get(square)?.color === game.colour) { setSelected(selected === square ? null : square); return; }
+    if (!game) return;
+    const exploring = Boolean(game.result);
+    if (!exploring && (replay !== null || !connected || pending || game.fen.split(' ')[1] !== game.colour)) return;
+    const chess = exploring ? replayPosition(game, replay ?? savedReplay(game)) : new Chess(game.fen);
+    const turn = exploring ? chess.turn() : game.colour;
+    if (chess.get(square)?.color === turn) { setSelected(selected === square ? null : square); return; }
     if (!selected) return;
     const moves = chess.moves({ square: selected, verbose: true }).filter((move) => move.to === square);
     if (!moves.length) { setSelected(null); return; }
     if (moves.some((move) => move.promotion)) { setPromotion({ from: selected, to: square }); return; }
-    void send({ type: 'move', from: selected, to: square, revision: game.revision });
+    if (exploring) playVariation({ from: selected, to: square });
+    else void send({ type: 'move', from: selected, to: square, revision: game.revision });
   }
   const boardChess = game ? chessFrom(game) : new Chess();
-  const last = boardChess.history({ verbose: true }).at(-1);
-  const replayChess = new Chess();
-  if (game && replay !== null) for (const move of game.moves.slice(0, replay)) replayChess.move(move);
-  const shown = replay !== null ? replayChess : boardChess;
-  const lastShown = replay !== null ? replayChess.history({ verbose: true }).at(-1) : last;
+  const shown = game?.result && replay ? replayPosition(game, replay) : boardChess;
+  const lastShown = shown.history({ verbose: true }).at(-1);
   const destinations = selected ? shown.moves({ square: selected, verbose: true }).map((move) => move.to) : [];
   const clocks = game ? remaining(game, now) : { w: 0, b: 0 };
   const clock = (time: number) => `${Math.floor(Math.ceil(time / 1000) / 60)}:${String(Math.ceil(time / 1000) % 60).padStart(2, '0')}`;
@@ -212,10 +224,10 @@ export function Play() {
         <p className="eyebrow text-muted mb-3">{c.casual}</p><div role="status" className="match-status"><h2 className="font-display text-3xl">{status}</h2>{!game.result && boardChess.isCheck() && <p className="text-sm mt-2">{c.check}</p>}</div>
         {!connected && !game.result && <p className="game-notice text-xs">{c.reconnecting}</p>}{pause > 0 && !game.result && <p role="status" className="game-notice text-xs">{c.paused} · {pause} {c.allowance}</p>}
         {engineError && <div role="alert" className="game-notice text-sm">{c.engineError}<Button className="underline block mt-3" onClick={() => setEngineRetry(engineRetry + 1)}>{c.retry}</Button></div>}
-        <section className="moves-panel" aria-label={c.moveList}><h3 className="eyebrow mb-4">{c.moveList}</h3>{!game.moves.length ? <p className="text-sm text-muted">{c.noMoves}</p> : <ol>{Array.from({ length: Math.ceil(game.moves.length / 2) }, (_, i) => <li key={i} className="move-row"><span>{i + 1}.</span>{game.moves.slice(i * 2, i * 2 + 2).map((move, j) => <Button key={j} disabled={!game.result} aria-pressed={replay === i * 2 + j + 1} onClick={() => { setSelected(null); setReplay(i * 2 + j + 1); }} className="move-notation">{move}</Button>)}</li>)}</ol>}</section>
-        {game.result ? <div className="grid gap-3 mt-5"><div className="replay-controls"><Button aria-label={c.beginning} onClick={() => setReplay(0)}>│‹</Button><Button aria-label={c.previous} onClick={() => setReplay(Math.max(0, (replay ?? game.moves.length) - 1))}>‹</Button><Button aria-label={c.next} onClick={() => setReplay(Math.min(game.moves.length, (replay ?? game.moves.length) + 1))}>›</Button><Button aria-label={c.latest} onClick={() => setReplay(null)}>›│</Button></div><Button className="game-secondary" onClick={download}>{c.download}</Button><Link to="/play" className="game-primary text-center">{c.newGame}</Link></div> : confirmResign ? <div className="mt-5"><p className="text-sm mb-3">{c.confirmResign}</p><div className="flex gap-3"><Button className="game-secondary" onClick={() => setConfirmResign(false)}>{c.cancel}</Button><Button className="game-primary" disabled={pending || !connected} onClick={() => { setConfirmResign(false); void send({ type: 'resign', revision: game.revision }); }}>{c.resign}</Button></div></div> : <Button className="game-secondary mt-5" disabled={!connected || pending} onClick={() => setConfirmResign(true)}>{c.resign}</Button>}
+        <section className="moves-panel" aria-label={c.moveList}><h3 className="eyebrow mb-4">{c.moveList}</h3>{!game.moves.length ? <p className="text-sm text-muted">{c.noMoves}</p> : <ol>{Array.from({ length: Math.ceil(game.moves.length / 2) }, (_, i) => <li key={i} className="move-row"><span>{i + 1}.</span>{game.moves.slice(i * 2, i * 2 + 2).map((move, j) => <Button key={j} disabled={!game.result} aria-pressed={replay?.branchAt === null && replay.ply === i * 2 + j + 1} onClick={() => navigateReplay(savedReplay(game, i * 2 + j + 1))} className="move-notation">{move}</Button>)}</li>)}</ol>}</section>
+        {game.result ? <div className="grid gap-3 mt-5"><div className="replay-controls"><Button aria-label={c.beginning} onClick={() => navigateReplay(replay ? { ...replay, ply: 0 } : savedReplay(game, 0))}>│‹</Button><Button aria-label={c.previous} onClick={() => navigateReplay(stepReplay(replay ?? savedReplay(game), -1))}>‹</Button><Button aria-label={c.next} onClick={() => navigateReplay(stepReplay(replay ?? savedReplay(game), 1))}>›</Button><Button aria-label={c.latest} onClick={() => navigateReplay(null)}>›│</Button></div><p className="text-xs text-muted">{rc.hint}</p>{replay?.branchAt !== null && replay?.branchAt !== undefined && <section aria-label={rc.variation}><p role="status" className="text-sm">{rc.variation}: {replay.moves.slice(replay.branchAt, replay.ply).join(' ')}</p><Button className="game-secondary mt-3" onClick={() => navigateReplay(savedReplay(game, replay.branchAt!))}>{rc.saved}</Button></section>}<Button className="game-secondary" onClick={download}>{c.download}</Button><Link to="/play" className="game-primary text-center">{c.newGame}</Link></div> : confirmResign ? <div className="mt-5"><p className="text-sm mb-3">{c.confirmResign}</p><div className="flex gap-3"><Button className="game-secondary" onClick={() => setConfirmResign(false)}>{c.cancel}</Button><Button className="game-primary" disabled={pending || !connected} onClick={() => { setConfirmResign(false); void send({ type: 'resign', revision: game.revision }); }}>{c.resign}</Button></div></div> : <Button className="game-secondary mt-5" disabled={!connected || pending} onClick={() => setConfirmResign(true)}>{c.resign}</Button>}
       </aside></div>
-      {promotion && <Dialog.Root open onOpenChange={(open) => { if (!open) setPromotion(null); }}><Dialog.Portal><Dialog.Backdrop className="fixed inset-0 z-50 bg-ink/50" /><Dialog.Popup className="promotion-panel fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2"><Dialog.Title className="font-display text-3xl mb-5">{c.promotion}</Dialog.Title><div className="grid grid-cols-2 gap-3">{(['q', 'r', 'b', 'n'] as const).map((piece, i) => <Button autoFocus={i === 0} key={piece} className="game-secondary" onClick={() => void send({ type: 'move', ...promotion, promotion: piece, revision: game.revision })}>{({ q: c.queen, r: c.rook, b: c.bishop, n: c.knight })[piece]}</Button>)}</div><Button className="mt-4 underline text-sm" onClick={() => setPromotion(null)}>{c.cancel}</Button></Dialog.Popup></Dialog.Portal></Dialog.Root>}
+      {promotion && <Dialog.Root open onOpenChange={(open) => { if (!open) setPromotion(null); }}><Dialog.Portal><Dialog.Backdrop className="fixed inset-0 z-50 bg-ink/50" /><Dialog.Popup className="promotion-panel fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2"><Dialog.Title className="font-display text-3xl mb-5">{c.promotion}</Dialog.Title><div className="grid grid-cols-2 gap-3">{(['q', 'r', 'b', 'n'] as const).map((piece, i) => <Button autoFocus={i === 0} key={piece} className="game-secondary" onClick={() => game.result ? playVariation({ ...promotion, promotion: piece }) : void send({ type: 'move', ...promotion, promotion: piece, revision: game.revision })}>{({ q: c.queen, r: c.rook, b: c.bishop, n: c.knight })[piece]}</Button>)}</div><Button className="mt-4 underline text-sm" onClick={() => setPromotion(null)}>{rc.cancelPromotion}</Button></Dialog.Popup></Dialog.Portal></Dialog.Root>}
     </div>}
   </main></div>;
 }
