@@ -79,8 +79,10 @@ export function App() {
     <main id="main">
       <section className="home-hero">
         <div className="home-copy">
-          <p className="home-eyebrow"><span />{t('beta')}</p>
+          <p className="home-eyebrow">{t('beta')}</p>
           <h1 className="home-headline">{t('headline')}<br /><em>{t('headlineItalic')}</em></h1>
+        </div>
+        <div className="home-invitation">
           <p className="home-intro">{t('detail')}</p>
           <div className="waitlist-block" id="waitlist">
             {state === 'success' ? <div role="status" className="home-success">
@@ -104,13 +106,13 @@ export function App() {
             <p className="home-trial">{t('trial')}</p>
           </div>
         </div>
-        <HomePreview />
       </section>
+      <HomePreview />
       <section className="home-details" aria-labelledby="details-heading">
         <div className="home-details-heading"><p className="home-eyebrow">{t('included')}</p><h2 id="details-heading">{t('intro')}</h2><p>{t('play')}</p></div>
         <div className="home-details-copy">
-          <article><span className="home-feature-symbol" aria-hidden="true">♞</span><div><h3>{t('opponentsTitle')}</h3><p>{t('opponents')}</p></div></article>
-          <article><span className="home-feature-symbol" aria-hidden="true">↳</span><div><h3>{t('coachTitle')}</h3><p>{t('coach')}</p></div></article>
+          <article><h3>{t('opponentsTitle')}</h3><p>{t('opponents')}</p></article>
+          <article><h3>{t('coachTitle')}</h3><p>{t('coach')}</p></article>
         </div>
       </section>
     </main>

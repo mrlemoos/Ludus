@@ -75,7 +75,7 @@ function Scene({ fen, selected, destinations, lastMove, onSquare, looking, lowQu
     <ContactShadows position={[0, -.399, 0]} opacity={.45} scale={[23, 18]} blur={2.2} far={4} resolution={256} />
   </group>;
 }
-function Camera({ flipped, looking, resetKey }: { flipped: boolean; looking: boolean; resetKey: number }) {
+function Camera({ flipped, looking, resetKey, presentation = false }: { flipped: boolean; looking: boolean; resetKey: number; presentation?: boolean }) {
   const { camera, size } = useThree();
   const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
   const motion = useRef<{ position: Vector3; target: Vector3; elapsed: number; finish: () => void } | null>(null);
@@ -89,13 +89,15 @@ function Camera({ flipped, looking, resetKey }: { flipped: boolean; looking: boo
     const side = flipped ? -1 : 1;
     camera.fov = looking ? 86 : 36; camera.updateProjectionMatrix();
     // Fit a 13-unit envelope, including the clock and captured pieces, on either viewport axis.
-    const distance = 6.5 / Math.tan(Math.PI / 10) / Math.min(1, size.width / size.height) + 3;
-    const position = looking ? new Vector3(0, 8.6, side * 22) : new Vector3(0, Math.sin(.77) * distance, side * Math.cos(.77) * distance);
+    const distance = (6.5 / Math.tan(Math.PI / 10) / Math.min(1, size.width / size.height) + 3) * (presentation ? .86 : 1);
+    const elevation = presentation ? .64 : .77;
+    const position = looking ? new Vector3(0, 8.6, side * 22) : new Vector3(0, Math.sin(elevation) * distance, side * Math.cos(elevation) * distance);
+    if (presentation && !looking) position.applyAxisAngle(new Vector3(0, 1, 0), -.32);
     const target = looking ? new Vector3(flipped ? 10 : 35, 10, side * -52) : new Vector3(0, 0, 0);
-    const azimuth = looking ? Math.atan2(position.x - target.x, position.z - target.z) : flipped ? Math.PI : 0;
+    const azimuth = looking ? Math.atan2(position.x - target.x, position.z - target.z) : (flipped ? Math.PI : 0) - (presentation ? .32 : 0);
     const limits = {
       minDistance: looking ? 60 : distance, maxDistance: looking ? 88 : distance + 7,
-      minPolarAngle: looking ? 1.48 : .25, maxPolarAngle: looking ? 1.63 : .84,
+      minPolarAngle: looking ? 1.48 : .25, maxPolarAngle: looking ? 1.63 : presentation ? 1.05 : .84,
       minAzimuthAngle: azimuth - (looking ? .3 : .4), maxAzimuthAngle: azimuth + (looking ? .3 : .4),
     };
     const finish = () => {
@@ -109,7 +111,7 @@ function Camera({ flipped, looking, resetKey }: { flipped: boolean; looking: boo
       motion.current = { position, target, elapsed: 0, finish };
     }
     initial.current = false;
-  }, [camera, size.width, size.height, flipped, looking, resetKey]);
+  }, [camera, size.width, size.height, flipped, looking, resetKey, presentation]);
   useFrame((_, delta) => {
     const move = motion.current, orbit = controls.current;
     if (!move || !orbit) return;
@@ -121,12 +123,12 @@ function Camera({ flipped, looking, resetKey }: { flipped: boolean; looking: boo
   }, -2);
   return <OrbitControls ref={controls} makeDefault enablePan={false} enableDamping={false} enableZoom={!looking} onStart={() => motion.current?.finish()} />;
 }
-export default function Board3D(props: BoardProps & TableProps & { resetKey: number; looking: boolean }) {
+export default function Board3D(props: BoardProps & TableProps & { resetKey: number; looking: boolean; presentation?: boolean }) {
   const [lowQuality, setLowQuality] = useState(false);
   return <div className="three-board" aria-hidden="true" data-view={props.looking ? 'room' : 'board'}>
     <Canvas shadows={!lowQuality} dpr={lowQuality ? .75 : [1, 1.5]} camera={{ position: [0, 16, 17], fov: 36, far: 600 }} onCreated={({ gl }) => { gl.setClearColor('#c5baa2'); }}>
       <PerformanceMonitor bounds={() => [30, 45]} onDecline={() => setLowQuality(true)} />
-      <Suspense fallback={null}><Scene {...props} lowQuality={lowQuality} /><Camera flipped={props.flipped} looking={props.looking} resetKey={props.resetKey} /></Suspense>
+      <Suspense fallback={null}><Scene {...props} lowQuality={lowQuality} /><Camera flipped={props.flipped} looking={props.looking} resetKey={props.resetKey} presentation={props.presentation} /></Suspense>
     </Canvas>
   </div>;
 }

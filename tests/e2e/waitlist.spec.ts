@@ -2,9 +2,9 @@ import { execFileSync } from 'node:child_process';
 import { test, expect } from '@playwright/test';
 
 const cases = [
-  { language: 'en-GB', name: 'English', title: 'Stay for', button: 'Save my seat', success: 'Your seat is on the list.' },
-  { language: 'es-ES', name: 'Español', title: 'Quédate para', button: 'Reservar mi sitio', success: 'Ya estás en la lista.' },
-  { language: 'fr-FR', name: 'Français', title: 'Encore', button: 'Réserver ma place', success: 'Votre place est sur la liste.' },
+  { language: 'en-GB', name: 'English', title: 'Make time', button: 'Join the waitlist', success: "You're on the list." },
+  { language: 'es-ES', name: 'Español', title: 'Haz tiempo', button: 'Apuntarme a la beta', success: 'Ya estás en la lista.' },
+  { language: 'fr-FR', name: 'Français', title: 'Prenez le temps', button: 'Rejoindre la bêta', success: 'Votre place est sur la liste.' },
 ];
 
 for (const locale of cases) {
@@ -46,22 +46,22 @@ test('retains email on failure and supports retry', async ({ page }) => {
   await page.goto('/');
   await page.locator('#email').fill('retry@example.com');
   await page.route('**/api/waitlist', (route) => route.fulfill({ status: 503, json: { error: 'unavailable' } }));
-  await page.getByRole('button', { name: 'Save my seat' }).click();
+  await page.getByRole('button', { name: 'Join the waitlist' }).click();
   await expect(page.getByRole('alert')).toContainText('try again');
   await expect(page.locator('#email')).toHaveValue('retry@example.com');
   await page.route('**/api/waitlist', (route) => route.fulfill({ status: 200, json: { ok: true } }));
-  await page.getByRole('button', { name: 'Save my seat' }).click();
-  await expect(page.getByRole('status')).toContainText('Your seat is on the list.');
+  await page.getByRole('button', { name: 'Join the waitlist' }).click();
+  await expect(page.getByRole('status')).toContainText("You're on the list.");
 });
 
 test('shows rate limits and validates before sending', async ({ page }) => {
   await page.goto('/');
   await page.locator('#email').fill('invalid');
-  await page.getByRole('button', { name: 'Save my seat' }).click();
+  await page.getByRole('button', { name: 'Join the waitlist' }).click();
   await expect(page.getByRole('alert')).toContainText('valid email');
   await page.route('**/api/waitlist', (route) => route.fulfill({ status: 429, json: { error: 'rate_limited' } }));
   await page.locator('#email').fill('limited@example.com');
-  await page.getByRole('button', { name: 'Save my seat' }).click();
+  await page.getByRole('button', { name: 'Join the waitlist' }).click();
   await expect(page.getByRole('alert')).toContainText('Wait a minute');
 });
 
@@ -74,7 +74,7 @@ test('fits narrow screens and supports keyboard language selection', async ({ pa
   await page.keyboard.press('ArrowDown');
   await page.getByRole('option', { name: 'Français' }).press('Enter');
   await expect(page.locator('html')).toHaveAttribute('lang', 'fr-FR');
-  await expect(page.getByRole('button', { name: 'Réserver ma place' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Rejoindre la bêta' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/waitlist-mobile.png', fullPage: true });
 });
@@ -102,6 +102,17 @@ test('switches board previews with keyboard and keeps the preview separate from 
   await expect(two).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.home-flat-board')).toBeVisible();
   await expect(page.locator('.home-flat-board')).toHaveAttribute('inert', '');
+  for (const width of [360, 900, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(async () => {
+      const frame = (await page.locator('.preview-stage').boundingBox())!;
+      const board = (await page.locator('.home-flat-board .play-board').boundingBox())!;
+      expect(board.height).toBeCloseTo(board.width, 0);
+      expect(board.y).toBeGreaterThanOrEqual(frame.y);
+      expect(board.y + board.height).toBeLessThanOrEqual(frame.y + frame.height);
+    }).toPass();
+  }
+  await two.focus();
   await page.keyboard.press('ArrowLeft');
   await expect(three).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('button', { name: 'Reset camera' })).toBeVisible();
