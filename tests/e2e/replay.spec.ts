@@ -12,6 +12,7 @@ test('finished replay explores both sides locally and restores the recorded line
     if (request.method() !== 'GET') writes.push(request.url());
     const path = new URL(request.url()).pathname;
     if (path === '/api/me') return route.fulfill({ json: { user: { id: 'replay-owner', name: 'Replay player' }, local: false } });
+    if (path === '/api/account') return route.fulfill({ json: { profile: { chessLevel: 'intermediate' } } });
     if (path === '/api/games') return route.fulfill({ json: [{ id: game.id, createdAt: 0, result: JSON.stringify(game.result) }] });
     return route.fulfill({ json: { game, serverNow: 5000 } });
   });

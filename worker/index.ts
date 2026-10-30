@@ -1,5 +1,9 @@
 import { gameApi } from './game-api';
 export { Match } from './match';
+export { HumanMatch } from './human-match';
+export { Matchmaking } from './matchmaking';
+import { featuresApi } from './features';
+import { purgeExpiredPersonalData, resumeAccountDeletions } from './accounts';
 import { drizzle } from 'drizzle-orm/d1';
 import { parseWaitlist } from '../shared/waitlist';
 import { waitlist } from './schema';
@@ -10,9 +14,13 @@ const reply = (status: number, error?: string) => Response.json(error ? { error 
 });
 
 export default {
+  async scheduled(_event: ScheduledController, env: Env) {
+    await resumeAccountDeletions(env);
+    await purgeExpiredPersonalData(env.DB);
+  },
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname !== '/api/waitlist') return gameApi(request, env);
+    if (url.pathname !== '/api/waitlist') return await featuresApi(request, env) ?? gameApi(request, env);
     if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST', 'Cache-Control': 'no-store' } });
     const origin = request.headers.get('Origin');
     if ((origin && origin !== url.origin) || request.headers.get('Sec-Fetch-Site') === 'cross-site') return reply(403, 'forbidden');

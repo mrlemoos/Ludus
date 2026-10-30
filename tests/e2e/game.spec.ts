@@ -58,6 +58,8 @@ test('Skecher lobby tabs support keyboard navigation, language changes and narro
   expect(errors).toEqual([]);
 });
 test('plays Stockfish, recovers accepted moves, resigns, replays and downloads PGN', async ({ page }) => {
+  let historyReads = 0;
+  page.on('request', (request) => { if (request.method() === 'GET' && new URL(request.url()).pathname === '/api/games') historyReads++; });
   await signIn(page); await finishActive(page);
   await page.getByRole('button', { name: 'Start game' }).click();
   await expect(page.locator('[data-square="e2"]')).toBeVisible();
@@ -80,6 +82,10 @@ test('plays Stockfish, recovers accepted moves, resigns, replays and downloads P
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download PGN' }).click();
   expect((await download).suggestedFilename()).toMatch(/^ludus-.*\.pgn$/);
+  const readsAfterDownload = historyReads;
+  // Observe completed-game broadcasts for a feedback cycle across several clock renders.
+  await page.waitForTimeout(1000);
+  expect(historyReads - readsAfterDownload).toBeLessThanOrEqual(2);
   await page.screenshot({ path: 'test-results/game-desktop.png', fullPage: true });
 });
 test('server rejects illegal/stale actions and foreign sessions; finalises checkmate once', async ({ page, playwright, baseURL }) => {

@@ -10,3 +10,7 @@
 - [ ] Verify billing events and process duplicates/out-of-order delivery safely; derive entitlements from trusted provider events.
 - [ ] Support cancellation and agreed renewal/payment-failure behaviour without deleting reviews or restricting free play.
 - [ ] Test checkout, spoofed events, duplicate events, cancellation and trial-to-paid transitions. Keep billing secrets server-side.
+
+## Completion wave
+
+Paid checkout remains disabled under the approved beta policy. Card-free Plus and downgrade are implemented separately; there is no charging endpoint or payment secret. Payment-provider integration is not represented as complete.

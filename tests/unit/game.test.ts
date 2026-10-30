@@ -35,7 +35,9 @@ describe('authoritative computer matches', () => {
   });
   it('persists repetition history rather than rebuilding from FEN', () => {
     const game = sequence(['g1f3', 'g8f6', 'f3g1', 'f6g8', 'g1f3', 'g8f6', 'f3g1', 'f6g8']);
-    expect(game.result?.reason).toBe('repetition');
+    expect(game.result).toBeNull();
+    const claimed = applyAction(game, { type: 'claimDraw', revision: game.revision }, game.updatedAt + 1);
+    expect(claimed.result?.reason).toBe('repetition');
     expect(chessFrom(game).isThreefoldRepetition()).toBe(true);
   });
   it('supports castling and en passant', () => {
@@ -69,4 +71,18 @@ describe('authoritative computer matches', () => {
     expect(game.colour).toBe('b');
   });
   it.each([null, {}, { type: 'move', from: 'a9', to: 'a1', revision: 0 }, { type: 'move', from: 'a7', to: 'a8', promotion: 'k', revision: 0 }, { type: 'resign', revision: -1 }, { type: 'resign', revision: .5 }])('rejects malformed actions %j', (input) => expect(parseAction(input)).toBeNull());
+});
+
+describe('approved computer draw policy', () => {
+  it('automatically ends at fivefold, while threefold needs a claim', () => {
+    const cycle = ['g1f3', 'g8f6', 'f3g1', 'f6g8'];
+    const game = sequence([...cycle, ...cycle, ...cycle, ...cycle]);
+    expect(game.result).toEqual({ winner: null, reason: 'fivefold' });
+  });
+  it('rejects premature and off-turn claims without mutating state', () => {
+    const game = start();
+    expect(() => applyAction(game, { type: 'claimDraw', revision: 0 }, 1)).toThrow('draw_not_claimable');
+    expect(game.result).toBeNull();
+    expect(game.moves).toEqual([]);
+  });
 });

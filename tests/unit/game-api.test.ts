@@ -12,7 +12,7 @@ const origin = 'https://ludus.example';
 function fixture() {
   const stub = { read: vi.fn(), act: vi.fn(), fetch: vi.fn() };
   const getByName = vi.fn(() => stub);
-  return { stub, getByName, env: { DB: {}, MATCHES: { getByName } } as unknown as Env };
+  return { stub, getByName, env: { DB: { prepare: () => ({ bind: () => ({ first: async () => null }) }) }, MATCHES: { getByName } } as unknown as Env };
 }
 function request(path = `/api/games/${id}`, init?: RequestInit) {
   return new Request(`${origin}${path}`, init);

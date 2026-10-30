@@ -28,8 +28,17 @@ export const verification = sqliteTable('verification', {
   id: text('id').primaryKey(), identifier: text('identifier').notNull(), value: text('value').notNull(),
   expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(), createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(), updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });
-export const invitations = sqliteTable('invitations', { email: text('email').primaryKey() });
+export const invitations = sqliteTable('invitations', {
+  email: text('email').primaryKey(), expiresAt: integer('expires_at'), redeemedBy: text('redeemed_by'), redeemedAt: integer('redeemed_at'), deliveryId: text('delivery_id'),
+});
 export const matches = sqliteTable('matches', {
   id: text('id').primaryKey(), owner: text('owner').notNull().references(() => user.id),
   createdAt: integer('created_at').notNull(), result: text('result'),
+  control: text('control', { enum: ['5+3', '10+5'] }).notNull().default('5+3'),
+  difficulty: integer('difficulty').notNull().default(1), colour: text('colour', { enum: ['w', 'b'] }).notNull().default('w'),
 });
+
+export * from './player-schema';
+export * from './online-schema';
+export * from './coach-schema';
+export * from './cosmetic-schema';

@@ -27,9 +27,12 @@ Prefer a flat board? Switch to 2D at any time. Your game, clock and controls car
 - Move with a mouse, touch or keyboard. The 3D view includes an accessible board; the 2D view offers direct square navigation.
 - Return to an unfinished game after a reload. The server owns accepted moves, clocks and results.
 - Replay completed games and download them as PGN.
+- Invite a friend or join the public casual queue at `/online`.
+- Track activity and manage privacy at `/account`.
+- Analyse finished games with the local engine at `/coach/:matchId`, even during model outages.
 - Choose British English, European Spanish or European French.
 
-Ludus is in development. The public site accepts waitlist entries; invited accounts can access the game at [/play](https://ludus.mrlemoos.dev/play). Human multiplayer, ratings, streaks and post-game AI coaching are planned. Real-device mobile performance and final art still need validation.
+Ludus is in development. The public site accepts waitlist entries; invited accounts can access the game at [/play](https://ludus.mrlemoos.dev/play). Casual friend games and public matchmaking are implemented, alongside profiles, activity and card-free beta Plus. Post-game engine analysis works locally; generated coaching requires a model that passes the evaluation gate. Rated entry and paid checkout stay disabled. See [beta readiness](docs/beta-readiness.md) for remaining release gates.
 
 ## Take a seat
 

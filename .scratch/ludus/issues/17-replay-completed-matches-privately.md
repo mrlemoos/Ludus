@@ -14,3 +14,7 @@
 ## Implementation progress
 
 Owners can reopen saved computer games, step through accepted moves in 2D or 3D and download PGN. Server checks ownership for match reads, moves and sockets. Browser tests cover finished positions, stepping, reloads and unauthenticated access. Legal alternative branches now run locally for either side after completion, including promotion, castling and en passant. Players can step within a variation or return to the recorded line. Shared replay helpers reject unfinished games; saved moves, result and PGN remain unchanged. Local evidence: `tsc --noEmit` passed, `vitest run` passed 97 tests including 11 replay cases, production build passed, and `playwright test tests/e2e/replay.spec.ts` passed one Chromium journey verifying branching, restoration and no API writes. The browser journey uses a finished-game fixture; cross-account API and Durable Object ownership checks now have unit coverage in `tests/unit/game-api.test.ts` and `tests/unit/match.test.ts`, including reads, actions and socket identity. Real two-account browser isolation and a dedicated server-side finished-match review access contract remain outstanding. This ticket is not complete.
+
+## Completion wave
+
+Cross-account reads/actions/sockets now have unit coverage; completed computer and human games expose local legal branching. Coaching match-loader rejects live/foreign matches. Integrated two-account browser play and coach privacy tests pass. Local analysis and navigation make no review-generation or activity writes.

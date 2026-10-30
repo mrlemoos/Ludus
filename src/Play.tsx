@@ -1,5 +1,5 @@
 import { ControlIcon } from './components/control-icon';
-import { Component, Suspense, lazy, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Component, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import { Button } from '@base-ui/react/button';
@@ -15,7 +15,10 @@ import { Board } from './Board';
 import { capturedPieces } from './captured-pieces';
 import { gameCopy } from './game-copy';
 import { replayCopy } from './replay-copy';
-import { coachIdentity } from '../shared/computer';
+import { coachIdentity, suggestDifficulty, type ComputerHistory } from '../shared/computer';
+import { playReturnPath } from '../shared/navigation';
+import type { PlayerProfile } from '../shared/profile';
+import { AppearanceControls, useAppearance } from './appearance';
 import { replayMove, replayPosition, savedReplay, stepReplay, type Replay } from '../shared/replay';
 import { isLanguage } from '../shared/waitlist';
 import { chessFrom, remaining, type Action, type Control, type Difficulty, type Game } from '../shared/game';
@@ -40,6 +43,10 @@ export function Play() {
   const [params, setParams] = useSearchParams();
   const gameId = params.get('game');
   const [identity, setIdentity] = useState<{ user: { id: string; name: string } | null; local: boolean } | null>(null);
+  const appearanceState = useAppearance(Boolean(identity?.user));
+  const [profile, setProfile] = useState<PlayerProfile | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [computerHistory, setComputerHistory] = useState<ComputerHistory[]>([]);
   const [history, setHistory] = useState<History>([]);
   const [game, setGame] = useState<Game | null>(null);
   const lobbyTab = params.get('tab') === 'history' ? 'history' : 'play';
@@ -75,7 +82,21 @@ export function Play() {
   }, []);
   const loadHistory = useCallback(() => api<History>('/api/games').then(setHistory).catch(() => setError(true)), []);
   useEffect(() => { void api<NonNullable<typeof identity>>('/api/me').then(setIdentity).catch(() => setError(true)); }, []);
-  useEffect(() => { if (identity?.user) void loadHistory(); }, [identity?.user?.id, loadHistory, game?.result]);
+  const completedGameKey = game?.result ? `${game.id}:${game.revision}` : null;
+  useEffect(() => { if (identity?.user) void loadHistory(); }, [identity?.user?.id, loadHistory, completedGameKey]);
+  useEffect(() => {
+    if (!identity?.user) return;
+    let disposed = false;
+    void api<{ profile: PlayerProfile | null }>('/api/account').then((data) => { if (!disposed) { setProfile(data.profile); setProfileLoaded(true); } }).catch(() => { if (!disposed) setError(true); });
+    return () => { disposed = true; };
+  }, [identity?.user?.id]);
+  useEffect(() => {
+    if (!identity?.user) return;
+    let disposed = false;
+    void Promise.all(history.filter((entry) => entry.result).slice(0, 12).map((entry) => api<Snapshot>(`/api/games/${entry.id}`).then(({ game }) => ({ difficulty: game.difficulty, colour: game.colour, result: game.result, completedAt: game.updatedAt })))).then((data) => { if (!disposed) setComputerHistory(data); }).catch(() => { /* Suggestions never block play. */ });
+    return () => { disposed = true; };
+  }, [history, identity?.user?.id]);
+  const suggestion = profile ? suggestDifficulty(profile.chessLevel, difficulty, computerHistory) : null;
   useEffect(() => {
     if (!gameId || !identity?.user) { setGame(null); return; }
     let cancelled = false;
@@ -129,8 +150,8 @@ export function Play() {
   async function signIn(local: boolean) {
     setPending(true); setError(false);
     try {
-      if (local) { const { url } = await api<{ url: string }>('/api/dev/sign-in', {}); location.assign(url); }
-      else { await api('/api/auth/sign-in/magic-link', { email, adult, callbackURL: `${location.origin}/play` }); setSent(true); }
+      if (local) { const { url } = await api<{ url: string }>('/api/dev/sign-in', { returnTo: playReturnPath(params.get('returnTo')) }); location.assign(url); }
+      else { await api('/api/auth/sign-in/magic-link', { email, adult, callbackURL: `${location.origin}${playReturnPath(params.get('returnTo'))}` }); setSent(true); }
     } catch { setError(true); } finally { setPending(false); }
   }
   async function start() {
@@ -162,15 +183,16 @@ export function Play() {
     if (exploring) playVariation({ from: selected, to: square });
     else void send({ type: 'move', from: selected, to: square, revision: game.revision });
   }
-  const boardChess = game ? chessFrom(game) : new Chess();
-  const shown = game?.result && replay ? replayPosition(game, replay) : boardChess;
-  const lastShown = shown.history({ verbose: true }).at(-1);
+  const boardChess = useMemo(() => game ? chessFrom(game) : new Chess(), [game?.id, game?.moves]);
+  const shown = useMemo(() => game?.result && replay ? replayPosition(game, replay) : boardChess, [boardChess, Boolean(game?.result), replay]);
+  const lastShown = useMemo(() => shown.history({ verbose: true }).at(-1), [shown]);
+  const captured = useMemo(() => capturedPieces(shown), [shown]);
   const destinations = selected ? shown.moves({ square: selected, verbose: true }).map((move) => move.to) : [];
   const clocks = game ? remaining(game, now) : { w: 0, b: 0 };
   const clock = (time: number) => `${Math.floor(Math.ceil(time / 1000) / 60)}:${String(Math.ceil(time / 1000) % 60).padStart(2, '0')}`;
   const topColour = flipped ? 'w' : 'b';
   const topIsYou = topColour === game?.colour;
-  const boardProps = { fen: shown.fen(), selected, destinations, lastMove: lastShown ? [lastShown.from, lastShown.to] : [], flipped, onSquare: chooseSquare, copy: c };
+  const boardProps = { appearance: appearanceState.appearance, fen: shown.fen(), selected, destinations, lastMove: lastShown ? [lastShown.from, lastShown.to] : [], flipped, onSquare: chooseSquare, copy: c };
   const resultTitle = game?.result ? game.result.winner === null ? c.draw : game.result.winner === game.colour ? c.won : c.lost : '';
   const status = game?.result ? `${resultTitle} · ${c[game.result.reason]}` : boardChess.turn() === game?.colour ? c.turn : c.thinking;
   const pause = game?.pauseStarted !== null && game?.pauseStarted !== undefined ? Math.max(0, Math.ceil((60_000 - game.pauseUsed - (now - game.pauseStarted)) / 1000)) : 0;
@@ -194,9 +216,9 @@ export function Play() {
       {sent && <p role="status" className="mt-4 text-sm">{c.sent}</p>}
       <p className="mt-4 text-xs text-muted leading-6">{c.invitation} <Link className="underline" to="/">{c.waitlist}</Link></p>
       {identity.local && <div className="mt-8 border-t border-ink/15 pt-5"><p className="eyebrow mb-3">{c.localNote}</p><Button disabled={pending} className="game-secondary w-full" onClick={() => void signIn(true)}>{c.local}</Button></div>}
-    </section></div> : !gameId ? <>
+    </section></div> : profileLoaded && !profile ? <section className="setup-card"><Link className="game-primary" to={`/account?returnTo=${encodeURIComponent(playReturnPath(params.get('returnTo')))}`}>{({ 'en-GB': 'Complete your profile to play', 'es-ES': 'Completa tu perfil para jugar', 'fr-FR': 'Complétez votre profil pour jouer' })[isLanguage(i18n.language) ? i18n.language : 'en-GB']}</Link></section> : !gameId ? <>
       <div className="flex justify-between gap-4 items-start mb-10"><div><p className="eyebrow mb-3">{identity.user.name} · Ludus</p><h1 className="font-display text-5xl sm:text-7xl">{c.setup}.</h1></div><Button className="text-xs underline py-3" onClick={() => void api('/api/auth/sign-out', {}).then(() => location.assign('/play'))}>{c.signOut}</Button></div>
-      <div className="lobby-grid"><figure className="lobby-scene"><ChessScene /><figcaption><span>{c.opponent}</span><span>{c.subtitle}</span></figcaption></figure>
+      <nav className="flex gap-5 mb-6 text-sm underline" aria-label="Ludus"><Link to="/online">{({ 'en-GB': 'Play online', 'es-ES': 'Jugar en línea', 'fr-FR': 'Jouer en ligne' })[isLanguage(i18n.language) ? i18n.language : 'en-GB']}</Link><Link to="/account">{({ 'en-GB': 'Your profile', 'es-ES': 'Tu perfil', 'fr-FR': 'Votre profil' })[isLanguage(i18n.language) ? i18n.language : 'en-GB']}</Link></nav><div className="lobby-grid"><figure className="lobby-scene"><ChessScene /><figcaption><span>{c.opponent}</span><span>{c.subtitle}</span></figcaption></figure>
         <div className="lobby-controls"><AppleMailTabs value={lobbyTab} onValueChange={setLobbyTab} label={c.play} tabs={[
           { value: 'play', label: c.newGame, icon: '♞' }, { value: 'history', label: c.history, icon: '↺' },
         ]}>
@@ -205,8 +227,8 @@ export function Play() {
               {lobbyTab === 'play' ? <section className="setup-card"><p className="eyebrow text-olive">{c.opponent}</p><h2 className="font-display text-4xl mt-3 mb-7">{c.play}</h2>
         <label className="setup-label">{c.control}<select className="game-input" value={control} onChange={(e) => setControl(e.target.value as Control)}><option>5+3</option><option>10+5</option></select></label>
         <label className="setup-label">{c.difficulty}<select className="game-input" value={difficulty} onChange={(e) => setDifficulty(Number(e.target.value) as Difficulty)}>{c.levels.map((name, i) => <option key={name} value={i + 1}>{name}</option>)}</select></label>
-        <label className="setup-label">{c.colour}<select className="game-input" value={colour} onChange={(e) => setColour(e.target.value as 'w' | 'b')}><option value="w">{c.white}</option><option value="b">{c.black}</option></select></label>
-        <Button className="game-primary mt-4 w-full" disabled={pending} onClick={() => void start()}>{history.some((g) => !g.result) ? c.resume : c.start} ↗</Button><p className="text-xs text-muted mt-4 leading-6">{c.provisional}</p>
+        {suggestion && <Button className="game-secondary mb-3" onClick={() => setDifficulty(suggestion.difficulty)}>{({ 'en-GB': 'Use suggested difficulty', 'es-ES': 'Usar dificultad sugerida', 'fr-FR': 'Utiliser la difficulté conseillée' })[isLanguage(i18n.language) ? i18n.language : 'en-GB']}: {c.levels[suggestion.difficulty - 1]}</Button>}<label className="setup-label">{c.colour}<select className="game-input" value={colour} onChange={(e) => setColour(e.target.value as 'w' | 'b')}><option value="w">{c.white}</option><option value="b">{c.black}</option></select></label>
+        <Button className="game-primary mt-4 w-full" disabled={pending} onClick={() => void start()}>{history.some((g) => !g.result) ? c.resume : c.start} ↗</Button><p className="text-xs text-muted mt-4 leading-6">{c.provisional}</p><AppearanceControls state={appearanceState} />
       </section> : <section className="history-panel"><h2 className="font-display text-3xl mb-6">{c.history}</h2>{history.length ? <ul>{history.map((entry) => <li key={entry.id}><Link className="history-row" to={`/play?game=${entry.id}`}><span><span className="block text-sm">{c.opponent}</span><span className="text-xs text-muted">{new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }).format(entry.createdAt)}</span></span><span className="text-xs">{entry.result ? c.replay : c.resume} →</span></Link></li>)}</ul> : <p className="text-muted text-sm">{c.noHistory}</p>}</section>}
             </Tabs.Panel>
           </SlidingPanel>
@@ -219,14 +241,15 @@ export function Play() {
         <div className="player-bar"><div><span className="player-avatar">L</span><span>{topIsYou ? c.you : coachIdentity.name}<small>{topIsYou ? identity.user.name : c.computer}</small></span></div><span className={`clock ${boardChess.turn() === topColour && !game.result ? 'clock-active' : ''}`}>{clock(clocks[flipped ? 'w' : 'b'])}</span></div>
         <div className="player-bar"><div><span className="player-avatar player-avatar-you">{topIsYou ? 'L' : identity.user.name[0]}</span><span>{topIsYou ? coachIdentity.name : c.you}<small>{topIsYou ? c.computer : identity.user.name}</small></span></div><span className={`clock ${boardChess.turn() === (flipped ? 'b' : 'w') && !game.result ? 'clock-active' : ''}`}>{clock(clocks[flipped ? 'b' : 'w'])}</span></div>
         </div>
-        <div className="board-frame">{view === '3d' ? <GraphicsBoundary key={resetKey} fallback={<div className="board-fallback"><p role="status" className="text-sm p-3">{c.unavailable3d}</p><Board {...boardProps} /></div>}><Suspense fallback={<div className="aspect-square grid place-items-center">{c.loading}</div>}><Board3D {...boardProps} resetKey={resetKey} looking={looking} captured={capturedPieces(shown)} tableClock={{ times: { w: clock(clocks.w), b: clock(clocks.b) }, active: game.result || pause > 0 ? null : boardChess.turn() }} /></Suspense>{!looking && <Board {...boardProps} concealed />}</GraphicsBoundary> : <Board {...boardProps} />}</div>
+        <div className="board-frame">{view === '3d' ? <GraphicsBoundary key={resetKey} fallback={<div className="board-fallback"><p role="status" className="text-sm p-3">{c.unavailable3d}</p><Board {...boardProps} /></div>}><Suspense fallback={<div className="aspect-square grid place-items-center">{c.loading}</div>}><Board3D {...boardProps} resetKey={resetKey} looking={looking} captured={captured} tableClock={{ times: { w: clock(clocks.w), b: clock(clocks.b) }, active: game.result || pause > 0 ? null : boardChess.turn() }} /></Suspense>{!looking && <Board {...boardProps} concealed />}</GraphicsBoundary> : <Board {...boardProps} />}</div>
         <div className="board-tools" role="group" aria-label={c.board}><Button className="game-secondary" onClick={() => { const next = view === '3d' ? '2d' : '3d'; setView(next); setLooking(false); try { localStorage.setItem('ludus-board', next); } catch { /* Preference is optional. */ } }}><ControlIcon name="board" />{view === '3d' ? c.view2d : c.view3d}</Button><Button className="game-secondary" onClick={() => setFlipped(!flipped)}><ControlIcon name="flip" />{c.flip}</Button>{view === '3d' && <><Button className="game-secondary" aria-pressed={looking} onClick={() => { setSelected(null); setLooking(!looking); }}><ControlIcon name="look" />{looking ? c.returnToBoard : c.lookAround}</Button><Button className="game-secondary" onClick={() => setResetKey(resetKey + 1)}><ControlIcon name="reset" />{c.reset}</Button></>}</div>
       </section><aside className="match-sidebar">
         <p className="eyebrow text-muted mb-3">{c.casual}</p><div role="status" className="match-status"><h2 className="font-display text-3xl">{status}</h2>{!game.result && boardChess.isCheck() && <p className="text-sm mt-2">{c.check}</p>}</div>
         {!connected && !game.result && <p className="game-notice text-xs">{c.reconnecting}</p>}{pause > 0 && !game.result && <p role="status" className="game-notice text-xs">{c.paused} · {pause} {c.allowance}</p>}
         {engineError && <div role="alert" className="game-notice text-sm">{c.engineError}<Button className="underline block mt-3" onClick={() => setEngineRetry(engineRetry + 1)}>{c.retry}</Button></div>}
+        {!game.result && boardChess.turn() === game.colour && (boardChess.isThreefoldRepetition() || boardChess.isDrawByFiftyMoves()) && <Button className="game-secondary" disabled={pending || !connected} onClick={() => void send({ type: 'claimDraw', revision: game.revision })}>{c.claimDraw}</Button>}
         <section className="moves-panel" aria-label={c.moveList}><h3 className="eyebrow mb-4">{c.moveList}</h3>{!game.moves.length ? <p className="text-sm text-muted">{c.noMoves}</p> : <ol>{Array.from({ length: Math.ceil(game.moves.length / 2) }, (_, i) => <li key={i} className="move-row"><span>{i + 1}.</span>{game.moves.slice(i * 2, i * 2 + 2).map((move, j) => <Button key={j} disabled={!game.result} aria-pressed={replay?.branchAt === null && replay.ply === i * 2 + j + 1} onClick={() => navigateReplay(savedReplay(game, i * 2 + j + 1))} className="move-notation">{move}</Button>)}</li>)}</ol>}</section>
-        {game.result ? <div className="grid gap-3 mt-5"><div className="replay-controls"><Button aria-label={c.beginning} onClick={() => navigateReplay(replay ? { ...replay, ply: 0 } : savedReplay(game, 0))}>│‹</Button><Button aria-label={c.previous} onClick={() => navigateReplay(stepReplay(replay ?? savedReplay(game), -1))}>‹</Button><Button aria-label={c.next} onClick={() => navigateReplay(stepReplay(replay ?? savedReplay(game), 1))}>›</Button><Button aria-label={c.latest} onClick={() => navigateReplay(null)}>›│</Button></div><p className="text-xs text-muted">{rc.hint}</p>{replay?.branchAt !== null && replay?.branchAt !== undefined && <section aria-label={rc.variation}><p role="status" className="text-sm">{rc.variation}: {replay.moves.slice(replay.branchAt, replay.ply).join(' ')}</p><Button className="game-secondary mt-3" onClick={() => navigateReplay(savedReplay(game, replay.branchAt!))}>{rc.saved}</Button></section>}<Button className="game-secondary" onClick={download}>{c.download}</Button><Link to="/play" className="game-primary text-center">{c.newGame}</Link></div> : confirmResign ? <div className="mt-5"><p className="text-sm mb-3">{c.confirmResign}</p><div className="flex gap-3"><Button className="game-secondary" onClick={() => setConfirmResign(false)}>{c.cancel}</Button><Button className="game-primary" disabled={pending || !connected} onClick={() => { setConfirmResign(false); void send({ type: 'resign', revision: game.revision }); }}>{c.resign}</Button></div></div> : <Button className="game-secondary mt-5" disabled={!connected || pending} onClick={() => setConfirmResign(true)}>{c.resign}</Button>}
+        {game.result ? <div className="grid gap-3 mt-5"><div className="replay-controls"><Button aria-label={c.beginning} onClick={() => navigateReplay(replay ? { ...replay, ply: 0 } : savedReplay(game, 0))}>│‹</Button><Button aria-label={c.previous} onClick={() => navigateReplay(stepReplay(replay ?? savedReplay(game), -1))}>‹</Button><Button aria-label={c.next} onClick={() => navigateReplay(stepReplay(replay ?? savedReplay(game), 1))}>›</Button><Button aria-label={c.latest} onClick={() => navigateReplay(null)}>›│</Button></div><p className="text-xs text-muted">{rc.hint}</p>{replay?.branchAt !== null && replay?.branchAt !== undefined && <section aria-label={rc.variation}><p role="status" className="text-sm">{rc.variation}: {replay.moves.slice(replay.branchAt, replay.ply).join(' ')}</p><Button className="game-secondary mt-3" onClick={() => navigateReplay(savedReplay(game, replay.branchAt!))}>{rc.saved}</Button></section>}<Button className="game-secondary" onClick={download}>{c.download}</Button><Link className="game-secondary" to={`/coach/${game.id}`}>{({ 'en-GB': 'Review with Lucía', 'es-ES': 'Analizar con Lucía', 'fr-FR': 'Analyser avec Lucía' })[isLanguage(i18n.language) ? i18n.language : 'en-GB']}</Link><Link to="/play" className="game-primary text-center">{c.newGame}</Link></div> : confirmResign ? <div className="mt-5"><p className="text-sm mb-3">{c.confirmResign}</p><div className="flex gap-3"><Button className="game-secondary" onClick={() => setConfirmResign(false)}>{c.cancel}</Button><Button className="game-primary" disabled={pending || !connected} onClick={() => { setConfirmResign(false); void send({ type: 'resign', revision: game.revision }); }}>{c.resign}</Button></div></div> : <Button className="game-secondary mt-5" disabled={!connected || pending} onClick={() => setConfirmResign(true)}>{c.resign}</Button>}
       </aside></div>
       {promotion && <Dialog.Root open onOpenChange={(open) => { if (!open) setPromotion(null); }}><Dialog.Portal><Dialog.Backdrop className="fixed inset-0 z-50 bg-ink/50" /><Dialog.Popup className="promotion-panel fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2"><Dialog.Title className="font-display text-3xl mb-5">{c.promotion}</Dialog.Title><div className="grid grid-cols-2 gap-3">{(['q', 'r', 'b', 'n'] as const).map((piece, i) => <Button autoFocus={i === 0} key={piece} className="game-secondary" onClick={() => game.result ? playVariation({ ...promotion, promotion: piece }) : void send({ type: 'move', ...promotion, promotion: piece, revision: game.revision })}>{({ q: c.queen, r: c.rook, b: c.bishop, n: c.knight })[piece]}</Button>)}</div><Button className="mt-4 underline text-sm" onClick={() => setPromotion(null)}>{rc.cancelPromotion}</Button></Dialog.Popup></Dialog.Portal></Dialog.Root>}
     </div>}

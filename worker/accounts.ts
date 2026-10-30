@@ -7,7 +7,7 @@ import { deleteCoachAccount } from './coach-store';
 const response = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
 type ProfileRow = { user_id: string; username: string; language: Language; timezone: string; pending_timezone: string | null; timezone_effective_at: number | null; chess_level: PlayerProfile['chessLevel']; teaching_profile: PlayerProfile['teachingProfile']; activity_public: number; adult_attested_at: number; policy_version: string; onboarded_at: number; trial_expires_at: number; mutation_id: string };
 export async function loadPlayerProfile(db: D1Database, owner: string, now = Date.now()): Promise<PlayerProfile | null> {
-  const p = await db.prepare('SELECT * FROM player_profiles WHERE user_id = ?').bind(owner).first<ProfileRow>();
+  const p = await db.prepare('SELECT * FROM player_profiles WHERE user_id = ? AND NOT EXISTS(SELECT 1 FROM account_deletions WHERE user_id=?)').bind(owner, owner).first<ProfileRow>();
   if (!p) return null;
   return profileFromRow(p, now);
 }
@@ -23,8 +23,8 @@ export async function recordActivity(db: D1Database, input: { gameId: string; pl
   for (const player of new Set(input.players)) {
     const zone = await db.prepare('SELECT timezone FROM timezone_history WHERE user_id = ? AND effective_at <= ? ORDER BY effective_at DESC LIMIT 1').bind(player, input.completedAt).first<{ timezone: string }>();
     if (!zone) continue;
-    await db.prepare('INSERT OR IGNORE INTO activity_events(user_id,game_id,completed_at,date,timezone) SELECT ?,?,?,?,? WHERE EXISTS (SELECT 1 FROM player_profiles WHERE user_id = ?)')
-      .bind(player, input.gameId, input.completedAt, localDate(input.completedAt, zone.timezone), zone.timezone, player).run();
+    await db.prepare('INSERT OR IGNORE INTO activity_events(user_id,game_id,completed_at,date,timezone) SELECT ?,?,?,?,? WHERE EXISTS (SELECT 1 FROM player_profiles WHERE user_id = ?) AND NOT EXISTS(SELECT 1 FROM account_deletions WHERE user_id=?)')
+      .bind(player, input.gameId, input.completedAt, localDate(input.completedAt, zone.timezone), zone.timezone, player, player).run();
   }
 }
 export async function readActivity(db: D1Database, owner: string, timezone: string, now = Date.now()) {
@@ -46,7 +46,7 @@ export async function boundedBody(request: Request): Promise<Record<string, unkn
 async function saveProfile(db: D1Database, owner: string, body: unknown, now: number) {
   const input = parseProfile(body);
   if (!input) return response({ error: 'invalid_profile' }, 400);
-  const row = await db.prepare('SELECT * FROM player_profiles WHERE user_id = ?').bind(owner).first<ProfileRow>();
+  const row = await db.prepare('SELECT * FROM player_profiles WHERE user_id = ? AND NOT EXISTS(SELECT 1 FROM account_deletions WHERE user_id=?)').bind(owner, owner).first<ProfileRow>();
   const previous = row ? profileFromRow(row, now) : null;
   const mutation = crypto.randomUUID();
   const zone = previous ? timezoneChange(previous, input.timezone, now) : { timezone: input.timezone, pendingTimezone: null, timezoneEffectiveAt: null };
@@ -89,6 +89,10 @@ async function deleteAccount(env: Env, owner: string, email: string, now: number
   }
   const tables = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table'").all<{ name: string }>();
   const names = new Set(tables.results.map((row) => row.name));
+  if (names.has('online_matches')) {
+    const online = await env.DB.prepare('SELECT id FROM online_matches WHERE white_id=? OR black_id=?').bind(owner, owner).all<{ id: string }>();
+    for (const game of online.results) await env.HUMAN_MATCHES.getByName(game.id).anonymise(owner);
+  }
   if (names.has('coach_requests')) await deleteCoachAccount(env.DB, owner);
   const matchmaking = env as unknown as { MATCHMAKING?: { getByName(name: string): { removeUser(id: string): Promise<void> } } };
   if (matchmaking.MATCHMAKING) await matchmaking.MATCHMAKING.getByName('beta').removeUser(owner);
@@ -189,8 +193,9 @@ export async function accountsApi(request: Request, env: Env): Promise<Response 
       const user = await env.DB.prepare('SELECT user_id FROM player_profiles WHERE username = ? COLLATE NOCASE').bind(username).first<{ user_id: string }>();
       const profile = user ? await loadPlayerProfile(env.DB, user.user_id) : null;
       if (!profile) return response({ error: 'not_found' }, 404);
-      const ratings = await env.DB.prepare('SELECT control,rating,deviation,games FROM ratings WHERE user_id = ?').bind(profile.userId).all();
-      return response({ ...publicProfile(profile), ratings: ratings.results, ...(profile.activityPublic ? { activity: await readActivity(env.DB, profile.userId, profile.timezone) } : {}) });
+      const ratings = await env.DB.prepare('SELECT control,rating,deviation,games FROM ratings WHERE user_id = ?').bind(profile.userId).all<{ control: string; rating: number; deviation: number; games: number }>();
+      const ranks = ['5+3', '10+5'].map((control) => ratings.results.find((rating) => rating.control === control) ?? { control, rating: 1500, deviation: 350, games: 0 });
+      return response({ ...publicProfile(profile), ratings: ranks, ...(profile.activityPublic ? { activity: await readActivity(env.DB, profile.userId, profile.timezone) } : {}) });
     }
     const session = await authFor(request, env).api.getSession({ headers: request.headers });
     if (!session) return response({ error: 'unauthorised' }, 401);

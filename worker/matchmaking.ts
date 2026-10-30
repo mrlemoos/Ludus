@@ -70,5 +70,5 @@ export class Matchmaking extends DurableObject<Env> {
     this.save(user, { status: 'computer', id }); return { reserved: true };
   }
   async releaseComputer(user: string, id: string) { const state = this.state(user); if (state.status === 'computer' && state.id === id) this.save(user, { status: 'idle' }); }
-  async removeUser(user: string) { this.ctx.storage.sql.exec('DELETE FROM players WHERE user_id=?', user); const rows = this.ctx.storage.sql.exec<{ token: string; data: string }>('SELECT token,data FROM invites').toArray(); for (const row of rows) { const invite: Invite = JSON.parse(row.data); if (invite.owner === user || invite.redeemedBy === user) this.ctx.storage.sql.exec('DELETE FROM invites WHERE token=?', row.token); } }
+  async removeUser(user: string) { const current = this.state(user); if (current.status === 'assigned') await this.release(current.match.id, Object.values(current.match.players)); this.ctx.storage.sql.exec('DELETE FROM players WHERE user_id=?', user); const rows = this.ctx.storage.sql.exec<{ token: string; data: string }>('SELECT token,data FROM invites').toArray(); for (const row of rows) { const invite: Invite = JSON.parse(row.data); if (invite.owner === user || invite.redeemedBy === user) this.ctx.storage.sql.exec('DELETE FROM invites WHERE token=?', row.token); } }
 }

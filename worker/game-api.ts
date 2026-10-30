@@ -1,5 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, desc, eq, isNull } from 'drizzle-orm';
+import { playReturnPath } from '../shared/navigation';
 import { authFor, localDevelopment } from './auth';
 import { invitations, matches } from './schema';
 
@@ -20,11 +21,14 @@ export async function gameApi(request: Request, env: Env): Promise<Response> {
       if (!localDevelopment(request, env)) return json({ error: 'not_found' }, 404);
       let link: string | undefined;
       const auth = authFor(request, env, (url) => { link = url; });
-      // Local access is limited to the deliberately seeded invitation, never arbitrary email input.
-      const email = 'leo.lemos.ds@icloud.com';
+      // Two fixed seeded identities allow real multiplayer checks; arbitrary email input is forbidden.
+      const body = await boundedJson(request);
+      const identity = body && typeof body === 'object' && 'account' in body ? body.account : 'leo';
+      if (identity !== 'leo' && identity !== 'friend') return json({ error: 'invalid' }, 400);
+      const email = identity === 'friend' ? 'ludus-friend@example.test' : 'leo.lemos.ds@icloud.com';
       const invited = await drizzle(env.DB).select().from(invitations).where(eq(invitations.email, email)).get();
       if (!invited) return json({ error: 'seed_required' }, 409);
-      await auth.api.signInMagicLink({ body: { email, name: 'Leo', callbackURL: `${url.origin}/play` }, headers: request.headers });
+      await auth.api.signInMagicLink({ body: { email, name: identity === 'friend' ? 'Friend' : 'Leo', callbackURL: `${url.origin}${playReturnPath(body && typeof body === 'object' && 'returnTo' in body ? body.returnTo : null)}` }, headers: request.headers });
       return link ? json({ url: link }) : json({ error: 'unavailable' }, 503);
     }
     if (url.pathname.startsWith('/api/auth/')) {
@@ -40,20 +44,33 @@ export async function gameApi(request: Request, env: Env): Promise<Response> {
     const session = await authFor(request, env).api.getSession({ headers: request.headers });
     if (!session) return json({ error: 'unauthorised' }, 401);
     const owner = session.user.id;
+    if (await env.DB.prepare('SELECT user_id FROM account_deletions WHERE user_id=?').bind(owner).first()) return json({ error: 'account_deleted' }, 403);
     const db = drizzle(env.DB);
     if (url.pathname === '/api/games') {
       if (request.method === 'GET') return json(await db.select().from(matches).where(eq(matches.owner, owner)).orderBy(desc(matches.createdAt)).limit(30));
       if (request.method !== 'POST') return json({ error: 'method' }, 405);
+      const profile = await env.DB.prepare('SELECT user_id FROM player_profiles WHERE user_id=?').bind(owner).first();
+      if (!profile) return json({ error: 'onboarding_required' }, 403);
       const input = await boundedJson(request);
       if (!input || typeof input !== 'object' || !('control' in input) || !['5+3', '10+5'].includes(String(input.control)) || !('difficulty' in input) || (typeof input.difficulty !== 'number' || ![1, 2, 3, 4].includes(input.difficulty)) || !('colour' in input) || !['w', 'b'].includes(String(input.colour))) return json({ error: 'invalid' }, 400);
       // Resume an unfinished game instead of silently abandoning it.
       const active = await db.select().from(matches).where(and(eq(matches.owner, owner), isNull(matches.result))).orderBy(desc(matches.createdAt)).limit(1).get();
       if (active) {
         const current = await env.MATCHES.getByName(active.id).read(owner);
-        if (current && !current.game.result) return json(current);
+        if (!current || !current.game.result) {
+          await env.MATCHMAKING.getByName('beta').reserveComputer(owner, active.id);
+          if (current) return json(current);
+          const recovered = await env.MATCHES.getByName(active.id).initialise(active.id, owner, active.control, active.difficulty as 1 | 2 | 3 | 4, active.colour);
+          return json({ game: recovered, serverNow: Date.now() });
+        }
       }
       const id = crypto.randomUUID();
-      await db.insert(matches).values({ id, owner, createdAt: Date.now() });
+      const coordinator = env.MATCHMAKING.getByName('beta');
+      await coordinator.reserveComputer(owner, id);
+      try {
+        const inserted = await env.DB.prepare('INSERT INTO matches(id,owner,created_at,control,difficulty,colour) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM player_profiles WHERE user_id=?) AND NOT EXISTS(SELECT 1 FROM account_deletions WHERE user_id=?)').bind(id, owner, Date.now(), input.control, input.difficulty, input.colour, owner, owner).run();
+        if (!inserted.meta.changes) { await coordinator.releaseComputer(owner, id); return json({ error: 'account_deleted' }, 403); }
+      } catch (error) { await coordinator.releaseComputer(owner, id); throw error; }
       const game = await env.MATCHES.getByName(id).initialise(id, owner, input.control as '5+3' | '10+5', Number(input.difficulty) as 1 | 2 | 3 | 4, input.colour as 'w' | 'b');
       return json({ game, serverNow: Date.now() });
     }

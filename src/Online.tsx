@@ -1,4 +1,4 @@
-import { Component, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Component, Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@base-ui/react/button';
@@ -53,7 +53,8 @@ export function Online() {
   async function run(operation: () => Promise<void>) { if (lock.current) return; lock.current = true; setPending(true); setError(false); try { await operation(); } catch { setError(true); } finally { lock.current = false; setPending(false); } }
   const act = (action: Omit<HumanAction, 'revision'>) => run(async () => { if (!game) return; accept(await api(`games/${game.id}`, { ...action, revision: game.revision })); setSelected(null); setPromotion(null); });
   const navigate = (next: typeof replay) => { setReplay(next); setSelected(null); setPromotion(null); };
-  const shown = new Chess(); if (game) for (const move of replay ? replay.moves.slice(0, replay.ply) : game.moves) shown.move(move);
+  const shown = useMemo(() => { const chess = new Chess(); if (game) for (const move of replay ? replay.moves.slice(0, replay.ply) : game.moves) chess.move(move); return chess; }, [game?.moves, replay]);
+  const captured = useMemo(() => capturedPieces(shown), [shown]);
   const playerColour = game?.players.w === user ? 'w' : 'b';
   function move(from: Square, to: Square, promoted?: string) {
     if (!game) return;
@@ -68,12 +69,12 @@ export function Online() {
     if (!legal.length) { setSelected(null); return; }
     if (legal.some((candidate) => candidate.promotion)) setPromotion({ from: selected, to: square }); else move(selected, square);
   }
-  const timing = game ? humanTiming(game, now) : null, last = shown.history({ verbose: true }).at(-1);
+  const timing = game ? humanTiming(game, now) : null, last = useMemo(() => shown.history({ verbose: true }).at(-1), [shown]);
   const props = { fen: shown.fen(), selected, destinations: selected ? shown.moves({ square: selected, verbose: true }).map((move) => move.to) : [], lastMove: last ? [last.from, last.to] : [], flipped, onSquare: square, copy: boardCopy, appearance: appearance.appearance };
   const clock = (time: number) => `${Math.floor(Math.ceil(time / 1000) / 60)}:${String(Math.ceil(time / 1000) % 60).padStart(2, '0')}`;
   return <div className="site-shell game-shell"><Header /><main id="main" className="game-main"><Link to="/play" className="underline text-sm">{c.back}</Link><h1 className="font-display text-5xl my-6">{c.title}</h1>
     {error && <p role="alert" className="game-notice">{c.error}</p>}
-    {user === undefined ? <p>{boardCopy.loading}</p> : !user ? <Link to="/play" className="game-primary">{c.signIn}</Link> : !id ? <div className="grid gap-5 max-w-2xl">
+    {user === undefined ? <p>{boardCopy.loading}</p> : !user ? <Link to={inviteToken ? `/play?returnTo=${encodeURIComponent(`/online?invite=${inviteToken}`)}` : '/play'} className="game-primary">{c.signIn}</Link> : !id ? <div className="grid gap-5 max-w-2xl">
       {inviteToken ? <Button className="game-primary" disabled={pending} onClick={() => void run(async () => { const state = await api<QueueState>('invitations/redeem', { token: inviteToken }); if (state.status === 'assigned') setParams({ game: state.match.id }); })}>{c.join}</Button> : <>
       <label className="setup-label">{c.control}<select className="game-input" value={control} onChange={(event) => setControl(event.target.value as Control)}><option>5+3</option><option>10+5</option></select></label>
       <label className="setup-label">{c.colour}<select className="game-input" value={colour} onChange={(event) => setColour(event.target.value as typeof colour)}><option value="random">{c.random}</option><option value="w">{boardCopy.white}</option><option value="b">{boardCopy.black}</option></select></label>
@@ -85,7 +86,7 @@ export function Online() {
       <section><h2 className="font-display text-3xl">{c.history}</h2>{history.length ? <ul>{history.map((entry) => <li key={entry.id}><Link className="history-row" to={`/online?game=${entry.id}`}>{entry.control} · {entry.rated ? c.rated : c.casual} · {entry.result ? c.finished : boardCopy.resume}</Link></li>)}</ul> : <p>{c.noHistory}</p>}</section></>}
     </div> : !game ? <p>{boardCopy.loading}</p> : <div className="match-grid"><section>
       <div className="flex justify-between py-4" aria-label={c.control}><span>{boardCopy.white} {clock(timing!.clocks.w)}</span><span>{boardCopy.black} {clock(timing!.clocks.b)}</span></div>
-      <div className="board-frame">{view === '3d' ? <OnlineGraphics fallback={<Board {...props} />}><Suspense fallback={<p>{boardCopy.loading}</p>}><Board3D {...props} resetKey={resetKey} looking={false} captured={capturedPieces(shown)} tableClock={{ times: { w: clock(timing!.clocks.w), b: clock(timing!.clocks.b) }, active: game.result || timing!.pauseRemaining > 0 ? null : shown.turn() }} /></Suspense><Board {...props} concealed /></OnlineGraphics> : <Board {...props} />}</div>
+      <div className="board-frame">{view === '3d' ? <OnlineGraphics fallback={<Board {...props} />}><Suspense fallback={<p>{boardCopy.loading}</p>}><Board3D {...props} resetKey={resetKey} looking={false} captured={captured} tableClock={{ times: { w: clock(timing!.clocks.w), b: clock(timing!.clocks.b) }, active: game.result || timing!.pauseRemaining > 0 ? null : shown.turn() }} /></Suspense><Board {...props} concealed /></OnlineGraphics> : <Board {...props} />}</div>
       <div className="board-tools"><Button className="game-secondary" onClick={() => setView(view === '3d' ? '2d' : '3d')}>{view === '3d' ? boardCopy.view2d : boardCopy.view3d}</Button><Button className="game-secondary" onClick={() => setFlipped(!flipped)}>{boardCopy.flip}</Button>{view === '3d' && <Button className="game-secondary" onClick={() => setResetKey(resetKey + 1)}>{boardCopy.reset}</Button>}</div>
     </section><aside className="match-sidebar"><p>{game.control} · {game.rated ? c.rated : c.casual}</p><h2 role="status" className="font-display text-3xl my-4">{game.result ? `${c.finished} · ${game.result.reason === 'agreement' ? c.agreement : game.result.reason === 'abort' ? c.abortReason : boardCopy[game.result.reason]}` : shown.turn() === playerColour ? c.turn : c.opponentTurn}</h2>
       {!game.result && (!connected ? <p>{c.reconnect}</p> : timing!.pauseRemaining > 0 && <p role="status">{c.disconnected} · {Math.ceil(timing!.pauseRemaining / 1000)} {c.seconds}</p>)}

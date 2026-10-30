@@ -24,7 +24,7 @@ function fixture() {
     sqlite.exec('BEGIN'); try { const results = []; for (const query of queries) results.push(query.run()); sqlite.exec('COMMIT'); return results; } catch (error) { sqlite.exec('ROLLBACK'); throw error; }
   } } as unknown as D1Database;
   const anonymise = vi.fn().mockResolvedValue(undefined), removeUser = vi.fn().mockResolvedValue(undefined);
-  return { sqlite, db, anonymise, removeUser, env: { DB: db, OPERATOR_IDS: 'owner', RESEND_API_KEY: 'test', AUTH_EMAIL_FROM: 'invites@example.com', MATCHES: { getByName: () => ({ anonymise }) }, MATCHMAKING: { getByName: () => ({ removeUser }) } } as unknown as Env };
+  return { sqlite, db, anonymise, removeUser, env: { DB: db, OPERATOR_IDS: 'owner', RESEND_API_KEY: 'test', AUTH_EMAIL_FROM: 'invites@example.com', MATCHES: { getByName: () => ({ anonymise }) }, HUMAN_MATCHES: { getByName: () => ({ anonymise }) }, MATCHMAKING: { getByName: () => ({ removeUser }) } } as unknown as Env };
 }
 const profile = { username: 'OwnerPlayer', language: 'en-GB', timezone: 'Europe/Madrid', chessLevel: 'casual', teachingProfile: 'developing', adult: true, activityPublic: true };
 function request(path: string, method = 'GET', body?: unknown) {
@@ -71,7 +71,7 @@ describe('account lifecycle with real SQLite migrations', () => {
     authentication.session.mockResolvedValue(null);
     const result = await accountsApi(request('/api/profiles/OwnerPlayer'), env);
     expect(result?.status).toBe(200);
-    expect(await result?.json()).toEqual({ username: 'OwnerPlayer', activityPublic: false, ratings: [] });
+    expect(await result?.json()).toEqual({ username: 'OwnerPlayer', activityPublic: false, ratings: [{ control: '5+3', rating: 1500, deviation: 350, games: 0 }, { control: '10+5', rating: 1500, deviation: 350, games: 0 }] });
   });
 
   it('attributes activity once using historical timezone despite later changes', async () => {
@@ -177,4 +177,11 @@ describe('operator invitation batches', () => {
     expect(sqlite.prepare('SELECT expires_at FROM invitations WHERE email=?').get('beta@example.com')).toEqual({ expires_at: Date.now() + 7 * 86400000 });
     expect((await accountsApi(request('/api/operator/invitations/preview', 'POST', { batchId: crypto.randomUUID(), emails: Array(11).fill('beta@example.com') }), env))?.status).toBe(400);
   });
+});
+
+it('anonymises retained human matches while deleting an account', async () => {
+  const f = fixture();
+  f.sqlite.prepare("INSERT INTO online_matches(id,white_id,black_id,control,rated) VALUES('human','owner','other','5+3',0)").run();
+  const response = await accountsApi(request('/api/account', 'DELETE', { confirmation: 'DELETE' }), f.env);
+  expect(response?.status).toBe(200); expect(f.anonymise).toHaveBeenCalledWith('owner');
 });

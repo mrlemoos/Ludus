@@ -10,14 +10,15 @@ import { CafeEnvironment } from './CafeEnvironment';
 import { TableClock, type TableClockProps } from './TableClock';
 import type { CapturedPiece } from './captured-pieces';
 import { pieceMotion } from './piece-motion';
+import { appearanceMaterials, defaultAppearance, finishMaterials, type Appearance } from '../shared/cosmetics';
 
 type TableProps = { captured: CapturedPiece[]; tableClock: TableClockProps };
 
-function Piece({ type, colour, selected, wood, geometry }: { type: PieceSymbol; colour: 'w' | 'b'; selected: boolean; wood: Texture; geometry: BufferGeometry }) {
+function Piece({ type, colour, selected, wood, geometry, finish = 'wood' }: { finish?: Appearance['pieces']; type: PieceSymbol; colour: 'w' | 'b'; selected: boolean; wood: Texture; geometry: BufferGeometry }) {
   const { lift } = useSpring({ lift: selected ? .2 : .02, immediate: window.matchMedia('(prefers-reduced-motion: reduce)').matches });
   return <animated.group position-y={lift} rotation-y={(colour === 'w' ? 0 : Math.PI) + (type === 'n' ? .4 : 0)}>
     <mesh geometry={geometry} castShadow receiveShadow dispose={null}>
-      <meshPhysicalMaterial map={wood} bumpMap={wood} bumpScale={.003} color={colour === 'w' ? '#dbb780' : '#634734'} roughness={.36} clearcoat={.25} clearcoatRoughness={.38} />
+      <meshPhysicalMaterial map={wood} bumpMap={wood} bumpScale={.003} color={finishMaterials[finish][colour === 'w' ? 'white' : 'black']} roughness={finishMaterials[finish].roughness} clearcoat={.25} clearcoatRoughness={.38} />
     </mesh>
     {type === 'n' && [-1, 1].map((side) => <mesh key={side} position={[side * .132, .93, -.09]} scale={[.35, 1, 1]}>
       <sphereGeometry args={[.026, 12, 8]} /><meshStandardMaterial color={colour === 'w' ? '#503b26' : '#211711'} roughness={.45} />
@@ -28,7 +29,8 @@ function MovingPiece({ from = [0, 0, 0], children }: { from?: [number, number, n
   const { x, z } = useSpring({ from: { x: from[0], z: from[2] }, to: { x: 0, z: 0 }, config: { duration: 800, easing: (t) => t * t * (3 - 2 * t) }, immediate: window.matchMedia('(prefers-reduced-motion: reduce)').matches });
   return <animated.group position-x={x} position-z={z}>{children}</animated.group>;
 }
-function Scene({ fen, selected, destinations, lastMove, onSquare, looking, lowQuality, captured, tableClock }: BoardProps & TableProps & { looking: boolean; lowQuality: boolean }) {
+function Scene({ fen, selected, destinations, lastMove, onSquare, looking, lowQuality, captured, tableClock, appearance = defaultAppearance }: BoardProps & TableProps & { looking: boolean; lowQuality: boolean }) {
+  const material = appearanceMaterials[appearance.board];
   const board = useMemo(() => new Chess(fen).board(), [fen]);
   const previousFen = useRef(fen);
   const motion = useMemo(() => pieceMotion(previousFen.current, fen, lastMove), [fen, lastMove[0], lastMove[1]]);
@@ -52,14 +54,14 @@ function Scene({ fen, selected, destinations, lastMove, onSquare, looking, lowQu
     {/* shortcut: ambient fill approximates indirect light; bake architectural lighting before beta. */}
     <ambientLight intensity={.35} /><hemisphereLight args={['#e3edff', '#796951', 1.5]} />
     <directionalLight position={[-24, 26, -18]} color="#ffe4b9" intensity={1.3} castShadow shadow-normalBias={.025} shadow-bias={-.0001} shadow-radius={3} shadow-mapSize={[1024, 1024]} shadow-camera-left={-7} shadow-camera-right={7} shadow-camera-top={7} shadow-camera-bottom={-7} />
-    <mesh position={[0, -.2, 0]} receiveShadow><boxGeometry args={[8.65, .4, 8.65]} /><meshStandardMaterial color="#5b3929" roughness={.4} /></mesh>
+    <mesh position={[0, -.2, 0]} receiveShadow><boxGeometry args={[8.65, .4, 8.65]} /><meshStandardMaterial color={material.edge} roughness={material.roughness} /></mesh>
     {board.flatMap((row, rank) => row.map((piece, file) => {
       const square = `${'abcdefgh'[file]}${8 - rank}` as Square;
-      const colour = selected === square ? '#a6aa63' : lastMove.includes(square) ? ((rank + file) % 2 ? '#939563' : '#d7cb8e') : ((rank + file) % 2 ? '#6c7355' : '#d9c59e');
+      const colour = selected === square ? '#a6aa63' : lastMove.includes(square) ? ((rank + file) % 2 ? '#939563' : '#d7cb8e') : ((rank + file) % 2 ? material.dark : material.light);
       return <group key={square} position={[file - 3.5, .02, rank - 3.5]} onClick={(e) => { e.stopPropagation(); if (!looking && e.delta < 5) onSquare(square); }}>
         <mesh receiveShadow position={[0, -.02, 0]}><boxGeometry args={[1, .04, 1]} /><meshStandardMaterial map={wood} color={colour} roughness={.5} /></mesh>
         {piece && <MovingPiece key={motion[square] ? fen : square} from={motion[square]}>
-          <Piece geometry={geometries[piece.type]} wood={wood} type={piece.type} colour={piece.color} selected={selected === square} />
+          <Piece finish={appearance.pieces} geometry={geometries[piece.type]} wood={wood} type={piece.type} colour={piece.color} selected={selected === square} />
         </MovingPiece>}
         {destinations.includes(square) && <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .035, 0]}><ringGeometry args={[piece ? .36 : .08, piece ? .42 : .14, 32]} /><meshBasicMaterial color="#38412c" transparent opacity={.7} /></mesh>}
       </group>;
@@ -68,7 +70,7 @@ function Scene({ fen, selected, destinations, lastMove, onSquare, looking, lowQu
     {(['b', 'w'] as const).flatMap((colour) => captured.filter((piece) => piece.colour === colour).map((piece, i) => {
       const side = colour === 'b' ? -1 : 1;
       return <group key={`${colour}-${i}`} name={`captured-${colour}-${piece.type}`} onClick={(event) => event.stopPropagation()} position={[side * (5.2 + i % 2 * .85), -.42, -side * (3.1 - Math.floor(i / 2) * .85)]}>
-        <Piece geometry={geometries[piece.type]} wood={wood} type={piece.type} colour={colour} selected={false} />
+        <Piece finish={appearance.pieces} geometry={geometries[piece.type]} wood={wood} type={piece.type} colour={colour} selected={false} />
       </group>;
     }))}
     <CafeEnvironment lowQuality={lowQuality} />

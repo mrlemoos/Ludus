@@ -18,3 +18,7 @@ Four explicit configurations now live in `shared/computer.ts` and drive the brow
 `tests/unit/computer.test.ts` and `tests/unit/engine.test.ts` cover all four command configurations, suggestion bounds, player colour, draws, unfinished games, history immutability, concurrent requests, disposal and search timeout. A timed-out worker is retired so late replies cannot answer a later request. Manual retry creates a fresh worker. Current full unit suite: 97 passed; TypeScript check passed. Implementation committed in `fa2e700`.
 
 Remaining: integrate advisory recommendations into onboarding/setup, obtain acceptance of provisional thresholds, calibrate strength on representative named devices and record actual results. No calibrated Elo or real-device strength claim is made. Ticket remains incomplete.
+
+## Completion wave
+
+Four settings are integrated into computer play. Onboarding/history recommendations are shown as explicit player actions and never silently update difficulty. Lucía identity is shared. Real-device calibration remains unmeasured; no Elo labels are shown.

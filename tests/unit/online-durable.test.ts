@@ -15,7 +15,7 @@ function sqliteContext() {
   return { db, storage, sockets, ctx: { storage, getWebSockets: (tag?: string) => sockets.filter((socket) => !tag || socket.player === tag), acceptWebSocket: vi.fn() } as unknown as DurableObjectState };
 }
 function d1Database() {
-  const db = new DatabaseSync(':memory:'); db.exec(readFileSync('drizzle/0004_online.sql', 'utf8'));
+  const db = new DatabaseSync(':memory:'); db.exec(readFileSync('drizzle/0004_online.sql', 'utf8')); db.exec('CREATE TABLE account_deletions(user_id TEXT PRIMARY KEY)');
   const prepare = (query: string) => {
     let values: SQLInputValue[] = [];
     const statement = { bind(...params: SQLInputValue[]) { values = params; return statement; }, async run() { return db.prepare(query).run(...values); }, async all() { return { results: db.prepare(query).all(...values) }; }, async first() { return db.prepare(query).get(...values) ?? null; }, execute() { return db.prepare(query).run(...values); } };
@@ -152,5 +152,30 @@ describe('SQLite human match durability and authorisation', () => {
     vi.setSystemTime(4000); await expect(f.match.phrase('white', 'goodGame')).resolves.toEqual({ ok: true });
     await f.match.report('white', 'assistance'); await f.match.report('white', 'assistance');
     expect(f.database.db.prepare('SELECT count(*) AS count FROM match_reports').get()).toEqual({ count: 1 });
+  });
+});
+
+describe('human account erasure', () => {
+  it('revokes the deleted seat and preserves opponent replay and cleanup retries', async () => {
+    const f = humanFixture(active());
+    const socket = { player: 'white', readyState: 1, send: vi.fn(), close: vi.fn(), deserializeAttachment: () => ({ player: 'white' }) };
+    f.sockets.push(socket);
+    f.database.db.prepare('INSERT INTO account_deletions VALUES(?)').run('white');
+    await f.match.anonymise('white');
+    expect(socket.close).toHaveBeenCalledWith(1008, 'Account deleted');
+    expect(f.saved().players.w).toBe('deleted:white');
+    expect(f.saved().result?.reason).toBe('resignation');
+    const terminal = f.saved();
+    expect(await f.match.read('white')).toBeNull();
+    expect((await f.match.read('black'))?.game.moves).toEqual(terminal.moves);
+    await f.match.anonymise('white');
+    expect(f.saved()).toEqual(terminal);
+    expect(f.database.db.prepare('SELECT white_id FROM online_matches').get()).toEqual({ white_id: 'deleted:white' });
+    expect(f.release).toHaveBeenCalled();
+  });
+  it('refuses a late initialisation after a player deleted their account', async () => {
+    const f = humanFixture(); f.database.db.prepare('INSERT INTO account_deletions VALUES(?)').run('white');
+    await expect(f.match.initialise(assignment)).rejects.toThrow('account_deleted');
+    expect(f.database.db.prepare('SELECT count(*) AS count FROM online_matches').get()).toEqual({ count: 0 });
   });
 });

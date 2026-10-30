@@ -2,14 +2,14 @@ import { Chess, type Color } from 'chess.js';
 
 export type Control = '5+3' | '10+5';
 export type Difficulty = 1 | 2 | 3 | 4;
-export type Result = { winner: Color | null; reason: 'checkmate' | 'stalemate' | 'material' | 'repetition' | 'fiftyMoves' | 'resignation' | 'timeout' };
+export type Result = { winner: Color | null; reason: 'checkmate' | 'stalemate' | 'material' | 'repetition' | 'fiftyMoves' | 'resignation' | 'timeout' | 'fivefold' | 'seventyFiveMoves' };
 export type Game = {
   id: string; owner: string; control: Control; difficulty: Difficulty; colour: Color;
   moves: string[]; fen: string; clocks: Record<Color, number>; updatedAt: number;
   revision: number; result: Result | null; pauseStarted: number | null; pauseUsed: number;
 };
 export type Action = { type: 'move'; from: string; to: string; promotion?: string; revision: number }
-  | { type: 'resign'; revision: number };
+  | { type: 'resign' | 'claimDraw'; revision: number };
 export function createGame(id: string, owner: string, control: Control, difficulty: Difficulty, colour: Color, now: number): Game {
   const time = control === '5+3' ? 300_000 : 600_000;
   return { id, owner, control, difficulty, colour, moves: [], fen: new Chess().fen(), clocks: { w: time, b: time }, updatedAt: now, revision: 0, result: null, pauseStarted: now, pauseUsed: 0 };
@@ -56,6 +56,11 @@ export function applyAction(game: Game, action: Action, now: number): Game {
   if (action.type === 'resign') return { ...current, clocks: remaining(current, now), updatedAt: now, revision: current.revision + 1, result: { winner: current.colour === 'w' ? 'b' : 'w', reason: 'resignation' } };
   const chess = chessFrom(current);
   const turn = chess.turn();
+  if (action.type === 'claimDraw') {
+    if (chess.turn() !== current.colour || (!chess.isThreefoldRepetition() && !chess.isDrawByFiftyMoves())) throw new Error('draw_not_claimable');
+    return { ...current, clocks: remaining(current, now), updatedAt: now, revision: current.revision + 1, result: { winner: null, reason: chess.isThreefoldRepetition() ? 'repetition' : 'fiftyMoves' } };
+  }
+  if (action.type !== 'move') throw new Error('invalid');
   const move = chess.move({ from: action.from, to: action.to, promotion: action.promotion });
   if (!move) throw new Error('illegal');
   const clocks = remaining(current, now);
@@ -64,15 +69,21 @@ export function applyAction(game: Game, action: Action, now: number): Game {
   if (chess.isCheckmate()) result = { winner: turn, reason: 'checkmate' };
   else if (chess.isStalemate()) result = { winner: null, reason: 'stalemate' };
   else if (chess.isInsufficientMaterial()) result = { winner: null, reason: 'material' };
-  else if (chess.isThreefoldRepetition()) result = { winner: null, reason: 'repetition' };
-  else if (chess.isDrawByFiftyMoves()) result = { winner: null, reason: 'fiftyMoves' };
+  else if (positionOccurrences(chess) >= 5) result = { winner: null, reason: 'fivefold' };
+  else if (Number(chess.fen().split(' ')[4]) >= 150) result = { winner: null, reason: 'seventyFiveMoves' };
   return { ...current, moves: [...current.moves, move.san], fen: chess.fen(), clocks, updatedAt: now, result, revision: current.revision + 1 };
 }
 export function parseAction(input: unknown): Action | null {
   if (!input || typeof input !== 'object' || !('revision' in input) || !Number.isSafeInteger(input.revision) || Number(input.revision) < 0 || !('type' in input)) return null;
-  if (input.type === 'resign') return { type: 'resign', revision: Number(input.revision) };
+  if (input.type === 'resign' || input.type === 'claimDraw') return { type: input.type, revision: Number(input.revision) };
   if (input.type !== 'move' || !('from' in input) || !('to' in input) || typeof input.from !== 'string' || typeof input.to !== 'string' || !/^[a-h][1-8]$/.test(input.from) || !/^[a-h][1-8]$/.test(input.to)) return null;
   const promotion = 'promotion' in input ? input.promotion : undefined;
   if (promotion !== undefined && (typeof promotion !== 'string' || !/^[qrbn]$/.test(promotion))) return null;
   return { type: 'move', from: input.from, to: input.to, promotion, revision: Number(input.revision) };
+}
+
+export function positionOccurrences(chess: Chess): number {
+  const key = (fen: string) => fen.split(' ').slice(0, 4).join(' ');
+  const target = key(chess.fen()), history = chess.history({ verbose: true });
+  return Number(key(new Chess().fen()) === target) + history.filter((move) => key(move.after) === target).length;
 }

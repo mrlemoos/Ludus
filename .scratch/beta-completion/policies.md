@@ -1,8 +1,8 @@
 # Remaining policy decisions
 
-Status: draft
+Status: approved
 
-Proposals below require Leo's approval. They do not replace confirmed decisions or authorise beta admission, billing or paid model requests.
+Approved by Leo on 2026-10-30 for implementation. Continue implementation waves without further approval requests. Beta admission still requires recorded operational/device validation; paid checkout remains disabled and model selection requires measured evaluation.
 
 ## Admission and personal data
 

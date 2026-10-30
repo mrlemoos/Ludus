@@ -46,6 +46,14 @@
       {
         "name": "MATCHES",
         "class_name": "Match"
+      },
+      {
+        "name": "HUMAN_MATCHES",
+        "class_name": "HumanMatch"
+      },
+      {
+        "name": "MATCHMAKING",
+        "class_name": "Matchmaking"
       }
     ]
   },
@@ -55,6 +63,18 @@
       "new_sqlite_classes": [
         "Match"
       ]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": [
+        "HumanMatch",
+        "Matchmaking"
+      ]
     }
-  ]
+  ],
+  "triggers": {
+    "crons": [
+      "0 3 * * *"
+    ]
+  }
 }

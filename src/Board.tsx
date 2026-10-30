@@ -1,9 +1,10 @@
 import { useRef, type KeyboardEvent } from 'react';
 import { Chess, type Square } from 'chess.js';
 import type { GameCopy } from './game-copy';
+import { appearanceMaterials, type Appearance } from '../shared/cosmetics';
 export const symbols = { w: { k: '♔', q: '♕', r: '♖', b: '♗', n: '♘', p: '♙' }, b: { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' } };
-export type BoardProps = { fen: string; flipped: boolean; selected: Square | null; destinations: string[]; lastMove: string[]; onSquare: (square: Square) => void; copy: GameCopy; concealed?: boolean };
-export function Board({ fen, flipped, selected, destinations, lastMove, onSquare, copy: c, concealed }: BoardProps) {
+export type BoardProps = { fen: string; flipped: boolean; selected: Square | null; destinations: string[]; lastMove: string[]; onSquare: (square: Square) => void; copy: GameCopy; concealed?: boolean; appearance?: Appearance };
+export function Board({ fen, flipped, selected, destinations, lastMove, onSquare, copy: c, concealed, appearance }: BoardProps) {
   const chess = new Chess(fen);
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const squares = Array.from({ length: 64 }, (_, i) => `${'abcdefgh'[flipped ? 7 - i % 8 : i % 8]}${flipped ? Math.floor(i / 8) + 1 : 8 - Math.floor(i / 8)}` as Square);
@@ -19,6 +20,7 @@ export function Board({ fen, flipped, selected, destinations, lastMove, onSquare
         const piece = chess.get(square);
         const legal = destinations.includes(square);
         return <button key={square} ref={(el) => { refs.current[i] = el; }} type="button" data-square={square}
+          style={appearance && selected !== square && !lastMove.includes(square) ? { backgroundColor: appearanceMaterials[appearance.board][((square.charCodeAt(0) + Number(square[1])) % 2 === 0) ? 'dark' : 'light'] } : undefined}
           className={`board-cell ${((square.charCodeAt(0) + Number(square[1])) % 2 === 0) ? 'cell-dark' : 'cell-light'} ${selected === square ? 'cell-selected' : ''} ${lastMove.includes(square) ? 'cell-last' : ''}`}
           aria-label={`${square}, ${piece ? `${piece.color === 'w' ? c.white : c.black} ${pieceNames[piece.type]}` : c.empty}${legal ? `, ${c.legal}` : ''}`}
           aria-pressed={selected === square} onClick={() => onSquare(square)} onKeyDown={(e) => key(e, i)}>

@@ -10,3 +10,7 @@
 - [ ] Choose named iPhone and Android devices, browsers, camera limits, readability checks and load/memory budgets before 3D implementation.
 - [ ] Target at least 30 FPS during mobile board interaction. Specify automatic quality reduction and manual 2D fallback checks.
 - [ ] Keep constrained rotation, zoom, reset and stable default angle; no explorable environment. Record asset and device approval.
+
+## Completion wave
+
+Approved reference devices are iPhone 13/Safari and Pixel 6/Chrome. Original project assets/materials and licence inventory are documented in `docs/assets.md`; measurable protocol is `docs/mobile-validation.md`. Camera/quality/fallback behaviour exists. Final realistic-art acceptance and actual device measurements remain outstanding.

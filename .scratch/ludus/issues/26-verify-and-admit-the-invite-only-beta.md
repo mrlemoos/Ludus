@@ -11,3 +11,7 @@
 - [ ] Check Cloudflare/Resend quotas and coach spending before invitation batches; retain deliberate hard-limit behaviour and avoid unapproved paid upgrades.
 - [ ] Confirm model quality/cost evidence and card-free trial expiry. Paid checkout is not a beta gate unless enabled; test it before exposing it.
 - [ ] Keep registration invite-only. Record remaining limitations and explicit release decision before admitting batches.
+
+## Completion wave
+
+Local unit and integrated Chromium verification cover onboarding/privacy, human/computer play, disconnects, replay, review-accounting/outages and all launch languages. Beta admission remains closed pending exact rated timeout handling, actual model evaluations, named-device measurements, final art review and operational capacity/email validation. See docs/beta-readiness.md. No invitations sent or production release asserted.

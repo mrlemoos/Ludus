@@ -14,3 +14,7 @@
 ## Implementation progress
 
 Implemented lazy-loaded R3F/Drei/React Spring board with project-authored traditional lathed wooden pieces, procedural grain and starter café columns. Shared match state, selection and legal destinations survive 3D/2D switching. Camera rotation/zoom is bounded, reset works, pointer drags do not submit moves, reduced motion disables selection lift, graphics failures offer 2D and measured low FPS lowers resolution/shadows. Browser tests render 3D and verify mobile 2D/keyboard interaction. Starter geometry is not final art; named iPhone/Android performance and final asset acceptance remain outstanding.
+
+## Completion wave
+
+Original café/wooden set and premium material rendering share authoritative board state. Browser tests cover both seats, graphics fallback, mobile layout, reduced motion and interaction. No actual iPhone/Android FPS result is claimed; see `docs/mobile-validation.md`.
