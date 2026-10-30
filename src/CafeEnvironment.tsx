@@ -1,9 +1,22 @@
 import { createContext, memo, useContext, useEffect, useMemo } from 'react';
 import { CubeCamera, ContactShadows, RoundedBox } from '@react-three/drei';
 import { CanvasTexture, RepeatWrapping, SRGBColorSpace, DoubleSide, Shape, ExtrudeGeometry, BoxGeometry, MeshStandardMaterial, Vector2, Vector3, CubicBezierCurve3, type Texture } from 'three';
+import { createCafeModels, type CafeMaterial } from './cafe-models';
 
 type Point = [number, number, number];
-const CafeResources = createContext<{ box: BoxGeometry; materials: Map<string, MeshStandardMaterial> } | null>(null);
+const CafeResources = createContext<{
+  box: BoxGeometry;
+  materials: Map<string, MeshStandardMaterial>;
+  models: ReturnType<typeof createCafeModels>;
+  finishes: Record<CafeMaterial, MeshStandardMaterial>;
+} | null>(null);
+
+function Model({ name }: { name: keyof ReturnType<typeof createCafeModels> }) {
+  const resources = useContext(CafeResources)!;
+  return <group>{resources.models[name].map(({ material, geometry }) =>
+    <mesh key={material} geometry={geometry} material={resources.finishes[material]} castShadow receiveShadow dispose={null} />,
+  )}</group>;
+}
 function Block({ at, size, colour, map, metal = false }: { at: Point; size: Point; colour: string; map?: Texture; metal?: boolean }) {
   const resources = useContext(CafeResources)!;
   const key = `${colour}-${map?.uuid ?? ''}-${metal}`;
@@ -120,16 +133,8 @@ function Sconce() {
     <pointLight position={[0, .12, .23]} color="#ffd09a" intensity={140} distance={45} decay={2} />
   </group>;
 }
-function Chair({ at, angle = 0, wood, leather }: { at: Point; angle?: number; wood: Texture; leather: Texture }) {
-  return <group position={at} rotation-y={angle}>
-    {[-.24, .24].flatMap((x) => [-.22, .22].map((z) => <Block key={`${x}-${z}`} at={[x, .24, z]} size={[.055, .48, .055]} colour={walnut} map={wood} />))}
-    <Block at={[0, .46, 0]} size={[.59, .09, .56]} colour={walnut} map={wood} />
-    <mesh position={[0, .52, 0]} scale={[1, .23, 1]} castShadow receiveShadow><sphereGeometry args={[.31, 24, 12]} /><meshStandardMaterial color="#592d30" map={leather} bumpMap={leather} bumpScale={.0015} roughness={.52} /></mesh>
-    {[-.28, .28].map((x) => <group key={x}><Block at={[x, .78, -.25]} size={[.06, .64, .06]} colour={walnut} map={wood} /><Block at={[x, .7, 0]} size={[.07, .06, .6]} colour="#694c35" map={wood} /></group>)}
-    <RoundedBox position={[0, .92, -.25]} args={[.5, .3, .075]} radius={.035} smoothness={2} castShadow receiveShadow><meshStandardMaterial color="#592d30" map={leather} bumpMap={leather} bumpScale={.0015} roughness={.52} /></RoundedBox>
-    {[-.21, .21].flatMap((x) => [.82, 1.02].map((y) => <mesh key={`${x}-${y}`} position={[x, y, -.207]}><sphereGeometry args={[.008, 8, 6]} /><meshStandardMaterial color={brass} metalness={.6} roughness={.4} /></mesh>))}
-    <Ring at={[0, 1.06, -.25]} radius={.28} tube={.035} colour={walnut} arc={Math.PI} />
-  </group>;
+function Chair({ at, angle = 0 }: { at: Point; angle?: number }) {
+  return <group position={at} rotation-y={angle}><Model name="chair" /></group>;
 }
 function Cup({ at }: { at: Point }) {
   const profile = useMemo(() => [
@@ -174,19 +179,34 @@ function Doorway({ front = false }: { front?: boolean }) {
       <Block at={[x, 1.3, .3]} size={[.09, 1.85, .08]} colour={plaster} />
       <Ring at={[x, 2.56, .25]} radius={.15} tube={.055} colour={carving} arc={Math.PI * 1.7} />
     </group>)}
-    {[-1, 1].flatMap((side) => [0, 1, 2].map((i) => <mesh key={`${side}-${i}`} position={[side * (.78 + i * .06), 2.48 + i * .045, .3]} rotation-z={side * (.3 + i * .4)} scale={[.045, .15, .035]} castShadow><sphereGeometry args={[1, 8, 8]} /><meshStandardMaterial color={carving} /></mesh>))}
     {[.76, .85, .95].map((r) => <Ring key={r} at={[0, 2.05, .16]} radius={r} tube={.055} colour={carving} arc={Math.PI} />)}
     <Block at={[0, 3.02, .15]} size={[2.25, .12, .48]} colour={carving} />
-    {[-1, 1].map((side) => <Ring key={side} at={[0, 3.02, .19]} radius={1.05} tube={.085} colour={carving} arc={1.05} rotation={[0, 0, side === 1 ? 0 : Math.PI - 1.05]} />)}
-    <mesh position={[0, 3.5, .23]} scale={[.15, .23, .07]} castShadow><sphereGeometry args={[1, 12, 12]} /><meshStandardMaterial color={carving} /></mesh>
-    {front && <Block at={[0, 1.55, -.12]} size={[1.5, 3.1, .08]} colour={walnut} />}
+    <Model name="portal" />
+    {front && <>
+      <Block at={[0, 1.55, -.12]} size={[1.5, 3.1, .08]} colour={walnut} />
+      <Model name="entranceDoor" />
+    </>}
   </group>;
 }
 
 export const CafeEnvironment = memo(function CafeEnvironment({ lowQuality }: { lowQuality: boolean }) {
-  const resources = useMemo(() => ({ box: new BoxGeometry(1, 1, 1), materials: new Map<string, MeshStandardMaterial>() }), []);
-  useEffect(() => () => { resources.box.dispose(); resources.materials.forEach((material) => material.dispose()); }, [resources]);
   const maps = useMemo(() => ({ wood: surface('wood'), stone: surface('stone'), plaster: surface('plaster'), floor: surface('floor'), ceiling: surface('ceiling'), paper: surface('paper'), leather: surface('leather'), newsprint: surface('newsprint') }), []);
+  const resources = useMemo(() => ({
+    box: new BoxGeometry(1, 1, 1), materials: new Map<string, MeshStandardMaterial>(), models: createCafeModels(),
+    finishes: {
+      wood: new MeshStandardMaterial({ color: walnut, map: maps.wood, bumpMap: maps.wood, bumpScale: .0015, roughness: .43 }),
+      leather: new MeshStandardMaterial({ color: '#592d30', map: maps.leather, bumpMap: maps.leather, bumpScale: .0015, roughness: .52 }),
+      brass: new MeshStandardMaterial({ color: brass, roughness: .36, metalness: .65 }),
+      plaster: new MeshStandardMaterial({ color: carving, map: maps.plaster, roughness: .82 }),
+      steel: new MeshStandardMaterial({ color: '#b1b6b2', roughness: .28, metalness: .8 }),
+      black: new MeshStandardMaterial({ color: '#252b28', roughness: .48 }),
+    },
+  }), [maps]);
+  useEffect(() => () => {
+    resources.box.dispose(); resources.materials.forEach((material) => material.dispose());
+    Object.values(resources.finishes).forEach((material) => material.dispose());
+    Object.values(resources.models).flat().forEach(({ geometry }) => geometry.dispose());
+  }, [resources]);
   useEffect(() => () => Object.values(maps).forEach((map) => map.dispose()), [maps]);
   return <CafeResources.Provider value={resources}><group position={[0, -15.4, 0]} scale={20}>
     <mesh position={[1.65, -.04, -1.5]} rotation-x={-Math.PI / 2} receiveShadow><planeGeometry args={[6.3, 10.3]} /><meshStandardMaterial map={maps.floor} roughness={.85} /></mesh>
@@ -251,17 +271,16 @@ export const CafeEnvironment = memo(function CafeEnvironment({ lowQuality }: { l
     </group>))}
     {/* Playing table, top at 0.75 m, board geometry unchanged above it. */}
     <RoundedBox position={[0, .724, 0]} args={[1.15, .052, .9]} radius={.018} smoothness={2} receiveShadow><meshStandardMaterial color="#c8bba3" map={maps.stone} roughness={.65} /></RoundedBox>
-    <Block at={[0, .66, 0]} size={[1.05, .09, .8]} colour={walnut} map={maps.wood} />
-    {[-.46, .46].flatMap((x) => [-.34, .34].map((z) => <Block key={`${x}-${z}`} at={[x, .32, z]} size={[.065, .64, .065]} colour={walnut} map={maps.wood} />))}
+    <Model name="tableBase" />
     <ContactShadows position={[1.65, .008, -1.5]} frames={1} opacity={.35} scale={10} blur={2} far={1.3} resolution={lowQuality ? 128 : 256} />
-    <Chair at={[0, 0, -.94]} angle={-.14} wood={maps.wood} leather={maps.leather} /><Chair at={[0, 0, 1]} angle={Math.PI} wood={maps.wood} leather={maps.leather} />
+    <Chair at={[0, 0, -.94]} angle={-.14} /><Chair at={[0, 0, 1]} angle={Math.PI} />
     <Cup at={[.43, .7565, .19]} /><RoundedBox position={[.43, .752, -.04]} args={[.09, .003, .17]} radius={.0012} smoothness={2} receiveShadow castShadow>
       <meshStandardMaterial color="#f4efe4" map={maps.paper} bumpMap={maps.paper} bumpScale={.0005} roughness={1} />
     </RoundedBox>
     {[-3.7, 1.65].map((z) => <group key={z} position={[2.8, 0, z]}>
       <Block at={[0, .73, 0]} size={[.85, .05, .8]} colour="#c8bba3" map={maps.stone} />
-      <Block at={[0, .36, 0]} size={[.1, .72, .1]} colour={walnut} /><Block at={[0, .05, 0]} size={[.6, .06, .5]} colour={walnut} />
-      <Chair at={[-.7, 0, 0]} angle={-Math.PI / 2} wood={maps.wood} leather={maps.leather} />
+      <Model name="cafeTableBase" />
+      <Chair at={[-.7, 0, 0]} angle={-Math.PI / 2} />
       <mesh position={[0, .762, 0]} rotation={[-Math.PI / 2, 0, -.15]} receiveShadow><planeGeometry args={[.3, .4]} /><meshStandardMaterial map={maps.newsprint} roughness={1} /></mesh>
       <Block at={[.015, .758, -.005]} size={[.31, .004, .4]} colour="#c5baa0" />
     </group>)}
@@ -284,15 +303,11 @@ export const CafeEnvironment = memo(function CafeEnvironment({ lowQuality }: { l
       {[2.35, 4.15].map((x) => <Block key={x} at={[x, y - .12, -6.12]} size={[.035, .2, .15]} colour={brass} metal />)}
       {[2.45, 2.7, 2.95, 3.2].map((x) => <mesh key={x} position={[x, y + .105, -6.05]} castShadow><cylinderGeometry args={[.065, .052, .15, 12]} /><meshStandardMaterial color="#e5dbc5" roughness={.35} /></mesh>)}
     </group>)}
-    <Block at={[3.4, 1.4, -5.4]} size={[.9, .52, .4]} colour="#8c8d86" metal />
-    <Block at={[3.4, 1.49, -5.18]} size={[.75, .13, .04]} colour="#242b29" />
-    {[3.1, 3.4, 3.7].map((x) => <Block key={x} at={[x, 1.27, -5.13]} size={[.035, .11, .09]} colour={brass} metal />)}
+    <group position={[3.4, 1.13, -5.4]}><Model name="espressoMachine" /></group>
     {[2.3, 2.55, 2.8].map((x) => <Cup key={x} at={[x, 1.1365, -5.35]} />)}
     <CubeCamera position={[4.56, 2.2, -.9]} frames={1} resolution={lowQuality ? 64 : 128} near={.05} far={600}>{(texture) => <mesh rotation-y={-Math.PI / 2}><planeGeometry args={[1.3, 2.1]} /><meshStandardMaterial color="#b5b6a1" envMap={texture} metalness={1} roughness={.24} /></mesh>}</CubeCamera>
     <group position={[4.56, 2.2, -.9]} rotation-y={-Math.PI / 2}>
-      {[-.73, .73].map((x) => <Block key={x} at={[x, 0, .02]} size={[.14, 2.35, .14]} colour={brass} metal />)}
-      {[-1.12, 1.12].map((y) => <Block key={y} at={[0, y, .02]} size={[1.6, .14, .14]} colour={brass} metal />)}
-      {[-.75, .75].flatMap((x) => [-1.1, 1.1].map((y) => <Ring key={`${x}-${y}`} at={[x, y, .1]} radius={.14} tube={.035} colour={brass} arc={Math.PI * 1.7} />))}
+      <Model name="mirror" />
     </group>
     {[-.95, 1.75, 4].map((x) => <group key={x} position={[x, 2.15, -6.05]}>
       <Sconce />
