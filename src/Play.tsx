@@ -15,6 +15,7 @@ import { Board } from './Board';
 import { capturedPieces } from './captured-pieces';
 import { gameCopy } from './game-copy';
 import { replayCopy } from './replay-copy';
+import { coachIdentity } from '../shared/computer';
 import { replayMove, replayPosition, savedReplay, stepReplay, type Replay } from '../shared/replay';
 import { isLanguage } from '../shared/waitlist';
 import { chessFrom, remaining, type Action, type Control, type Difficulty, type Game } from '../shared/game';
@@ -177,7 +178,7 @@ export function Play() {
     if (!game) return;
     const chess = chessFrom(game);
     const result = !game.result ? '*' : game.result.winner === 'w' ? '1-0' : game.result.winner === 'b' ? '0-1' : '1/2-1/2';
-    chess.header('Event', 'Ludus casual computer game', 'White', game.colour === 'w' ? identity?.user?.name ?? 'Player' : 'Lucía', 'Black', game.colour === 'b' ? identity?.user?.name ?? 'Player' : 'Lucía', 'Result', result);
+    chess.header('Event', 'Ludus casual computer game', 'White', game.colour === 'w' ? identity?.user?.name ?? 'Player' : coachIdentity.name, 'Black', game.colour === 'b' ? identity?.user?.name ?? 'Player' : coachIdentity.name, 'Result', result);
     const url = URL.createObjectURL(new Blob([chess.pgn()], { type: 'application/x-chess-pgn' }));
     const a = document.createElement('a'); a.href = url; a.download = `ludus-${game.id}.pgn`; a.click(); URL.revokeObjectURL(url);
   }
@@ -215,8 +216,8 @@ export function Play() {
       <div className="match-heading"><div><Link to="/play?tab=history" className="eyebrow text-muted">← {c.history}</Link><h1 className="font-display match-title">{c.opponent}</h1></div><span className="match-badge"><span aria-hidden="true">◷</span>{game.control} · {c.levels[game.difficulty - 1]}</span></div>
       <div className="match-grid"><section className="match-stage">
         <div className="match-players">
-        <div className="player-bar"><div><span className="player-avatar">L</span><span>{topIsYou ? c.you : 'Lucía'}<small>{topIsYou ? identity.user.name : c.computer}</small></span></div><span className={`clock ${boardChess.turn() === topColour && !game.result ? 'clock-active' : ''}`}>{clock(clocks[flipped ? 'w' : 'b'])}</span></div>
-        <div className="player-bar"><div><span className="player-avatar player-avatar-you">{topIsYou ? 'L' : identity.user.name[0]}</span><span>{topIsYou ? 'Lucía' : c.you}<small>{topIsYou ? c.computer : identity.user.name}</small></span></div><span className={`clock ${boardChess.turn() === (flipped ? 'b' : 'w') && !game.result ? 'clock-active' : ''}`}>{clock(clocks[flipped ? 'b' : 'w'])}</span></div>
+        <div className="player-bar"><div><span className="player-avatar">L</span><span>{topIsYou ? c.you : coachIdentity.name}<small>{topIsYou ? identity.user.name : c.computer}</small></span></div><span className={`clock ${boardChess.turn() === topColour && !game.result ? 'clock-active' : ''}`}>{clock(clocks[flipped ? 'w' : 'b'])}</span></div>
+        <div className="player-bar"><div><span className="player-avatar player-avatar-you">{topIsYou ? 'L' : identity.user.name[0]}</span><span>{topIsYou ? coachIdentity.name : c.you}<small>{topIsYou ? c.computer : identity.user.name}</small></span></div><span className={`clock ${boardChess.turn() === (flipped ? 'b' : 'w') && !game.result ? 'clock-active' : ''}`}>{clock(clocks[flipped ? 'b' : 'w'])}</span></div>
         </div>
         <div className="board-frame">{view === '3d' ? <GraphicsBoundary key={resetKey} fallback={<div className="board-fallback"><p role="status" className="text-sm p-3">{c.unavailable3d}</p><Board {...boardProps} /></div>}><Suspense fallback={<div className="aspect-square grid place-items-center">{c.loading}</div>}><Board3D {...boardProps} resetKey={resetKey} looking={looking} captured={capturedPieces(shown)} tableClock={{ times: { w: clock(clocks.w), b: clock(clocks.b) }, active: game.result || pause > 0 ? null : boardChess.turn() }} /></Suspense>{!looking && <Board {...boardProps} concealed />}</GraphicsBoundary> : <Board {...boardProps} />}</div>
         <div className="board-tools" role="group" aria-label={c.board}><Button className="game-secondary" onClick={() => { const next = view === '3d' ? '2d' : '3d'; setView(next); setLooking(false); try { localStorage.setItem('ludus-board', next); } catch { /* Preference is optional. */ } }}><ControlIcon name="board" />{view === '3d' ? c.view2d : c.view3d}</Button><Button className="game-secondary" onClick={() => setFlipped(!flipped)}><ControlIcon name="flip" />{c.flip}</Button>{view === '3d' && <><Button className="game-secondary" aria-pressed={looking} onClick={() => { setSelected(null); setLooking(!looking); }}><ControlIcon name="look" />{looking ? c.returnToBoard : c.lookAround}</Button><Button className="game-secondary" onClick={() => setResetKey(resetKey + 1)}><ControlIcon name="reset" />{c.reset}</Button></>}</div>
