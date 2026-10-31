@@ -130,3 +130,10 @@ Use the five default triage labels. See `docs/agents/triage-labels.md`.
 ### Domain docs
 
 Single-context layout with root `GLOSSARY.md` and `docs/adr/`. See `docs/agents/domain.md`.
+
+## Confirmed billing delivery update, 2026-10-31
+
+- Stripe is the chosen subscription provider. Leo chose live-mode integration instead of creating a separate sandbox.
+- One Ludus Plus product, EUR 8 monthly with inclusive-tax price behaviour; local currency conversion remains subject to verified account eligibility.
+- Purchase remains supported throughout beta, including its final 48 hours. Preserve original beta expiry and explicit purchase consent.
+- Tax, account activation, currency eligibility and provider verification still block charging. See `.scratch/ludus/stripe-spec.md`, `.scratch/stripe/` and `docs/stripe.md` for agreed terms, gates and current evidence.

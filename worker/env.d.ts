@@ -1,4 +1,9 @@
 interface Env {
+  STRIPE_API_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_BILLING_ENABLED?: string;
+  STRIPE_TAX_READY?: string;
+  STRIPE_LIFECYCLE_READY?: string;
   OPERATOR_IDS?: string;
   COACH_API_KEY?: string;
   COACH_API_URL?: string;

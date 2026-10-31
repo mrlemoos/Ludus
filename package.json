@@ -37,6 +37,7 @@
     "react-i18next": "^17.1.9",
     "react-router": "^8.5.0",
     "stockfish": "^19.0.1",
+    "stripe": "23.1.0",
     "three": "^0.186.1"
   },
   "devDependencies": {

@@ -1,5 +1,6 @@
 import { Chess } from 'chess.js';
 import { isLanguage, type Language } from './waitlist';
+import { hasPlusAccess } from './plus';
 
 export const teachingProfiles = ['beginner', 'developing', 'club', 'advanced'] as const;
 export type TeachingProfile = typeof teachingProfiles[number];
@@ -18,7 +19,7 @@ export type SavedReview = { id: string; matchId: string; language: Language; pro
 export type SavedReply = { id: string; reviewId: string; language: Language; question: string; document: CoachDocument; createdAt: number };
 export type CoachInput = { key: string; matchId: string; language: Language; profile: TeachingProfile; analysis: AnalysisLine[] };
 export const monthKey = (now: number) => new Date(now).toISOString().slice(0, 7);
-export const hasPlus = (trialExpiresAt: number | null, now: number) => trialExpiresAt !== null && trialExpiresAt > now;
+export const hasPlus = (trialExpiresAt: number | null, now: number) => hasPlusAccess({ trialExpiresAt }, now);
 export const reviewLimit = (plus: boolean) => plus ? 30 : 3;
 export function isTeachingProfile(value: unknown): value is TeachingProfile { return teachingProfiles.some((profile) => profile === value); }
 export function positionAt(moves: readonly string[], ply: number): Chess {

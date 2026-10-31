@@ -3,15 +3,18 @@ import { Link } from 'react-router';
 import { Header } from './App';
 type Member = { email: string; language: string; redeemed_at: number | null; expires_at: number | null };
 type Report = { id: string; match_id: string; category: string; status: string };
+type BillingCase = { id: string; reason: string; resource: string; resolved_at: number | null };
 export function Operator() {
   const [members, setMembers] = useState<Member[]>([]), [reports, setReports] = useState<Report[]>([]), [selection, setSelection] = useState<string[]>([]);
   const [batch, setBatch] = useState<string | null>(null), [preview, setPreview] = useState<{ email: string; language: string }[]>([]), [capacity, setCapacity] = useState(false), [pending, setPending] = useState(false), [message, setMessage] = useState('');
   const [reissue, setReissue] = useState(false);
+  const [billingCases, setBillingCases] = useState<BillingCase[]>([]);
   async function load() {
-    const [waitlist, reports] = await Promise.all([fetch('/api/operator/waitlist'), fetch('/api/operator/reports')]);
-    if (!waitlist.ok || !reports.ok) throw new Error();
+    const [waitlist, reports, billing] = await Promise.all([fetch('/api/operator/waitlist'), fetch('/api/operator/reports'), fetch('/api/operator/billing')]);
+    if (!waitlist.ok || !reports.ok || !billing.ok) throw new Error();
     setMembers((await waitlist.json() as { members: Member[] }).members);
     setReports((await reports.json() as { reports: Report[] }).reports);
+    setBillingCases((await billing.json() as { cases: BillingCase[] }).cases);
   }
   useEffect(() => { void load().catch(() => setMessage('Operator access required, or service unavailable.')); }, []);
   async function post(path: string, body: unknown) {
@@ -22,7 +25,7 @@ export function Operator() {
       if (!response.ok) throw new Error(data.error);
       if (data.invitations) setPreview(data.invitations);
       if (data.sent !== undefined) { setMessage(`Sent ${data.sent} invitations.`); setBatch(null); setPreview([]); setSelection([]); setCapacity(false); }
-      if (path === 'reports') await load();
+      if (path === 'reports' || path === 'billing') await load();
     } catch (error) { setMessage(error instanceof Error && error.message ? error.message : 'Request failed. Retry the same batch.'); } finally { setPending(false); }
   }
   function prepare() { const id = batch ?? crypto.randomUUID(); setBatch(id); void post('invitations/preview', { batchId: id, emails: selection, reissue }); }
@@ -32,5 +35,6 @@ export function Operator() {
     <label><input type="checkbox" checked={reissue} disabled={pending || !!batch} onChange={(event) => setReissue(event.target.checked)} /> Explicitly reissue pending invitations</label><p><button disabled={pending || selection.length === 0 || preview.length > 0} onClick={prepare}>Preview batch</button></p>
     {preview.length > 0 && <section><h2>Review invitation batch</h2><ul>{preview.map((entry) => <li key={entry.email}>{entry.email} · {entry.language}</li>)}</ul><p>Invitations expire seven days after this preview. Existing admitted accounts retain access.</p><label><input type="checkbox" checked={capacity} onChange={(event) => setCapacity(event.target.checked)} /> I checked Cloudflare and Resend capacity.</label><p><button disabled={pending || !capacity} onClick={() => void post('invitations/send', { batchId: batch, capacityConfirmed: capacity })}>Send invitations</button> <button disabled={pending} onClick={() => { setBatch(null); setPreview([]); setCapacity(false); }}>Cancel preview</button></p></section>}
     <h2>Fair-play reports</h2><p>Review manually. A report does not establish cheating and does not reverse ratings.</p>{reports.map((report) => <article key={report.id}><p>{report.match_id} · {report.category} · {report.status}</p><button disabled={pending} onClick={() => void post('reports', { reportId: report.id, status: 'reviewed' })}>Mark reviewed</button> <button disabled={pending} onClick={() => void post('reports', { reportId: report.id, status: 'dismissed' })}>Dismiss</button></article>)}<p role="status">{message}</p>
+    <section aria-label="Billing review"><h2>Billing review</h2><p>Review payment cases in Stripe. Marking reviewed does not refund money or change access.</p>{billingCases.map((item) => <article key={item.id}><p>{item.resource} · {item.reason}</p>{item.resolved_at ? <p>Reviewed</p> : <button disabled={pending} onClick={() => void post('billing', { caseId: item.id })}>Mark reviewed</button>}</article>)}</section>
   </main></div>;
 }

@@ -11,6 +11,11 @@ test('edits profile without restarting beta trial and enforces hidden activity i
   try {
     await page.goto('/account');
     await expect(page.getByRole('heading', { name: 'Your profile' })).toBeVisible();
+    const billing = page.getByRole('region', { name: 'Ludus Plus' });
+    await expect(billing.getByText('Subscriptions are not available yet.')).toBeVisible();
+    await expect(billing.getByRole('button', { name: 'Subscribe to Plus' })).toHaveCount(0);
+    const blockedCheckout = await page.request.post('/api/billing/checkout', { headers: { Origin: 'http://127.0.0.1:4173' }, data: {} });
+    expect(blockedCheckout.status()).toBe(503);
     await expect(page.getByLabel('Public username')).toHaveValue(initial.profile.username);
     await page.getByLabel('Show my activity publicly').uncheck();
     await page.getByRole('button', { name: 'Save profile' }).click();

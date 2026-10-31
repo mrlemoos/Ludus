@@ -1,14 +1,16 @@
 import { DatabaseSync } from 'node:sqlite';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const authentication = vi.hoisted(() => ({ session: vi.fn() }));
+const billing = vi.hoisted(() => ({ cancel: vi.fn() }));
 vi.mock('../../worker/auth', () => ({ authFor: () => ({ api: { getSession: authentication.session } }) }));
+vi.mock('../../worker/billing', () => ({ cancelAccountBilling: billing.cancel }));
 import { accountsApi, loadPlayerProfile, purgeExpiredPersonalData, recordActivity } from '../../worker/accounts';
 
 function fixture() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec('PRAGMA foreign_keys=ON');
-  for (const file of ['0000_grey_triton.sql', '0001_pale_microchip.sql', '0003_accounts.sql', '0004_online.sql', '0005_coach.sql', '0006_cosmetics.sql', '0007_invitation_batches.sql']) sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));
+  for (const file of readdirSync('drizzle').filter((file) => file.endsWith('.sql')).sort()) sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));
   sqlite.prepare('INSERT INTO user(id,name,email,email_verified,created_at,updated_at) VALUES (?,?,?,?,?,?)').run('owner', 'Owner', 'owner@example.com', 1, 0, 0);
   sqlite.prepare('INSERT INTO user(id,name,email,email_verified,created_at,updated_at) VALUES (?,?,?,?,?,?)').run('other', 'Other', 'other@example.com', 1, 0, 0);
   function statement(query: string, parameters: unknown[] = []) {
@@ -30,10 +32,36 @@ const profile = { username: 'OwnerPlayer', language: 'en-GB', timezone: 'Europe/
 function request(path: string, method = 'GET', body?: unknown) {
   return new Request(`https://ludus.example${path}`, { method, headers: { Origin: 'https://ludus.example', 'Content-Type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
-beforeEach(() => { authentication.session.mockResolvedValue({ user: { id: 'owner', email: 'owner@example.com', emailVerified: true } }); vi.useFakeTimers(); vi.setSystemTime(Date.parse('2026-10-30T12:00:00Z')); });
+beforeEach(() => { billing.cancel.mockReset().mockResolvedValue(undefined); authentication.session.mockResolvedValue({ user: { id: 'owner', email: 'owner@example.com', emailVerified: true } }); vi.useFakeTimers(); vi.setSystemTime(Date.parse('2026-10-30T12:00:00Z')); });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('account lifecycle with real SQLite migrations', () => {
+  it('keeps deletion pending and retryable until billing cancellation succeeds', async () => {
+    const { env, sqlite } = fixture();
+    await accountsApi(request('/api/account', 'POST', profile), env);
+    sqlite.prepare("INSERT INTO session(id,expires_at,token,created_at,updated_at,user_id) VALUES('s',9999999999999,'token',0,0,'owner')").run();
+    billing.cancel.mockRejectedValueOnce(new Error('offline'));
+    const pending = await accountsApi(request('/api/account', 'DELETE', { confirmation: 'DELETE' }), env);
+    expect(pending!.status).toBe(202); expect(await pending!.json()).toEqual({ deletionPending: true });
+    expect(sqlite.prepare('SELECT * FROM player_profiles').all()).toHaveLength(1);
+    expect(sqlite.prepare('SELECT * FROM session').all()).toHaveLength(1);
+    expect((await accountsApi(request('/api/account', 'GET'), env))!.status).toBe(202);
+    expect((await accountsApi(request('/api/account', 'POST', profile), env))!.status).toBe(403);
+    expect((await accountsApi(request('/api/account', 'DELETE', { confirmation: 'DELETE' }), env))!.status).toBe(200);
+    expect(sqlite.prepare('SELECT * FROM player_profiles').all()).toHaveLength(0);
+    expect(sqlite.prepare('SELECT * FROM session').all()).toHaveLength(0);
+  });
+  it('restricts billing review to operators and resolves cases without changing entitlements', async () => {
+    const { env, sqlite } = fixture();
+    sqlite.prepare("INSERT INTO billing_review_cases(id,owner,reason,resource,created_at) VALUES('case','owner','late_payment','in_fixture',0)").run();
+    env.OPERATOR_IDS = 'other';
+    expect((await accountsApi(request('/api/operator/billing'), env))!.status).toBe(403);
+    env.OPERATOR_IDS = 'owner';
+    expect((await accountsApi(request('/api/operator/billing'), env))!.status).toBe(200);
+    expect((await accountsApi(request('/api/operator/billing', 'POST', { caseId: 'case' }), env))!.status).toBe(200);
+    expect(sqlite.prepare('SELECT resolved_at FROM billing_review_cases').get()?.resolved_at).toBe(Date.now());
+    expect(sqlite.prepare('SELECT * FROM billing_invoice_access').all()).toEqual([]);
+  });
   it('serialises conflicting onboarding attempts without changing the winning timezone or trial', async () => {
     const { env, sqlite } = fixture();
     const results = await Promise.all([

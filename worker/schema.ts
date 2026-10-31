@@ -42,3 +42,4 @@ export * from './player-schema';
 export * from './online-schema';
 export * from './coach-schema';
 export * from './cosmetic-schema';
+export * from './billing-schema';

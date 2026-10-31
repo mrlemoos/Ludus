@@ -3,6 +3,7 @@ import { dailyActivity, earnsActivity, localDate, timezoneChange } from '../shar
 import { isOperator, parseProfile, policyVersion, publicProfile, type PlayerProfile } from '../shared/profile';
 import type { Language } from '../shared/waitlist';
 import { deleteCoachAccount } from './coach-store';
+import { cancelAccountBilling } from './billing';
 
 const response = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
 type ProfileRow = { user_id: string; username: string; language: Language; timezone: string; pending_timezone: string | null; timezone_effective_at: number | null; chess_level: PlayerProfile['chessLevel']; teaching_profile: PlayerProfile['teachingProfile']; activity_public: number; adult_attested_at: number; policy_version: string; onboarded_at: number; trial_expires_at: number; mutation_id: string };
@@ -77,11 +78,11 @@ export async function purgeExpiredPersonalData(db: D1Database, now = Date.now())
   if (hasReports) await db.prepare('DELETE FROM match_reports WHERE created_at < ?').bind(now - 90 * 86400000).run();
 }
 async function deleteAccount(env: Env, owner: string, email: string, now: number) {
-  // Revoke first. A failed durable cleanup leaves a retryable tombstone, never a valid session.
-  await env.DB.batch([
-    env.DB.prepare('INSERT OR IGNORE INTO account_deletions(user_id,requested_at) VALUES (?,?)').bind(owner, now),
-    env.DB.prepare('DELETE FROM session WHERE user_id = ?').bind(owner),
-  ]);
+  // The tombstone blocks play/purchases. Retain only deletion-status/retry access until billing is cancelled.
+  await env.DB.prepare('INSERT OR IGNORE INTO account_deletions(user_id,requested_at) VALUES (?,?)').bind(owner, now).run();
+  // Retain the retryable tombstone and reconciliation linkage if provider cancellation fails.
+  await cancelAccountBilling(env, owner);
+  await env.DB.prepare('DELETE FROM session WHERE user_id = ?').bind(owner).run();
   const games = await env.DB.prepare('SELECT id FROM matches WHERE owner = ?').bind(owner).all<{ id: string }>();
   for (const game of games.results) {
     const stub = env.MATCHES.getByName(game.id) as unknown as { anonymise: (owner: string) => Promise<unknown> };
@@ -121,7 +122,12 @@ async function deleteAccount(env: Env, owner: string, email: string, now: number
 }
 export async function resumeAccountDeletions(env: Env) {
   const rows = await env.DB.prepare('SELECT d.user_id,u.email FROM account_deletions d JOIN user u ON u.id=d.user_id WHERE d.completed_at IS NULL').all<{ user_id: string; email: string }>();
-  for (const row of rows.results) await deleteAccount(env, row.user_id, row.email, Date.now());
+  let failed = false;
+  for (const row of rows.results) {
+    try { await deleteAccount(env, row.user_id, row.email, Date.now()); }
+    catch { failed = true; }
+  }
+  if (failed) throw new Error('account_deletions_pending');
 }
 type Delivery = { id: string; batch_id: string; email: string; language: Language; created_at: number; expires_at: number; sent_at: number | null; status: string };
 const invitationCopy = {
@@ -199,8 +205,9 @@ export async function accountsApi(request: Request, env: Env): Promise<Response 
     }
     const session = await authFor(request, env).api.getSession({ headers: request.headers });
     if (!session) return response({ error: 'unauthorised' }, 401);
-    const deleting = await env.DB.prepare('SELECT user_id FROM account_deletions WHERE user_id = ?').bind(session.user.id).first();
-    if (deleting) return response({ error: 'account_deleted' }, 403);
+    const deleting = await env.DB.prepare('SELECT user_id,completed_at FROM account_deletions WHERE user_id = ?').bind(session.user.id).first<{ user_id: string; completed_at: number | null }>();
+    if (deleting && path === '/api/account' && deleting.completed_at === null && request.method === 'GET') return response({ deletionPending: true }, 202);
+    if (deleting && !(path === '/api/account' && deleting.completed_at === null && request.method === 'DELETE')) return response({ error: 'account_deleted' }, 403);
     if (path === '/api/account') {
       if (request.method === 'GET') {
         const profile = await loadPlayerProfile(env.DB, session.user.id);
@@ -210,12 +217,22 @@ export async function accountsApi(request: Request, env: Env): Promise<Response 
       if (request.method === 'DELETE') {
         const body = await boundedBody(request);
         if (body?.confirmation !== 'DELETE') return response({ error: 'confirmation_required' }, 400);
-        await deleteAccount(env, session.user.id, session.user.email, Date.now());
+        try { await deleteAccount(env, session.user.id, session.user.email, Date.now()); }
+        catch { return response({ deletionPending: true }, 202); }
         return response({ deleted: true });
       }
       return response({ error: 'method' }, 405);
     }
     if (!isOperator(session.user, env.OPERATOR_IDS)) return response({ error: 'forbidden' }, 403);
+    if (path === '/api/operator/billing' && request.method === 'GET') {
+      return response({ cases: (await env.DB.prepare('SELECT id,reason,resource,created_at,resolved_at FROM billing_review_cases ORDER BY resolved_at IS NOT NULL,created_at DESC LIMIT 200').all()).results });
+    }
+    if (path === '/api/operator/billing' && request.method === 'POST') {
+      const body = await boundedBody(request);
+      if (!body || typeof body.caseId !== 'string' || body.caseId.length > 250) return response({ error: 'invalid' }, 400);
+      const updated = await env.DB.prepare('UPDATE billing_review_cases SET resolved_at=? WHERE id=? AND resolved_at IS NULL').bind(Date.now(), body.caseId).run();
+      return updated.meta.changes ? response({ resolved: true }) : response({ error: 'not_found' }, 404);
+    }
     if (path === '/api/operator/waitlist' && request.method === 'GET') {
       const rows = await env.DB.prepare('SELECT w.email,w.language,w.created_at,i.expires_at,i.redeemed_at FROM waitlist w LEFT JOIN invitations i ON i.email=w.email ORDER BY w.created_at LIMIT 200').all();
       return response({ members: rows.results });

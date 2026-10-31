@@ -1,9 +1,10 @@
 import { defaultAppearance, parseAppearance, permittedAppearance } from '../shared/cosmetics';
-export async function cosmeticsApi(request: Request, env: Env, owner: string) {
+import { hasPlusAccess } from '../shared/plus';
+export async function cosmeticsApi(request: Request, env: Env, owner: string, paidUntil: number | null = null) {
   const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
   const profile = await env.DB.prepare('SELECT trial_expires_at FROM player_profiles WHERE user_id = ?').bind(owner).first<{ trial_expires_at: number }>();
   if (!profile) return json({ error: 'onboarding_required' }, 403);
-  const plus = profile.trial_expires_at > Date.now();
+  const plus = hasPlusAccess({ trialExpiresAt: profile.trial_expires_at, paidAccessUntil: paidUntil }, Date.now());
   if (request.method === 'GET') {
     const saved = await env.DB.prepare('SELECT board,pieces FROM player_cosmetics WHERE owner=?').bind(owner).first();
     return json({ appearance: permittedAppearance(parseAppearance(saved) ?? defaultAppearance, plus), plus });

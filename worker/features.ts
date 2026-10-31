@@ -4,10 +4,13 @@ import { onlineApi } from './online-api';
 import { coachApi } from './coach';
 import { cosmeticsApi } from './cosmetics';
 import { apiJson, boundedRequest } from './http';
+import { billingApi } from './billing';
+import { paidAccessUntil } from './billing-access';
 export async function featuresApi(original: Request, env: Env): Promise<Response | null> {
   const path = new URL(original.url).pathname;
   const accountRoute = path === '/api/account' || path.startsWith('/api/profiles/') || path.startsWith('/api/operator/');
-  if (!accountRoute && path !== '/api/appearance' && !path.startsWith('/api/online/') && !path.startsWith('/api/coach/')) return null;
+  const billingRoute = path === '/api/billing' || path.startsWith('/api/billing/');
+  if (!accountRoute && !billingRoute && path !== '/api/appearance' && !path.startsWith('/api/online/') && !path.startsWith('/api/coach/')) return null;
   const request = await boundedRequest(original);
   if (request instanceof Response) return request;
   try {
@@ -18,11 +21,13 @@ export async function featuresApi(original: Request, env: Env): Promise<Response
     if (await env.DB.prepare('SELECT user_id FROM account_deletions WHERE user_id=?').bind(owner).first()) return apiJson({ error: 'account_deleted' }, 403);
     const profile = await loadPlayerProfile(env.DB, owner);
     if (!profile) return apiJson({ error: 'onboarding_required' }, 403);
-    if (path === '/api/appearance') return await cosmeticsApi(request, env, owner);
+    if (billingRoute) return await billingApi(request, env, owner, profile);
     if (path.startsWith('/api/online/')) return await onlineApi(request, env, owner);
+    const paidUntil = await paidAccessUntil(env.DB, owner);
+    if (path === '/api/appearance') return await cosmeticsApi(request, env, owner, paidUntil);
     return await coachApi(request, env, {
       session: async () => ({ id: owner }),
-      account: async () => ({ trialExpiresAt: profile.trialExpiresAt, teachingProfile: profile.teachingProfile }),
+      account: async () => ({ trialExpiresAt: profile.trialExpiresAt, paidAccessUntil: paidUntil, teachingProfile: profile.teachingProfile }),
       loadMatch: async (player, id) => {
         const computer = await env.MATCHES.getByName(id).read(player);
         if (computer) return computer.game;

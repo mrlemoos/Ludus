@@ -1,9 +1,10 @@
 import { authFor } from './auth';
 import { CoachStore } from './coach-store';
 import { callProvider, providerAvailable, providerPayload, reserveCostMicros, type CoachEnvironment, type ProviderPayload } from './coach-provider';
-import { hasPlus, isTeachingProfile, parseCoachInput, recurringMistakes, reviewLimit, suggestedProfile, validateAnalysis, validateDocument, type SavedCoachMatch, type TeachingProfile } from '../shared/coaching';
+import { isTeachingProfile, parseCoachInput, recurringMistakes, reviewLimit, suggestedProfile, validateAnalysis, validateDocument, type SavedCoachMatch, type TeachingProfile } from '../shared/coaching';
+import { hasPlusAccess, type PlusAccess } from '../shared/plus';
 import { isLanguage } from '../shared/waitlist';
-export type CoachAccount = { trialExpiresAt: number | null; teachingProfile: TeachingProfile };
+export type CoachAccount = PlusAccess & { teachingProfile: TeachingProfile };
 export type CoachDependencies = {
   loadMatch?: (owner: string, id: string) => Promise<SavedCoachMatch | null>;
   account: (owner: string) => Promise<CoachAccount | null>;
@@ -39,7 +40,7 @@ export async function coachApi(request: Request, env: CoachEnvironment, dependen
     });
     const available = () => dependencies.available?.() ?? providerAvailable(env);
     if (url.pathname === '/api/coach/status' && request.method === 'GET') {
-      const reviews = await store.reviews(owner), plus = hasPlus(account.trialExpiresAt, now());
+      const reviews = await store.reviews(owner), plus = hasPlusAccess(account, now());
       return json({ available: await available(), plus, limit: reviewLimit(plus), usage: await store.usage(owner, now()), profile: account.teachingProfile, suggestedProfile: suggestedProfile(reviews, account.teachingProfile), recurring: plus ? recurringMistakes(reviews) : [], reviews });
     }
     const matchRoute = /^\/api\/coach\/matches\/([a-zA-Z0-9_-]{1,80})$/.exec(url.pathname);
@@ -84,7 +85,7 @@ export async function coachApi(request: Request, env: CoachEnvironment, dependen
     }
     if (existing?.state === 'pending') return json({ error: 'generation_pending' }, 409);
     if (!reply && (!isTeachingProfile(profile) || profile !== account.teachingProfile)) return json({ error: 'profile_changed' }, 409);
-    const plus = hasPlus(account.trialExpiresAt, now());
+    const plus = hasPlusAccess(account, now());
     if (reply && !plus) return json({ error: 'plus_required' }, 403);
     if (!await available()) return json({ error: 'coach_unavailable' }, 503);
     const previous = saved ? (await store.replies(owner, saved.id)).slice(-4).map((item) => ({ question: item.question, summary: item.document.summary })) : undefined;

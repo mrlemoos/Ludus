@@ -7,6 +7,7 @@ import { purgeExpiredPersonalData, resumeAccountDeletions } from './accounts';
 import { drizzle } from 'drizzle-orm/d1';
 import { parseWaitlist } from '../shared/waitlist';
 import { waitlist } from './schema';
+import { billingWebhook, reconcileBilling } from './billing';
 
 const reply = (status: number, error?: string) => Response.json(error ? { error } : { ok: true }, {
   status,
@@ -14,12 +15,18 @@ const reply = (status: number, error?: string) => Response.json(error ? { error 
 });
 
 export default {
-  async scheduled(_event: ScheduledController, env: Env) {
-    await resumeAccountDeletions(env);
-    await purgeExpiredPersonalData(env.DB);
+  async scheduled(event: ScheduledController, env: Env) {
+    const results = await Promise.allSettled([
+      reconcileBilling(env),
+      resumeAccountDeletions(env),
+      ...(event.cron === '0 3 * * *' ? [purgeExpiredPersonalData(env.DB)] : []),
+    ]);
+    if (results.some((result) => result.status === 'rejected')) throw new Error('scheduled_cleanup_incomplete');
   },
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    // Stripe authenticates by raw-body signature, not browser Origin/session headers.
+    if (url.pathname === '/api/billing/webhook') return billingWebhook(request, env);
     if (url.pathname !== '/api/waitlist') return await featuresApi(request, env) ?? gameApi(request, env);
     if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST', 'Cache-Control': 'no-store' } });
     const origin = request.headers.get('Origin');

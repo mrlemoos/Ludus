@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('../../worker/auth', () => ({ authFor: () => ({ api: { getSession: async () => null } }) }));
-import { coachApi, type CoachDependencies } from '../../worker/coach';
+import { coachApi, type CoachAccount, type CoachDependencies } from '../../worker/coach';
 import { CoachStore, deleteCoachAccount } from '../../worker/coach-store';
 import type { CoachEnvironment } from '../../worker/coach-provider';
 import type { SavedCoachMatch } from '../../shared/coaching';
@@ -41,6 +41,21 @@ async function review(f: ReturnType<typeof fixture>, key = 'idempotency-key-0001
   expect(response.status).toBe(200); return (await response.json() as { review: { id: string; language: string; profile: string } }).review;
 }
 describe('private coach API with atomic SQLite accounting', () => {
+  it('uses trusted paid access after beta and removes it at expiry without resetting usage', async () => {
+    const f = fixture();
+    const expiry = Date.parse('2026-11-01T00:00:00Z');
+    const account: CoachAccount = { trialExpiresAt: 0, paidAccessUntil: expiry, teachingProfile: 'beginner' };
+    f.dependencies.account = async () => account;
+    await review(f);
+    const status = async () => (await coachApi(request('/api/coach/status'), f.env, f.dependencies)).json() as Promise<{ plus: boolean; limit: number; usage: { reviews: number } }>;
+    expect(await status()).toMatchObject({ plus: true, limit: 30, usage: { reviews: 1 } });
+    account.paidAccessSuspended = true;
+    expect(await status()).toMatchObject({ plus: false, limit: 3, usage: { reviews: 1 } });
+    account.paidAccessSuspended = false;
+    account.paidAccessUntil = Date.parse('2026-10-30T12:00:00Z');
+    expect(await status()).toMatchObject({ plus: false, limit: 3, usage: { reviews: 1 } });
+  });
+
   it('saves idempotently and preserves language when the UI changes', async () => {
     const f = fixture(); const saved = await review(f); await review(f);
     expect(f.generate).toHaveBeenCalledOnce();

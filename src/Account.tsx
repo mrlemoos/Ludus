@@ -14,6 +14,66 @@ const labels = {
   'fr-FR': { privacy: 'Votre e-mail, vos analyses et vos conversations restent privés. Vous choisissez de rendre votre activité publique.', streak: 'Série quotidienne', title: 'Votre profil', username: 'Pseudo public', timezone: 'Fuseau horaire', language: 'Langue', level: 'Niveau aux échecs', teaching: 'Profil du coach', activity: 'Afficher mon activité publiquement', adult: 'J’ai 18 ans ou plus', save: 'Enregistrer le profil', saved: 'Profil enregistré.', error: 'Enregistrement impossible. Vérifiez les informations et réessayez.', signIn: 'Connectez-vous pour compléter votre profil.', deletion: 'Supprimer le compte', confirmation: 'Saisissez DELETE pour supprimer définitivement votre compte', deleteNote: 'Les sessions sont révoquées, les analyses privées et le profil supprimés, les parties conservées anonymisées. Les signalements expirent après 90 jours et les données d’envoi après 30 jours. Les inscriptions sans invitation expirent après 180 jours.', pending: 'Le changement de fuseau prend effet à minuit dans votre fuseau actuel.', plus: 'Fin de Plus bêta', days: 'Activité', hidden: 'L’activité est privée.', noProfile: 'Profil introuvable.', back: 'Jouer aux échecs' },
 };
 type Activity = { days: Record<string, number>; streak: number; today?: string };
+const deletionCopy = {
+  'en-GB': { pending: 'Deletion is pending. Billing cancellation will retry automatically. You can also retry now.', retry: 'Retry deletion' },
+  'es-ES': { pending: 'La eliminación está pendiente. Se reintentará cancelar la facturación automáticamente. También puedes reintentarlo ahora.', retry: 'Reintentar eliminación' },
+  'fr-FR': { pending: 'La suppression est en attente. L’annulation de la facturation sera réessayée automatiquement. Vous pouvez aussi réessayer maintenant.', retry: 'Réessayer la suppression' },
+};
+const billingDates = {
+  'en-GB': { next: 'Next payment', end: 'Access ends', grace: 'Payment overdue. Plus grace ends', refresh: 'Refresh billing status', status: { active: 'Active', trialing: 'Scheduled after beta', past_due: 'Payment overdue', canceled: 'Cancelled', incomplete: 'Payment pending', incomplete_expired: 'Payment expired', unpaid: 'Unpaid', paused: 'Paused' } },
+  'es-ES': { next: 'Próximo pago', end: 'El acceso termina', grace: 'Pago pendiente. El periodo de gracia de Plus termina', refresh: 'Actualizar facturación', status: { active: 'Activa', trialing: 'Programada tras la beta', past_due: 'Pago pendiente', canceled: 'Cancelada', incomplete: 'Pago en curso', incomplete_expired: 'Pago caducado', unpaid: 'Sin pagar', paused: 'En pausa' } },
+  'fr-FR': { next: 'Prochain paiement', end: 'Fin de l’accès', grace: 'Paiement en retard. Fin du délai de grâce Plus', refresh: 'Actualiser la facturation', status: { active: 'Actif', trialing: 'Prévu après la bêta', past_due: 'Paiement en retard', canceled: 'Annulé', incomplete: 'Paiement en attente', incomplete_expired: 'Paiement expiré', unpaid: 'Impayé', paused: 'En pause' } },
+};
+const billingCopy = {
+  'en-GB': { title: 'Ludus Plus', unavailable: 'Subscriptions are not available yet.', buy: 'Subscribe to Plus', manage: 'Manage subscription', error: 'Could not open billing. Try again.', monthly: 'per month, including applicable tax', renewal: 'Cancel anytime. Your remaining beta days stay free. Billing starts after beta ends.', returned: 'Checking subscription status. Payment confirmation can take a moment.' },
+  'es-ES': { title: 'Ludus Plus', unavailable: 'Las suscripciones aún no están disponibles.', buy: 'Suscribirme a Plus', manage: 'Gestionar suscripción', error: 'No se ha podido abrir la facturación. Inténtalo de nuevo.', monthly: 'al mes, impuestos aplicables incluidos', renewal: 'Cancela cuando quieras. Los días restantes de la beta siguen siendo gratuitos. La facturación comienza al terminar la beta.', returned: 'Comprobando la suscripción. La confirmación del pago puede tardar un momento.' },
+  'fr-FR': { title: 'Ludus Plus', unavailable: 'Les abonnements ne sont pas encore disponibles.', buy: 'S’abonner à Plus', manage: 'Gérer l’abonnement', error: 'Impossible d’ouvrir la facturation. Réessayez.', monthly: 'par mois, taxes applicables comprises', renewal: 'Annulez à tout moment. Les jours restants de la bêta restent gratuits. La facturation commence à la fin de la bêta.', returned: 'Vérification de l’abonnement. La confirmation du paiement peut prendre un moment.' },
+};
+type BillingStatus = { enabled: boolean; canManage: boolean; amount: number; currency: string; subscription: { status: string; paid_until: number | null; cancel_at: number | null; grace_until: number | null; next_charge_at: number | null; amount: number | null; currency: string | null } | null };
+function BillingSection({ language }: { language: Language }) {
+  const copy = billingCopy[language];
+  const [status, setStatus] = useState<BillingStatus | null>(null), [error, setError] = useState(false), [busy, setBusy] = useState(false);
+  async function refresh() {
+    setBusy(true); setError(false);
+    try { const response = await fetch('/api/billing'); if (!response.ok) throw new Error(); setStatus(await response.json() as BillingStatus); }
+    catch { setError(true); } finally { setBusy(false); }
+  }
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch('/api/billing', { signal: controller.signal }).then(async (response) => {
+      if (!response.ok) throw new Error();
+      setStatus(await response.json() as BillingStatus);
+    }).catch(() => { if (!controller.signal.aborted) setError(true); });
+    return () => controller.abort();
+  }, []);
+  async function open(action: 'checkout' | 'portal') {
+    setBusy(true); setError(false);
+    try {
+      const response = await fetch(`/api/billing/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      if (!response.ok) throw new Error();
+      const data = await response.json() as { url: string };
+      const url = new URL(data.url);
+      if (url.protocol !== 'https:' || !['checkout.stripe.com', 'billing.stripe.com'].includes(url.hostname)) throw new Error();
+      location.assign(url.href);
+    } catch { setError(true); setBusy(false); }
+  }
+  const subscribed = status?.subscription && !['canceled', 'incomplete_expired'].includes(status.subscription.status);
+  const dates = billingDates[language], sub = status?.subscription;
+  const date = (value: number) => new Intl.DateTimeFormat(language, { dateStyle: 'long', timeStyle: 'short' }).format(value);
+  return <section aria-label={copy.title} style={{ marginBlock: 24 }}>
+    <h2>{copy.title}</h2>
+    {!status ? <p role="status" aria-busy={!error}>{error ? copy.error : '…'}</p> : <>
+      <p>{new Intl.NumberFormat(language, { style: 'currency', currency: sub?.currency ?? status.currency }).format((sub?.amount ?? status.amount) / 100)} {copy.monthly}</p>
+      {sub && <p>{dates.status[sub.status as keyof typeof dates.status] ?? copy.returned}</p>}
+      {sub?.cancel_at ? <p>{dates.end}: {date(sub.cancel_at)}</p> : subscribed && sub?.next_charge_at ? <p>{dates.next}: {date(sub.next_charge_at)}</p> : null}
+      {sub?.grace_until && sub.grace_until > Date.now() && <p>{dates.grace}: {date(sub.grace_until)}</p>}
+      {!status.enabled ? <p>{copy.unavailable}</p> : !subscribed && <><p>{copy.renewal}</p><button disabled={busy} onClick={() => void open('checkout')}>{copy.buy}</button></>}
+      {status.canManage && <button disabled={busy} onClick={() => void open('portal')}>{copy.manage}</button>}
+      <button disabled={busy} onClick={() => void refresh()}>{dates.refresh}</button>
+      {error && <p role="alert">{copy.error}</p>}
+    </>}
+  </section>;
+}
 const levels = { 'en-GB': ['Beginner', 'Casual', 'Intermediate', 'Advanced'], 'es-ES': ['Principiante', 'Ocasional', 'Intermedio', 'Avanzado'], 'fr-FR': ['Débutant', 'Occasionnel', 'Intermédiaire', 'Avancé'] };
 const teaching = { 'en-GB': ['Beginner', 'Developing', 'Club', 'Advanced'], 'es-ES': ['Principiante', 'En desarrollo', 'Club', 'Avanzado'], 'fr-FR': ['Débutant', 'En progression', 'Club', 'Avancé'] };
 function ActivityGrid({ activity, label, streakLabel }: { activity: Activity; label: string; streakLabel: string }) {
@@ -30,7 +90,8 @@ export function Account() {
   const { i18n } = useTranslation(); const language = i18n.language in labels ? i18n.language as Language : 'en-GB'; const copy = labels[language];
   const [profile, setProfile] = useState<PlayerProfile | null>(null), [loaded, setLoaded] = useState(false), [signedIn, setSignedIn] = useState(true), [operator, setOperator] = useState(false);
   const [activity, setActivity] = useState<Activity | null>(null), [message, setMessage] = useState(''), [pending, setPending] = useState(false), [confirmation, setConfirmation] = useState('');
-  useEffect(() => { void fetch('/api/account').then(async (r) => { if (r.status === 401) { setSignedIn(false); return; } if (!r.ok) throw new Error(); const data = await r.json() as { profile: PlayerProfile | null; operator: boolean; activity?: Activity }; setProfile(data.profile); setOperator(data.operator); setActivity(data.activity ?? null); }).catch(() => setMessage(copy.error)).finally(() => setLoaded(true)); }, []);
+  const [deletionPending, setDeletionPending] = useState(false);
+  useEffect(() => { void fetch('/api/account').then(async (r) => { if (r.status === 401) { setSignedIn(false); return; } if (!r.ok) throw new Error(); const data = await r.json() as { profile: PlayerProfile | null; operator: boolean; activity?: Activity; deletionPending?: boolean }; if (data.deletionPending) { setDeletionPending(true); return; } setProfile(data.profile); setOperator(data.operator); setActivity(data.activity ?? null); }).catch(() => setMessage(copy.error)).finally(() => setLoaded(true)); }, []);
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = new FormData(event.currentTarget); setPending(true); setMessage('');
     try {
@@ -40,10 +101,10 @@ export function Account() {
   }
   async function remove() {
     setPending(true);
-    try { const result = await fetch('/api/account', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmation }) }); if (!result.ok) throw new Error(); location.assign('/'); } catch { setMessage(copy.error); setPending(false); }
+    try { const result = await fetch('/api/account', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmation: deletionPending ? 'DELETE' : confirmation }) }); if (!result.ok) throw new Error(); if (result.status === 202) { setDeletionPending(true); setMessage(''); setPending(false); return; } location.assign('/'); } catch { setMessage(copy.error); setPending(false); }
   }
   return <div className="site-shell"><Header /><main className="feature-page" style={{ maxWidth: 640, margin: '3rem auto', padding: 24 }}><Link to="/play">{copy.back}</Link><h1>{copy.title}</h1>
-    {!loaded ? <p aria-busy="true">…</p> : !signedIn ? <p>{copy.signIn}</p> : <>
+    {!loaded ? <p aria-busy="true">…</p> : !signedIn ? <p>{copy.signIn}</p> : deletionPending ? <><p>{deletionCopy[language].pending}</p><button disabled={pending} onClick={() => void remove()}>{deletionCopy[language].retry}</button></> : <>
       <form onSubmit={(event) => void save(event)} style={{ display: 'grid', gap: 16 }} key={profile?.userId ?? 'new'}>
         <label>{copy.username}<input name="username" required minLength={3} maxLength={24} pattern="[a-zA-Z0-9_]{3,24}" defaultValue={profile?.username} autoComplete="nickname" /></label>
         <label>{copy.language}<select name="language" defaultValue={profile?.language ?? language}>{Object.entries(languageNames).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select></label>
@@ -56,6 +117,7 @@ export function Account() {
         <button disabled={pending}>{copy.save}</button>
       </form>
       {profile && <><p>{copy.plus}: {new Intl.DateTimeFormat(language, { dateStyle: 'long' }).format(profile.trialExpiresAt)}</p><Link to={`/players/${profile.username}`}>{profile.username}</Link></>}
+      {profile && <BillingSection language={language} />}
       {activity && <ActivityGrid activity={activity} label={copy.days} streakLabel={copy.streak} />}{operator && <p><Link to="/operator">Operator</Link></p>}
       {profile && <details><summary>{copy.deletion}</summary><p>{copy.deleteNote}</p><label>{copy.confirmation}<input value={confirmation} onChange={(e) => setConfirmation(e.target.value)} /></label><button disabled={pending || confirmation !== 'DELETE'} onClick={() => void remove()}>{copy.deletion}</button></details>}
     </>}<p role="status">{message}</p></main></div>;
