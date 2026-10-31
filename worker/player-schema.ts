@@ -17,4 +17,7 @@ export const invitationDeliveries = sqliteTable('invitation_deliveries', {
   language: text('language').notNull(), createdAt: integer('created_at').notNull(), expiresAt: integer('expires_at').notNull(), sentAt: integer('sent_at'), status: text('status').notNull(),
 });
 export const accountDeletions = sqliteTable('account_deletions', { userId: text('user_id').primaryKey(), requestedAt: integer('requested_at').notNull(), completedAt: integer('completed_at') });
+export const complimentaryPlus = sqliteTable('complimentary_plus', {
+  email: text('email').primaryKey(), grantedAt: integer('granted_at').notNull(), revokedAt: integer('revoked_at'),
+});
 export const invitationBatches = sqliteTable('invitation_batches', { id: text('id').primaryKey(), fingerprint: text('fingerprint').notNull(), operatorId: text('operator_id').notNull(), reissue: integer('reissue', { mode: 'boolean' }).notNull().default(false), createdAt: integer('created_at').notNull() });

@@ -5,6 +5,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import * as schema from './schema';
 import { invitationEligible } from '../shared/profile';
+import { hasComplimentaryInvitation } from './complimentary-plus';
 
 export function localDevelopment(request: Request, env: Env) {
   return env.LOCAL_DEV === 'true' && ['localhost', '127.0.0.1', '[::1]'].includes(new URL(request.url).hostname);
@@ -12,7 +13,7 @@ export function localDevelopment(request: Request, env: Env) {
 export async function admitSession(db: D1Database, userId: string, now: number): Promise<boolean> {
   const admitted = await db.prepare(`UPDATE invitations SET redeemed_by=?,redeemed_at=COALESCE(redeemed_at,?)
     WHERE email=(SELECT lower(email) FROM user WHERE id=? AND email_verified=1 AND NOT EXISTS (SELECT 1 FROM account_deletions WHERE user_id=?))
-    AND (redeemed_by=? OR (redeemed_by IS NULL AND expires_at>?)) RETURNING email`)
+    AND (redeemed_by=? OR (redeemed_by IS NULL AND (expires_at>? OR EXISTS(SELECT 1 FROM complimentary_plus WHERE complimentary_plus.email=invitations.email AND revoked_at IS NULL)))) RETURNING email`)
     .bind(userId, now, userId, userId, userId, now).first();
   return !!admitted;
 }
@@ -24,7 +25,7 @@ export function authFor(request: Request, env: Env, capture?: (url: string) => v
   const eligible = async (email: string, id: string | null) => {
     if (id && await env.DB.prepare('SELECT user_id FROM account_deletions WHERE user_id = ?').bind(id).first()) return false;
     const invited = await db.select().from(schema.invitations).where(eq(schema.invitations.email, email.toLowerCase())).get();
-    return invitationEligible(invited ?? null, id, Date.now());
+    return invitationEligible(invited ?? null, id, Date.now()) || (!!invited && (invited.redeemedBy === null || invited.redeemedBy === id) && await hasComplimentaryInvitation(env.DB, email));
   };
   return betterAuth({
     secret, rateLimit: { enabled: !local }, baseURL: new URL(request.url).origin,

@@ -39,3 +39,12 @@ test('pending deletion offers retry and never claims completion on cancellation 
   await expect(page).toHaveURL(/\/account$/);
   await expect(page.getByRole('button', { name: 'Save profile' })).toHaveCount(0);
 });
+
+test('complimentary Plus shows no expiry and never offers a paid purchase', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('ludus-language', 'en-GB'));
+  await page.route('**/api/account', (route) => route.fulfill({ json: { profile, operator: false } }));
+  await page.route('**/api/billing', (route) => route.fulfill({ json: { enabled: true, complimentaryPlus: true, canManage: false, amount: 800, currency: 'eur', subscription: null } }));
+  await page.goto('/account');
+  await expect(page.getByText('Complimentary Plus · No expiry', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Subscribe to Plus' })).toHaveCount(0);
+});

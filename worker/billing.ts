@@ -4,6 +4,7 @@ import { billingEnabled, checkoutParams, liveCatalogue, stripeFor, verifyStripeE
 import type { Language } from '../shared/waitlist';
 import { reconcileSubscription, recordRiskEvent, reviewBilling } from './billing-lifecycle';
 import { paidAccessUntil } from './billing-access';
+import { hasComplimentaryPlus } from './complimentary-plus';
 
 type BillingAccount = {
   owner: string; customer: string | null; generation: string; checkout: string | null;
@@ -37,10 +38,11 @@ export async function billingApi(request: Request, env: Env, owner: string, prof
   if (request.method === 'GET' && path === '/api/billing') {
     const stored = await env.DB.prepare("SELECT status,paid_until,cancel_at,grace_until,next_charge_at,amount,currency,cancel_requested_at FROM billing_subscriptions WHERE owner=? ORDER BY status NOT IN ('canceled','incomplete_expired') DESC,COALESCE(next_charge_at,paid_until,0) DESC,id DESC LIMIT 1").bind(owner).first();
     const row = await account(env.DB, owner);
-    return apiJson({ enabled: billingEnabled(env), currency: 'eur', amount: 800, interval: 'month', subscription: stored, canManage: !!row?.customer, paidAccessUntil: await paidAccessUntil(env.DB, owner, deps.now?.() ?? Date.now()) });
+    return apiJson({ enabled: billingEnabled(env), complimentaryPlus: await hasComplimentaryPlus(env.DB, owner), currency: 'eur', amount: 800, interval: 'month', subscription: stored, canManage: !!row?.customer, paidAccessUntil: await paidAccessUntil(env.DB, owner, deps.now?.() ?? Date.now()) });
   }
   if (request.method !== 'POST' || !['/api/billing/checkout', '/api/billing/portal'].includes(path)) return apiJson({ error: 'not_found' }, 404);
   if (request.headers.get('Origin') !== new URL(request.url).origin || request.headers.get('Sec-Fetch-Site') === 'cross-site') return apiJson({ error: 'forbidden' }, 403);
+  if (path.endsWith('/checkout') && await hasComplimentaryPlus(env.DB, owner)) return apiJson({ error: 'complimentary_plus_active' }, 409);
   if (path.endsWith('/checkout') && !billingEnabled(env)) return apiJson({ error: 'billing_unavailable' }, 503);
   if (path.endsWith('/portal') && !(await account(env.DB, owner))?.customer) return apiJson({ error: 'no_subscription' }, 409);
   const stripe = deps.stripe ?? stripeFor(env), now = deps.now?.() ?? Date.now();

@@ -4,13 +4,23 @@ import { describe, expect, it } from 'vitest';
 import { admitSession } from '../../worker/auth';
 function fixture() {
   const sqlite = new DatabaseSync(':memory:');
-  for (const file of ['0000_grey_triton.sql', '0001_pale_microchip.sql', '0003_accounts.sql']) sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));
+  for (const file of ['0000_grey_triton.sql', '0001_pale_microchip.sql', '0003_accounts.sql', '0011_nifty_redwing.sql']) sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));
   sqlite.prepare('INSERT INTO user(id,name,email,email_verified,created_at,updated_at) VALUES (?,?,?,?,?,?)').run('player', 'Player', 'player@example.com', 1, 0, 0);
   sqlite.prepare('INSERT INTO invitations(email,expires_at) VALUES (?,?)').run('player@example.com', 1000);
   const db = { prepare: (query: string) => ({ bind: (...parameters: (string | number)[]) => ({ first: async () => sqlite.prepare(query).get(...parameters) ?? null }) }) } as unknown as D1Database;
   return { sqlite, db };
 }
 describe('atomic invitation redemption before session creation', () => {
+  it('keeps a complimentary invite valid without bypassing email verification or another redemption', async () => {
+    const { db, sqlite } = fixture();
+    sqlite.prepare("INSERT INTO complimentary_plus(email,granted_at) VALUES('player@example.com',0)").run();
+    expect(await admitSession(db, 'player', 1001)).toBe(true);
+    sqlite.prepare("UPDATE invitations SET redeemed_by='another-account'").run();
+    expect(await admitSession(db, 'player', 1002)).toBe(false);
+    sqlite.prepare('UPDATE invitations SET redeemed_by=NULL').run();
+    sqlite.prepare('UPDATE user SET email_verified=0').run();
+    expect(await admitSession(db, 'player', 1003)).toBe(false);
+  });
   it('admits verified invited email once and preserves admission after expiry', async () => {
     const { db, sqlite } = fixture();
     expect(await admitSession(db, 'player', 999)).toBe(true);

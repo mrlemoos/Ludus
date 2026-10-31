@@ -19,6 +19,7 @@ const deletionCopy = {
   'es-ES': { pending: 'La eliminación está pendiente. Se reintentará cancelar la facturación automáticamente. También puedes reintentarlo ahora.', retry: 'Reintentar eliminación' },
   'fr-FR': { pending: 'La suppression est en attente. L’annulation de la facturation sera réessayée automatiquement. Vous pouvez aussi réessayer maintenant.', retry: 'Réessayer la suppression' },
 };
+const complimentaryCopy = { 'en-GB': 'Complimentary Plus · No expiry', 'es-ES': 'Plus de cortesía · Sin caducidad', 'fr-FR': 'Plus offert · Sans expiration' };
 const billingDates = {
   'en-GB': { next: 'Next payment', end: 'Access ends', grace: 'Payment overdue. Plus grace ends', refresh: 'Refresh billing status', status: { active: 'Active', trialing: 'Scheduled after beta', past_due: 'Payment overdue', canceled: 'Cancelled', incomplete: 'Payment pending', incomplete_expired: 'Payment expired', unpaid: 'Unpaid', paused: 'Paused' } },
   'es-ES': { next: 'Próximo pago', end: 'El acceso termina', grace: 'Pago pendiente. El periodo de gracia de Plus termina', refresh: 'Actualizar facturación', status: { active: 'Activa', trialing: 'Programada tras la beta', past_due: 'Pago pendiente', canceled: 'Cancelada', incomplete: 'Pago en curso', incomplete_expired: 'Pago caducado', unpaid: 'Sin pagar', paused: 'En pausa' } },
@@ -29,7 +30,7 @@ const billingCopy = {
   'es-ES': { title: 'Ludus Plus', unavailable: 'Las suscripciones aún no están disponibles.', buy: 'Suscribirme a Plus', manage: 'Gestionar suscripción', error: 'No se ha podido abrir la facturación. Inténtalo de nuevo.', monthly: 'al mes, impuestos aplicables incluidos', renewal: 'Cancela cuando quieras. Los días restantes de la beta siguen siendo gratuitos. La facturación comienza al terminar la beta.', returned: 'Comprobando la suscripción. La confirmación del pago puede tardar un momento.' },
   'fr-FR': { title: 'Ludus Plus', unavailable: 'Les abonnements ne sont pas encore disponibles.', buy: 'S’abonner à Plus', manage: 'Gérer l’abonnement', error: 'Impossible d’ouvrir la facturation. Réessayez.', monthly: 'par mois, taxes applicables comprises', renewal: 'Annulez à tout moment. Les jours restants de la bêta restent gratuits. La facturation commence à la fin de la bêta.', returned: 'Vérification de l’abonnement. La confirmation du paiement peut prendre un moment.' },
 };
-type BillingStatus = { enabled: boolean; canManage: boolean; amount: number; currency: string; subscription: { status: string; paid_until: number | null; cancel_at: number | null; grace_until: number | null; next_charge_at: number | null; amount: number | null; currency: string | null } | null };
+type BillingStatus = { enabled: boolean; complimentaryPlus?: boolean; canManage: boolean; amount: number; currency: string; subscription: { status: string; paid_until: number | null; cancel_at: number | null; grace_until: number | null; next_charge_at: number | null; amount: number | null; currency: string | null } | null };
 function BillingSection({ language }: { language: Language }) {
   const copy = billingCopy[language];
   const [status, setStatus] = useState<BillingStatus | null>(null), [error, setError] = useState(false), [busy, setBusy] = useState(false);
@@ -63,11 +64,11 @@ function BillingSection({ language }: { language: Language }) {
   return <section aria-label={copy.title} style={{ marginBlock: 24 }}>
     <h2>{copy.title}</h2>
     {!status ? <p role="status" aria-busy={!error}>{error ? copy.error : '…'}</p> : <>
-      <p>{new Intl.NumberFormat(language, { style: 'currency', currency: sub?.currency ?? status.currency }).format((sub?.amount ?? status.amount) / 100)} {copy.monthly}</p>
+      {status.complimentaryPlus ? <p>{complimentaryCopy[language]}</p> : <p>{new Intl.NumberFormat(language, { style: 'currency', currency: sub?.currency ?? status.currency }).format((sub?.amount ?? status.amount) / 100)} {copy.monthly}</p>}
       {sub && <p>{dates.status[sub.status as keyof typeof dates.status] ?? copy.returned}</p>}
       {sub?.cancel_at ? <p>{dates.end}: {date(sub.cancel_at)}</p> : subscribed && sub?.next_charge_at ? <p>{dates.next}: {date(sub.next_charge_at)}</p> : null}
       {sub?.grace_until && sub.grace_until > Date.now() && <p>{dates.grace}: {date(sub.grace_until)}</p>}
-      {!status.enabled ? <p>{copy.unavailable}</p> : !subscribed && <><p>{copy.renewal}</p><button disabled={busy} onClick={() => void open('checkout')}>{copy.buy}</button></>}
+      {!status.complimentaryPlus && (!status.enabled ? <p>{copy.unavailable}</p> : !subscribed && <><p>{copy.renewal}</p><button disabled={busy} onClick={() => void open('checkout')}>{copy.buy}</button></>)}
       {status.canManage && <button disabled={busy} onClick={() => void open('portal')}>{copy.manage}</button>}
       <button disabled={busy} onClick={() => void refresh()}>{dates.refresh}</button>
       {error && <p role="alert">{copy.error}</p>}

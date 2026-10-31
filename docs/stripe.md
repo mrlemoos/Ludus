@@ -1,5 +1,17 @@
 # Stripe billing
 
+## Complimentary Plus
+
+Explicitly granted accounts can receive Plus with no expiry and no Stripe subscription. Grants are stored by normalised email in `complimentary_plus`; only verified ownership unlocks them. A pending recipient still completes email sign-in, age confirmation and onboarding normally. The original beta expiry remains unchanged. Standard Plus review/conversation limits apply.
+
+After applying migrations and deploying the matching Worker, grant access with:
+
+```sh
+node scripts/grant-plus.ts --remote player@example.test
+```
+
+Use `--local` for development. The script grants access and creates/refreshes the invitation without sending email, creating a session, marking email verified or fabricating onboarding. An active grant keeps that invitation redeemable after its usual expiry. Revoking the grant removes permanent Plus; remaining beta/paid access remains independent. Account deletion removes the grant. Paid Checkout is blocked while complimentary Plus is active; an existing subscription is never silently changed.
+
 ## Current delivery
 
 Live catalogue and local purchase, paid access, renewal grace, refunds/disputes, deletion cancellation and scheduled reconciliation are implemented. Charging remains disabled by default. Provider journey verification, account activation, tax/consumer terms, retention policy and currency eligibility remain release gates. Local checks do not prove a complete live integration.
@@ -86,3 +98,5 @@ Typecheck, unit suite, production build and local migrations run during implemen
 Final local verification on 2026-10-31: TypeScript passed; 32 unit files / 279 tests passed; nine targeted Chromium account/billing/coaching journeys passed; production build and local migration 0010 passed; whitespace check passed. Provider activation, real payment/webhook delivery and remote deployment remain unverified.
 
 Pre-commit verification: full pnpm check passed on 2026-10-31: TypeScript, 279 unit tests, production build and all 31 Chromium journeys, including 3D/mobile and two-session multiplayer. No premium grants, push or deployment performed.
+
+Complimentary-grant activation on 2026-10-31: migration 0011 applied to production, Worker version 1f197d17-99ed-4c45-ab6d-9240f4b9ee57 deployed, and exactly three requested email grants read back with revoked_at NULL. No fabricated onboarding or Stripe subscriptions. Paid Checkout gates explicitly set false. Validation passed: TypeScript, 283 unit tests, production build and all 32 Chromium journeys. Grant-specific code remains uncommitted; no push performed.

@@ -6,6 +6,7 @@ import { cosmeticsApi } from './cosmetics';
 import { apiJson, boundedRequest } from './http';
 import { billingApi } from './billing';
 import { paidAccessUntil } from './billing-access';
+import { hasComplimentaryPlus } from './complimentary-plus';
 export async function featuresApi(original: Request, env: Env): Promise<Response | null> {
   const path = new URL(original.url).pathname;
   const accountRoute = path === '/api/account' || path.startsWith('/api/profiles/') || path.startsWith('/api/operator/');
@@ -23,11 +24,11 @@ export async function featuresApi(original: Request, env: Env): Promise<Response
     if (!profile) return apiJson({ error: 'onboarding_required' }, 403);
     if (billingRoute) return await billingApi(request, env, owner, profile);
     if (path.startsWith('/api/online/')) return await onlineApi(request, env, owner);
-    const paidUntil = await paidAccessUntil(env.DB, owner);
-    if (path === '/api/appearance') return await cosmeticsApi(request, env, owner, paidUntil);
+    const [paidUntil, complimentary] = await Promise.all([paidAccessUntil(env.DB, owner), hasComplimentaryPlus(env.DB, owner)]);
+    if (path === '/api/appearance') return await cosmeticsApi(request, env, owner, paidUntil, complimentary);
     return await coachApi(request, env, {
       session: async () => ({ id: owner }),
-      account: async () => ({ trialExpiresAt: profile.trialExpiresAt, paidAccessUntil: paidUntil, teachingProfile: profile.teachingProfile }),
+      account: async () => ({ trialExpiresAt: profile.trialExpiresAt, paidAccessUntil: paidUntil, complimentaryPlus: complimentary, teachingProfile: profile.teachingProfile }),
       loadMatch: async (player, id) => {
         const computer = await env.MATCHES.getByName(id).read(player);
         if (computer) return computer.game;

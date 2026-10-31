@@ -90,6 +90,7 @@ async function deleteAccount(env: Env, owner: string, email: string, now: number
   }
   const tables = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table'").all<{ name: string }>();
   const names = new Set(tables.results.map((row) => row.name));
+  if (names.has('complimentary_plus')) await env.DB.prepare('DELETE FROM complimentary_plus WHERE email=?').bind(email.toLowerCase()).run();
   if (names.has('online_matches')) {
     const online = await env.DB.prepare('SELECT id FROM online_matches WHERE white_id=? OR black_id=?').bind(owner, owner).all<{ id: string }>();
     for (const game of online.results) await env.HUMAN_MATCHES.getByName(game.id).anonymise(owner);
