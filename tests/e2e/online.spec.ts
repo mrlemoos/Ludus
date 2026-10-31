@@ -54,10 +54,11 @@ test('two accounts play a friend game, reject foreign access, exchange phrases a
 test('onboarded account sees trial, activity, public profile and explicit coach outage', async ({ page }) => {
   await login(page, 'leo');
   await page.goto('/account');
-  await expect(page.getByRole('heading', { name: 'Your profile' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '@Leo', exact: true })).toBeVisible();
   await expect(page.getByText('Beta Plus ends', { exact: false })).toBeVisible();
-  await page.goto('/players/Leo');
-  await expect(page.getByRole('heading', { name: 'Leo', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'View public profile' }).click();
+  await expect(page).toHaveURL(/\/@Leo$/);
+  await expect(page.getByRole('heading', { name: '@Leo', exact: true })).toBeVisible();
   await page.goto('/operator');
   await expect(page.getByRole('heading', { name: /invitation/i })).toBeVisible();
 });

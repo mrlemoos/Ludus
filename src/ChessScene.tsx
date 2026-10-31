@@ -1,3 +1,5 @@
+import { Wordmark } from './components/wordmark';
+
 const backRank = ['rook', 'knight', 'bishop', 'queen', 'king', 'bishop', 'knight', 'rook'];
 
 function Piece({ kind }: { kind: string }) {
@@ -33,7 +35,7 @@ export function ChessScene() {
         })}
       </div>
       <div className="cup"><div className="coffee" /></div>
-      <div className="scene-wordmark">ludus</div>
+      <div className="scene-wordmark"><Wordmark decorative /></div>
     </div>
   );
 }

@@ -10,7 +10,7 @@ test('edits profile without restarting beta trial and enforces hidden activity i
   expect(initial.profile).toBeTruthy();
   try {
     await page.goto('/account');
-    await expect(page.getByRole('heading', { name: 'Your profile' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: `@${initial.profile.username}`, exact: true })).toBeVisible();
     const billing = page.getByRole('region', { name: 'Ludus Plus' });
     await expect(billing.getByText('Subscriptions are not available yet.')).toBeVisible();
     await expect(billing.getByRole('button', { name: 'Subscribe to Plus' })).toHaveCount(0);

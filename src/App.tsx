@@ -9,6 +9,7 @@ import { languageNames } from './i18n';
 import { HomePreview } from './HomePreview';
 import { gameCopy } from './game-copy';
 import './home.css';
+import { Wordmark } from './components/wordmark';
 
 function Arrow() {
   return <svg className="action-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6" stroke="currentColor" strokeWidth="1.5" /></svg>;
@@ -23,7 +24,7 @@ export function Header({ compact = false }: { compact?: boolean }) {
     try { localStorage.setItem('ludus-language', i18n.language); } catch { /* Language still works without storage. */ }
   }, [i18n.language, t]);
   return <header className="site-header">
-    <Link to="/" className="wordmark" aria-label="Ludus">ludus<span aria-hidden="true">.</span></Link>
+    <Wordmark />
     <div className="flex items-center gap-4 sm:gap-7">
       {!compact && <Link to="/play" className="header-play" aria-label={gameCopy[isLanguage(i18n.language) ? i18n.language : 'en-GB'].play}><span className="hidden sm:inline">{gameCopy[isLanguage(i18n.language) ? i18n.language : 'en-GB'].play}</span><span aria-hidden="true" className="text-xl sm:hidden">♞</span></Link>}
       {!compact && <span className="hidden text-xs tracking-wide text-muted sm:block">{t('location')}</span>}
@@ -116,7 +117,7 @@ export function App() {
         </div>
       </section>
     </main>
-    <footer className="home-footer"><Link to="/" className="wordmark" aria-label="Ludus">ludus.</Link><p>{t('note')}</p><p>{t('soon')}</p></footer>
+    <footer className="home-footer"><Wordmark /><p>{t('note')}</p><p>{t('soon')}</p></footer>
   </div></div>;
 }
 
