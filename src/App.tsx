@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Select } from '@base-ui/react/select';
 import { Button } from '@base-ui/react/button';
 import { Input } from '@base-ui/react/input';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { isLanguage, languages, parseWaitlist } from '../shared/waitlist';
 import { languageNames } from './i18n';
 import { HomePreview } from './HomePreview';
@@ -17,12 +17,15 @@ function Arrow() {
 
 export function Header({ compact = false }: { compact?: boolean }) {
   const { t, i18n } = useTranslation();
+  const { pathname } = useLocation();
   useEffect(() => {
     document.documentElement.lang = i18n.language;
-    document.title = t('pageTitle');
-    document.querySelector('meta[name="description"]')?.setAttribute('content', t('description'));
+    if (!/^\/(?:@|%40|players\/)/i.test(pathname)) {
+      document.title = t('pageTitle');
+      document.querySelector('meta[name="description"]')?.setAttribute('content', t('description'));
+    }
     try { localStorage.setItem('ludus-language', i18n.language); } catch { /* Language still works without storage. */ }
-  }, [i18n.language, t]);
+  }, [i18n.language, t, pathname]);
   return <header className="site-header">
     <Wordmark />
     <div className="flex items-center gap-4 sm:gap-7">

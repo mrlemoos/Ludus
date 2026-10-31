@@ -26,6 +26,10 @@ test('edits profile without restarting beta trial and enforces hidden activity i
     expect(publicResponse).not.toHaveProperty('activity');
     expect(publicResponse).not.toHaveProperty('email');
     expect(publicResponse).not.toHaveProperty('teachingProfile');
+    const publicHtml = await page.request.get(`/@${initial.profile.username.toLowerCase()}`).then((response) => response.text());
+    expect(publicHtml).not.toContain('activity-cells');
+    expect(publicHtml).not.toContain('"activity":');
+    expect(publicHtml).toContain('Activity is private.');
     await page.goto(`/players/${initial.profile.username}`);
     await expect(page.getByText('Activity is private.')).toBeVisible();
     await page.goto('/operator');

@@ -1,4 +1,5 @@
 import { gameApi } from './game-api';
+import { publicProfileSeo } from './profile-seo';
 export { Match } from './match';
 export { HumanMatch } from './human-match';
 export { Matchmaking } from './matchmaking';
@@ -25,6 +26,8 @@ export default {
   },
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    const seo = await publicProfileSeo(request, env);
+    if (seo) return seo;
     // Stripe authenticates by raw-body signature, not browser Origin/session headers.
     if (url.pathname === '/api/billing/webhook') return billingWebhook(request, env);
     if (url.pathname !== '/api/waitlist') return await featuresApi(request, env) ?? gameApi(request, env);

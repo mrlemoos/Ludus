@@ -57,7 +57,7 @@ test('onboarded account sees trial, activity, public profile and explicit coach 
   await expect(page.getByRole('heading', { name: '@Leo', exact: true })).toBeVisible();
   await expect(page.getByText('Beta Plus ends', { exact: false })).toBeVisible();
   await page.getByRole('link', { name: 'View public profile' }).click();
-  await expect(page).toHaveURL(/\/@Leo$/);
+  await expect(page).toHaveURL(/\/@leo$/);
   await expect(page.getByRole('heading', { name: '@Leo', exact: true })).toBeVisible();
   await page.goto('/operator');
   await expect(page.getByRole('heading', { name: /invitation/i })).toBeVisible();

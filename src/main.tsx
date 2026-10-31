@@ -8,6 +8,7 @@ import '@fontsource/manrope/latin-500.css';
 import '@fontsource/manrope/latin-600.css';
 import './i18n';
 import './styles.css';
+import './profile.css';
 import { App, NotFound } from './App';
 import { Play } from './Play';
 const Account = React.lazy(() => import('./Account').then((module) => ({ default: module.Account })));

@@ -2,6 +2,8 @@ import { authFor } from './auth';
 import { dailyActivity, earnsActivity, localDate, timezoneChange } from '../shared/activity';
 import { isOperator, parseProfile, policyVersion, publicProfile, type PlayerProfile } from '../shared/profile';
 import type { Language } from '../shared/waitlist';
+import type { PublicPlayerProfile } from '../shared/public-profile';
+import { validPublicUsername } from '../shared/profile-seo';
 import { deleteCoachAccount } from './coach-store';
 import { cancelAccountBilling } from './billing';
 
@@ -18,6 +20,15 @@ function profileFromRow(p: ProfileRow, now: number): PlayerProfile {
     pendingTimezone: active ? null : p.pending_timezone, timezoneEffectiveAt: active ? null : p.timezone_effective_at,
     chessLevel: p.chess_level, teachingProfile: p.teaching_profile, activityPublic: !!p.activity_public,
     adultAttestedAt: p.adult_attested_at, policyVersion: p.policy_version, onboardedAt: p.onboarded_at, trialExpiresAt: p.trial_expires_at };
+}
+export async function readPublicProfile(db: D1Database, username: string): Promise<PublicPlayerProfile | null> {
+  if (!validPublicUsername(username)) return null;
+  const user = await db.prepare('SELECT user_id FROM player_profiles WHERE username = ? COLLATE NOCASE').bind(username).first<{ user_id: string }>();
+  const profile = user ? await loadPlayerProfile(db, user.user_id) : null;
+  if (!profile) return null;
+  const ratings = await db.prepare('SELECT control,rating,deviation,games FROM ratings WHERE user_id = ?').bind(profile.userId).all<{ control: string; rating: number; deviation: number; games: number }>();
+  const ranks = ['5+3', '10+5'].map((control) => ratings.results.find((rating) => rating.control === control) ?? { control, rating: 1500, deviation: 350, games: 0 });
+  return { ...publicProfile(profile), ratings: ranks, ...(profile.activityPublic ? { activity: await readActivity(db, profile.userId, profile.timezone) } : {}) };
 }
 export async function recordActivity(db: D1Database, input: { gameId: string; players: readonly string[]; reason: string; moves: number; completedAt: number }) {
   if (!earnsActivity(input.reason, input.moves)) return;
@@ -196,13 +207,8 @@ export async function accountsApi(request: Request, env: Env): Promise<Response 
   try {
     if (path.startsWith('/api/profiles/') && request.method === 'GET') {
       const username = decodeURIComponent(path.slice('/api/profiles/'.length));
-      if (!/^[a-zA-Z0-9_]{3,24}$/.test(username)) return response({ error: 'not_found' }, 404);
-      const user = await env.DB.prepare('SELECT user_id FROM player_profiles WHERE username = ? COLLATE NOCASE').bind(username).first<{ user_id: string }>();
-      const profile = user ? await loadPlayerProfile(env.DB, user.user_id) : null;
-      if (!profile) return response({ error: 'not_found' }, 404);
-      const ratings = await env.DB.prepare('SELECT control,rating,deviation,games FROM ratings WHERE user_id = ?').bind(profile.userId).all<{ control: string; rating: number; deviation: number; games: number }>();
-      const ranks = ['5+3', '10+5'].map((control) => ratings.results.find((rating) => rating.control === control) ?? { control, rating: 1500, deviation: 350, games: 0 });
-      return response({ ...publicProfile(profile), ratings: ranks, ...(profile.activityPublic ? { activity: await readActivity(env.DB, profile.userId, profile.timezone) } : {}) });
+      const profile = await readPublicProfile(env.DB, username);
+      return profile ? response(profile) : response({ error: 'not_found' }, 404);
     }
     const session = await authFor(request, env).api.getSession({ headers: request.headers });
     if (!session) return response({ error: 'unauthorised' }, 401);

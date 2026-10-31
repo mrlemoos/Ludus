@@ -5,7 +5,8 @@ const authentication = vi.hoisted(() => ({ session: vi.fn() }));
 const billing = vi.hoisted(() => ({ cancel: vi.fn() }));
 vi.mock('../../worker/auth', () => ({ authFor: () => ({ api: { getSession: authentication.session } }) }));
 vi.mock('../../worker/billing', () => ({ cancelAccountBilling: billing.cancel }));
-import { accountsApi, loadPlayerProfile, purgeExpiredPersonalData, recordActivity } from '../../worker/accounts';
+import { profileSitemap, publicProfileSeo, serialisePublicProfile } from '../../worker/profile-seo';
+import { accountsApi, loadPlayerProfile, purgeExpiredPersonalData, recordActivity, readPublicProfile } from '../../worker/accounts';
 
 function fixture() {
   const sqlite = new DatabaseSync(':memory:');
@@ -212,4 +213,59 @@ it('anonymises retained human matches while deleting an account', async () => {
   f.sqlite.prepare("INSERT INTO online_matches(id,white_id,black_id,control,rated) VALUES('human','owner','other','5+3',0)").run();
   const response = await accountsApi(request('/api/account', 'DELETE', { confirmation: 'DELETE' }), f.env);
   expect(response?.status).toBe(200); expect(f.anonymise).toHaveBeenCalledWith('owner');
+});
+
+
+describe('public profile SEO privacy and discovery', () => {
+  it('shares the API privacy boundary and removes deletion-pending profiles from discovery', async () => {
+    const { env, db, sqlite } = fixture();
+    await accountsApi(request('/api/account', 'POST', { ...profile, activityPublic: false }), env);
+    await recordActivity(db, { gameId: 'private-game', players: ['owner'], reason: 'checkmate', moves: 20, completedAt: Date.now() });
+    const data = await readPublicProfile(db, profile.username);
+    expect(data).toMatchObject({ username: profile.username, activityPublic: false });
+    expect(data).not.toHaveProperty('activity');
+    for (const privateKey of ['email', 'userId', 'timezone', 'teachingProfile', 'trialExpiresAt']) expect(data).not.toHaveProperty(privateKey);
+    expect(await (await profileSitemap(db, '/sitemaps/profiles-1.xml')).text()).toContain('/@ownerplayer');
+    sqlite.prepare("INSERT INTO account_deletions(user_id,requested_at) VALUES('owner',0)").run();
+    expect(await readPublicProfile(db, profile.username)).toBeNull();
+    expect(await (await profileSitemap(db, '/sitemap.xml')).text()).not.toContain('/sitemaps/profiles-1.xml');
+    expect((await profileSitemap(db, '/sitemaps/profiles-1.xml')).status).toBe(404);
+  });
+
+  it('paginates discovery beyond one thousand players without repeating entries', async () => {
+    const { db, sqlite } = fixture();
+    const addUser = sqlite.prepare('INSERT INTO user(id,name,email,email_verified,created_at,updated_at) VALUES (?,?,?,?,?,?)');
+    const addProfile = sqlite.prepare("INSERT INTO player_profiles(user_id,username,language,timezone,chess_level,teaching_profile,activity_public,adult_attested_at,policy_version,onboarded_at,trial_expires_at) VALUES(?,?,'en-GB','UTC','casual','club',1,0,'fixture',0,1)");
+    sqlite.exec('BEGIN');
+    for (let index = 0; index < 1001; index++) {
+      const username = `player${String(index).padStart(4, '0')}`;
+      addUser.run(username, username, `${username}@example.com`, 1, 0, 0);
+      addProfile.run(username, username);
+    }
+    sqlite.exec('COMMIT');
+    const index = await (await profileSitemap(db, '/sitemap.xml')).text();
+    expect(index).toContain('profiles-2.xml'); expect(index).not.toContain('profiles-3.xml');
+    const first = await (await profileSitemap(db, '/sitemaps/profiles-1.xml')).text();
+    const second = await (await profileSitemap(db, '/sitemaps/profiles-2.xml')).text();
+    expect(first.match(/<url>/g)).toHaveLength(1000);
+    expect(second.match(/<url>/g)).toHaveLength(1);
+    expect(first).not.toContain('/@player1000'); expect(second).toContain('/@player1000');
+    expect((await profileSitemap(db, '/sitemaps/profiles-9007199254740992.xml')).status).toBe(404);
+  });
+
+  it('returns a retryable 503 when the HTML template is unavailable', async () => {
+    const { env } = fixture();
+    await accountsApi(request('/api/account', 'POST', profile), env);
+    env.ASSETS = { fetch: async () => new Response(null, { status: 503 }), connect: () => { throw new Error('unused'); } };
+    const response = await publicProfileSeo(request('/@ownerplayer'), env);
+    expect(response?.status).toBe(503);
+    expect(response?.headers.get('Retry-After')).toBe('60');
+    expect(response?.headers.get('Cache-Control')).toBe('no-store');
+  });
+
+  it('serialises public bootstrap JSON without allowing an injected closing script tag', () => {
+    const text = serialisePublicProfile({ username: '</script><script>alert(1)</script>', data: null, missing: true });
+    expect(text).not.toContain('<');
+    expect(JSON.parse(text).username).toBe('</script><script>alert(1)</script>');
+  });
 });
