@@ -32,6 +32,7 @@ test('Skecher lobby tabs support keyboard navigation, language changes and narro
   await signIn(page); await finishActive(page);
   const newGame = page.getByRole('tab', { name: 'New game', exact: true });
   await expect(newGame).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.lobby-controls')).toHaveCSS('opacity', '1');
   await page.screenshot({ path: 'test-results/lobby-desktop.png', fullPage: true });
   await newGame.focus();
   await page.keyboard.press('ArrowRight');
@@ -53,7 +54,7 @@ test('Skecher lobby tabs support keyboard navigation, language changes and narro
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole('tab', { name: 'Nouvelle partie', exact: true }).blur();
   await expect(page.locator('.skip-link')).not.toBeInViewport();
-  await expect(page.getByRole('tab', { name: 'Nouvelle partie', exact: true })).toHaveCSS('flex-grow', '1.35');
+  await expect(page.getByRole('tab', { name: 'Nouvelle partie', exact: true })).toHaveCSS('flex-grow', '0');
   await page.screenshot({ path: 'test-results/lobby-mobile.png', fullPage: true });
   expect(errors).toEqual([]);
 });
