@@ -10,7 +10,6 @@ import { Header } from './App';
 import { Tabs } from '@base-ui/react/tabs';
 import { AppleMailTabs } from './components/apple-mail-tabs';
 import { SlidingPanel } from './components/sliding-panel';
-import { ChessScene } from './ChessScene';
 import { Board } from './Board';
 import { capturedPieces } from './captured-pieces';
 import { gameCopy } from './game-copy';
@@ -206,7 +205,7 @@ export function Play() {
   }
   return <div className={`site-shell game-shell play-page ${identity?.user && gameId ? 'match-shell' : ''}`}><a className="skip-link" href="#main">{c.play}</a><Header compact={Boolean(identity?.user && gameId)} /><main id="main" className="game-main">
     {error && <div role="alert" className="game-notice mb-5">{c.error} <Button onClick={() => location.reload()}>{c.retry}</Button></div>}
-    {!identity ? <p>{c.loading}</p> : !identity.user ? <div className="entry-layout"><div className="entry-scene" aria-hidden="true"><ChessScene /><span className="cafe-caption">Ludus · Madrid</span></div><section className="entry-panel">
+    {!identity ? <p>{c.loading}</p> : !identity.user ? <div className="entry-layout"><section className="entry-panel">
       <p className="eyebrow">Ludus · Madrid</p><h1 className="font-display text-6xl sm:text-7xl">{c.title}</h1><p className="text-muted">{c.subtitle}</p>
       <form className="grid gap-5 mt-8" onSubmit={(e) => { e.preventDefault(); if (adult) void signIn(false); }}>
         <label className="grid gap-2 text-sm">{c.email}<Input type="email" required maxLength={254} autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="game-input" /></label>
@@ -217,18 +216,18 @@ export function Play() {
       <p className="mt-4 text-xs text-muted leading-6">{c.invitation} <Link className="underline" to="/">{c.waitlist}</Link></p>
       {identity.local && <div className="mt-8 border-t border-ink/15 pt-5"><p className="eyebrow mb-3">{c.localNote}</p><Button disabled={pending} className="game-secondary w-full" onClick={() => void signIn(true)}>{c.local}</Button></div>}
     </section></div> : profileLoaded && !profile ? <section className="setup-card"><Link className="game-primary" to={`/account?returnTo=${encodeURIComponent(playReturnPath(params.get('returnTo')))}`}>{({ 'en-GB': 'Complete your profile to play', 'es-ES': 'Completa tu perfil para jugar', 'fr-FR': 'Complétez votre profil pour jouer' })[isLanguage(i18n.language) ? i18n.language : 'en-GB']}</Link></section> : !gameId ? <>
-      <div className="lobby-heading"><div><p className="eyebrow mb-3">{identity.user.name} · Ludus</p><h1 className="font-display lobby-title">{c.setup}.</h1></div><Button className="text-xs underline py-3" onClick={() => void api('/api/auth/sign-out', {}).then(() => location.assign('/play'))}>{c.signOut}</Button></div>
-      <nav className="lobby-navigation" aria-label="Ludus"><Link to="/online">{({ 'en-GB': 'Play online', 'es-ES': 'Jugar en línea', 'fr-FR': 'Jouer en ligne' })[isLanguage(i18n.language) ? i18n.language : 'en-GB']}</Link><Link to="/account">{({ 'en-GB': 'Your profile', 'es-ES': 'Tu perfil', 'fr-FR': 'Votre profil' })[isLanguage(i18n.language) ? i18n.language : 'en-GB']}</Link></nav><div className="lobby-grid"><figure className="lobby-scene"><ChessScene /><figcaption><span>{c.opponent}</span><span>{c.subtitle}</span></figcaption></figure>
+      <div className="lobby-heading"><div><p className="eyebrow mb-3">{identity.user.name} · Ludus</p><h1 className="lobby-title">{c.setup}.</h1></div><Button className="text-xs underline py-3" onClick={() => void api('/api/auth/sign-out', {}).then(() => location.assign('/play'))}>{c.signOut}</Button></div>
+      <nav className="lobby-navigation" aria-label="Ludus"><Link to="/online">{({ 'en-GB': 'Play online', 'es-ES': 'Jugar en línea', 'fr-FR': 'Jouer en ligne' })[isLanguage(i18n.language) ? i18n.language : 'en-GB']}</Link><Link to="/account">{({ 'en-GB': 'Your profile', 'es-ES': 'Tu perfil', 'fr-FR': 'Votre profil' })[isLanguage(i18n.language) ? i18n.language : 'en-GB']}</Link></nav><div className="lobby-grid">
         <div className="lobby-controls"><AppleMailTabs minimal value={lobbyTab} onValueChange={setLobbyTab} label={c.play} tabs={[
           { value: 'play', label: c.newGame, icon: '♞' }, { value: 'history', label: c.history, icon: '↺' },
         ]}>
           <SlidingPanel activeKey={lobbyTab} direction={lobbyTab === 'play' ? -1 : 1}>
             <Tabs.Panel value={lobbyTab} className="lobby-tab-panel">
-              {lobbyTab === 'play' ? <section className="setup-card"><p className="eyebrow text-olive">{c.opponent}</p><h2 className="font-display text-4xl mt-3 mb-7">{c.play}</h2>
+              {lobbyTab === 'play' ? <section className="setup-card"><p className="eyebrow text-olive">{c.opponent}</p><h2>{c.play}</h2><div className="lobby-settings">
         <label className="setup-label">{c.control}<select className="game-input" value={control} onChange={(e) => setControl(e.target.value as Control)}><option>5+3</option><option>10+5</option></select></label>
         <label className="setup-label">{c.difficulty}<select className="game-input" value={difficulty} onChange={(e) => setDifficulty(Number(e.target.value) as Difficulty)}>{c.levels.map((name, i) => <option key={name} value={i + 1}>{name}</option>)}</select></label>
-        {suggestion && <Button className="game-secondary mb-3" onClick={() => setDifficulty(suggestion.difficulty)}>{({ 'en-GB': 'Use suggested difficulty', 'es-ES': 'Usar dificultad sugerida', 'fr-FR': 'Utiliser la difficulté conseillée' })[isLanguage(i18n.language) ? i18n.language : 'en-GB']}: {c.levels[suggestion.difficulty - 1]}</Button>}<label className="setup-label">{c.colour}<select className="game-input" value={colour} onChange={(e) => setColour(e.target.value as 'w' | 'b')}><option value="w">{c.white}</option><option value="b">{c.black}</option></select></label>
-        <Button className="game-primary mt-4 w-full" disabled={pending} onClick={() => void start()}>{history.some((g) => !g.result) ? c.resume : c.start} ↗</Button><p className="text-xs text-muted mt-4 leading-6">{c.provisional}</p><details className="lobby-materials"><summary>{({ 'en-GB': 'Board materials', 'es-ES': 'Materiales del tablero', 'fr-FR': 'Matériaux de l’échiquier' })[isLanguage(i18n.language) ? i18n.language : 'en-GB']}</summary><AppearanceControls state={appearanceState} /></details>
+        <label className="setup-label">{c.colour}<select className="game-input" value={colour} onChange={(e) => setColour(e.target.value as 'w' | 'b')}><option value="w">{c.white}</option><option value="b">{c.black}</option></select></label>
+        </div>{suggestion && <Button className="game-secondary mb-3" onClick={() => setDifficulty(suggestion.difficulty)}>{({ 'en-GB': 'Use suggested difficulty', 'es-ES': 'Usar dificultad sugerida', 'fr-FR': 'Utiliser la difficulté conseillée' })[isLanguage(i18n.language) ? i18n.language : 'en-GB']}: {c.levels[suggestion.difficulty - 1]}</Button>}<Button className="game-primary" disabled={pending} onClick={() => void start()}>{history.some((g) => !g.result) ? c.resume : c.start} ↗</Button><p className="text-xs text-muted mt-4 leading-6">{c.provisional}</p><details className="lobby-materials"><summary>{({ 'en-GB': 'Board materials', 'es-ES': 'Materiales del tablero', 'fr-FR': 'Matériaux de l’échiquier' })[isLanguage(i18n.language) ? i18n.language : 'en-GB']}</summary><AppearanceControls state={appearanceState} /></details>
       </section> : <section className="history-panel"><h2 className="font-display text-3xl mb-6">{c.history}</h2>{history.length ? <ul>{history.map((entry) => <li key={entry.id}><Link className="history-row" to={`/play?game=${entry.id}`}><span><span className="block text-sm">{c.opponent}</span><span className="text-xs text-muted">{new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }).format(entry.createdAt)}</span></span><span className="text-xs">{entry.result ? c.replay : c.resume} →</span></Link></li>)}</ul> : <p className="text-muted text-sm">{c.noHistory}</p>}</section>}
             </Tabs.Panel>
           </SlidingPanel>
