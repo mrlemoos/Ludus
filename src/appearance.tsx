@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Button } from '@base-ui/react/button';
 import { useTranslation } from 'react-i18next';
 import { defaultAppearance, parseAppearance, type Appearance } from '../shared/cosmetics';
 const labels = {
@@ -38,9 +39,10 @@ export function useAppearance(enabled = true) {
   }
   return { appearance, error, pending, save };
 }
-export function AppearanceControls({ state }: { state: ReturnType<typeof useAppearance> }) {
+export function AppearanceControls({ state, swatches = false }: { state: ReturnType<typeof useAppearance>; swatches?: boolean }) {
   const { i18n } = useTranslation();
   const c = labels[i18n.language as keyof typeof labels] ?? labels['en-GB'];
+  if (swatches) return <div className="swatch-row" role="group" aria-label={c.title}>{(['wood', 'walnut', 'marble'] as const).map((board) => <Button key={board} type="button" className={`swatch swatch-${board}`} aria-label={c[board]} aria-pressed={state.appearance.board === board} disabled={state.pending} onClick={() => void state.save({ ...state.appearance, board })} />)}<Button type="button" className="swatch swatch-ebony" aria-label={c.ebony} aria-pressed={state.appearance.pieces === 'ebony'} disabled={state.pending} onClick={() => void state.save({ ...state.appearance, pieces: state.appearance.pieces === 'ebony' ? 'wood' : 'ebony' })} />{state.error && <p role="alert" className="sr-only">{c.error}</p>}</div>;
   return <fieldset className="grid gap-3 mt-5" disabled={state.pending}><legend className="eyebrow">{c.title}</legend>
     <select aria-label={c.title} className="game-input" value={state.appearance.board} onChange={(e) => void state.save({ ...state.appearance, board: e.target.value as Appearance['board'] })}>
       <option value="wood">{c.wood}</option><option value="walnut">{c.walnut}</option><option value="marble">{c.marble}</option>

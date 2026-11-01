@@ -1,4 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
+async function resignActive(page: Page) {
+  const origin = new URL(page.url()).origin;
+  const status = await page.request.get('/api/online/status').then((response) => response.json());
+  if (status.status !== 'assigned') return;
+  const snapshot = await page.request.get(`/api/online/games/${status.match.id}`).then((response) => response.json());
+  if (!snapshot.game || snapshot.game.result) return;
+  expect((await page.request.post(`/api/online/games/${status.match.id}`, { data: { type: 'resign', revision: snapshot.game.revision }, headers: { Origin: origin } })).ok()).toBe(true);
+}
 async function login(page: Page, account: 'leo' | 'friend') {
   await page.addInitScript(() => { localStorage.setItem('ludus-language', 'en-GB'); localStorage.setItem('ludus-board', '2d'); });
   await page.goto('/play');
@@ -14,10 +22,10 @@ test('two accounts play a friend game, reject foreign access, exchange phrases a
   try {
     await login(page, 'leo'); await login(friend, 'friend');
     const origin = baseURL!;
-    const create = await page.request.post('/api/online/invitations', { data: { control: '5+3', colour: 'w' }, headers: { Origin: origin } });
+    const create = await page.request.post('/api/online/invitations', { data: { control: '5+3' }, headers: { Origin: origin } });
     expect(create.ok()).toBe(true);
     const invitation = await create.json();
-    const redeemed = await friend.request.post('/api/online/invitations/redeem', { data: { token: invitation.token }, headers: { Origin: origin } });
+    const redeemed = await friend.request.post('/api/online/invitations/redeem', { data: { token: invitation.token, colour: 'b' }, headers: { Origin: origin } });
     expect(redeemed.ok()).toBe(true);
     const assigned = await redeemed.json(), id = assigned.match.id;
     await page.goto(`/online?game=${id}`); await friend.goto(`/online?game=${id}`);
@@ -50,6 +58,88 @@ test('two accounts play a friend game, reject foreign access, exchange phrases a
     expect(report.ok()).toBe(true);
     await page.screenshot({ path: 'test-results/online-finished.png', fullPage: true });
   } finally { await otherContext.close(); await foreignContext.close(); }
+});
+test('a guest who chooses white moves first and the host answers as black', async ({ page, browser, baseURL }) => {
+  const otherContext = await browser.newContext(); const friend = await otherContext.newPage();
+  try {
+    await login(page, 'leo'); await login(friend, 'friend');
+    const origin = baseURL!;
+    const create = await page.request.post('/api/online/invitations', { data: { control: '5+3' }, headers: { Origin: origin } });
+    expect(create.ok()).toBe(true);
+    const invitation = await create.json();
+    const redeemed = await friend.request.post('/api/online/invitations/redeem', { data: { token: invitation.token, colour: 'w' }, headers: { Origin: origin } });
+    expect(redeemed.ok()).toBe(true);
+    const id = (await redeemed.json()).match.id;
+    await page.goto(`/online?game=${id}`); await friend.goto(`/online?game=${id}`);
+    await expect(page.locator('[data-square="e7"]')).toBeVisible();
+    await expect(friend.locator('[data-square="e2"]')).toBeVisible();
+    await expect(page.getByText('Reconnecting')).toHaveCount(0);
+    await expect(friend.getByText('Reconnecting')).toHaveCount(0);
+    await friend.locator('[data-square="e2"]').click(); await friend.locator('[data-square="e4"]').click();
+    await expect(page.locator('[data-square="e4"]')).toHaveAccessibleName(/White Pawn/);
+    await page.locator('[data-square="e7"]').click(); await page.locator('[data-square="e5"]').click();
+    await expect(friend.locator('[data-square="e5"]')).toHaveAccessibleName(/Black Pawn/);
+    await resignActive(page);
+  } finally { await otherContext.close(); }
+});
+test('the first player in the public queue plays white', async ({ page, browser }) => {
+  const otherContext = await browser.newContext(); const friend = await otherContext.newPage();
+  try {
+    await login(page, 'leo'); await login(friend, 'friend');
+    await resignActive(page); await resignActive(friend);
+    await page.goto('/online'); await friend.goto('/online');
+    await page.getByRole('button', { name: 'Find an opponent', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Cancel search', exact: true })).toBeVisible();
+    await friend.getByRole('button', { name: 'Find an opponent', exact: true }).click();
+    await expect(page).toHaveURL(/\/online\?game=/);
+    await expect(friend).toHaveURL(/\/online\?game=/);
+    expect(new URL(page.url()).searchParams.get('game')).toBe(new URL(friend.url()).searchParams.get('game'));
+    await expect(page.locator('[data-square="e2"]')).toBeVisible();
+    await expect(friend.locator('[data-square="e7"]')).toBeVisible();
+    await expect(page.getByText('Reconnecting')).toHaveCount(0);
+    await page.locator('[data-square="e2"]').click(); await page.locator('[data-square="e4"]').click();
+    await expect(friend.locator('[data-square="e4"]')).toHaveAccessibleName(/White Pawn/);
+    await resignActive(page);
+  } finally { await otherContext.close(); }
+});
+test('a rejected move shows the piece and then puts it back', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(String(error)));
+  let release = () => {};
+  const hold = new Promise<void>((resolve) => { release = resolve; });
+  const now = Date.now();
+  const game = { id: '11111111-1111-4111-8111-111111111111', players: { w: 'leo', b: 'friend' }, control: '5+3', rated: false, moves: [] as string[], fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', clocks: { w: 300000, b: 300000 }, updatedAt: now, revision: 0, result: null, disconnected: { w: false, b: false }, pauseUsed: { w: 0, b: 0 }, drawOffer: null };
+  await page.addInitScript(`(() => {
+    localStorage.setItem('ludus-language', 'en-GB'); localStorage.setItem('ludus-board', '2d');
+    class QuietSocket {
+      static CONNECTING = 0; static OPEN = 1; static CLOSING = 2; static CLOSED = 3;
+      constructor() { this.readyState = QuietSocket.CONNECTING; queueMicrotask(() => { this.readyState = QuietSocket.OPEN; if (this.onopen) this.onopen(); }); }
+      send() {}
+      close() { this.readyState = QuietSocket.CLOSED; if (this.onclose) this.onclose(); }
+      addEventListener() {}
+      removeEventListener() {}
+    }
+    window.WebSocket = QuietSocket;
+  })();`);
+  await page.route('**/api/**', async (route) => {
+    const request = route.request(), path = new URL(request.url()).pathname;
+    if (path === '/api/me') return route.fulfill({ json: { user: { id: 'leo', name: 'Leo' } } });
+    if (path === '/api/appearance') return route.fulfill({ json: { appearance: { board: 'wood', pieces: 'wood' } } });
+    if (request.method() === 'POST' && path === `/api/online/games/${game.id}`) { await hold; return route.fulfill({ status: 409, json: { error: 'conflict' } }); }
+    if (path === `/api/online/games/${game.id}`) return route.fulfill({ json: { game, serverNow: now } });
+    return route.fulfill({ json: {} });
+  });
+  try {
+    await page.goto(`/online?game=${game.id}`);
+    await expect(page.locator('[data-square="e2"]')).toBeVisible();
+    await expect(page.getByText('Reconnecting')).toHaveCount(0);
+    await page.locator('[data-square="e2"]').click(); await page.locator('[data-square="e4"]').click();
+    await expect(page.locator('[data-square="e4"]')).toHaveAccessibleName(/White Pawn/);
+    release();
+    await expect(page.locator('[data-square="e2"]')).toHaveAccessibleName(/White Pawn/);
+    await expect(page.locator('[data-square="e4"]')).toHaveAccessibleName(/Empty/);
+    expect(errors).toEqual([]);
+  } finally { release(); }
 });
 test('onboarded account sees trial, activity, public profile and explicit coach outage', async ({ page }) => {
   await login(page, 'leo');

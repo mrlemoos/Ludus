@@ -17,6 +17,7 @@ export async function onlineApi(request: Request, env: Env, user: string): Promi
   try {
     if (url.pathname === '/api/online/status' && request.method === 'GET') return json({ ...await coordinator.status(user), ratedEnabled: RATED_ENABLED, ratedGate: RATED_GATE });
     if (url.pathname === '/api/online/history' && request.method === 'GET') return json((await env.DB.prepare('SELECT id,control,rated,result,finished_at FROM online_matches WHERE white_id=? OR black_id=? ORDER BY finished_at DESC,id DESC LIMIT 30').bind(user, user).all()).results);
+    if (url.pathname === '/api/online/socket' && request.method === 'GET') { if (request.headers.get('Origin') !== url.origin) return json({ error: 'forbidden' }, 403); return coordinator.fetch(new Request(request.url, { headers: { Upgrade: 'websocket', 'X-Player': user } })); }
     const match = /^\/api\/online\/games\/([0-9a-f-]{36})(?:\/(socket|phrase|report))?$/.exec(url.pathname);
     if (match) {
       const stub = env.HUMAN_MATCHES.getByName(match[1]);
@@ -36,8 +37,8 @@ export async function onlineApi(request: Request, env: Env, user: string): Promi
       return json(await coordinator.join(user, input.control as Control, input.rated, rating?.rating ?? initialRating().rating));
     }
     if (url.pathname === '/api/online/queue/cancel' || url.pathname === '/api/online/queue/ai') { if (typeof input.token !== 'string') return json({ error: 'invalid' }, 400); return json(await coordinator.cancel(user, input.token, url.pathname.endsWith('/ai'))); }
-    if (url.pathname === '/api/online/invitations') { if (!['5+3', '10+5'].includes(String(input.control)) || !['w', 'b', 'random'].includes(String(input.colour))) return json({ error: 'invalid' }, 400); return json(await coordinator.createInvite(user, input.control as Control, input.colour as 'w' | 'b' | 'random')); }
-    if (url.pathname === '/api/online/invitations/redeem' || url.pathname === '/api/online/invitations/cancel') { if (typeof input.token !== 'string' || !/^[0-9a-f-]{36}$/.test(input.token)) return json({ error: 'invalid' }, 400); return json(url.pathname.endsWith('/redeem') ? await coordinator.redeem(user, input.token) : await coordinator.revokeInvite(user, input.token)); }
+    if (url.pathname === '/api/online/invitations') { if (!['5+3', '10+5'].includes(String(input.control)) || 'colour' in input) return json({ error: 'invalid' }, 400); return json(await coordinator.createInvite(user, input.control as Control)); }
+    if (url.pathname === '/api/online/invitations/redeem' || url.pathname === '/api/online/invitations/cancel') { if (typeof input.token !== 'string' || !/^[0-9a-f-]{36}$/.test(input.token) || (url.pathname.endsWith('/redeem') && input.colour !== 'w' && input.colour !== 'b' && input.colour !== 'random')) return json({ error: 'invalid' }, 400); return json(url.pathname.endsWith('/redeem') ? await coordinator.redeem(user, input.token, input.colour as 'w' | 'b' | 'random') : await coordinator.revokeInvite(user, input.token)); }
     return json({ error: 'not_found' }, 404);
-  } catch (error) { const reason = error instanceof Error ? error.message : 'unavailable'; return json({ error: reason === 'rated_unavailable' ? reason : 'unavailable' }, reason === 'rated_unavailable' ? 409 : 503); }
+  } catch (error) { const reason = error instanceof Error ? error.message : 'unavailable'; if (reason === 'not_found') return json({ error: reason }, 404); if (['rated_unavailable', 'busy', 'invalid_invite', 'stale_queue', 'stale_invite', 'invalid_queue'].includes(reason)) return json({ error: reason }, 409); return json({ error: 'unavailable' }, 503); }
 }

@@ -146,10 +146,10 @@ export function Play() {
     }).catch(() => { if (!cancelled) setEngineError(true); });
     return () => { cancelled = true; computer?.dispose(); };
   }, [game?.id, game?.revision, game?.pauseStarted, connected, engineRetry, send]);
-  async function signIn(local: boolean) {
+  async function signIn(local: boolean, account: 'leo' | 'friend' = 'leo') {
     setPending(true); setError(false);
     try {
-      if (local) { const { url } = await api<{ url: string }>('/api/dev/sign-in', { returnTo: playReturnPath(params.get('returnTo')) }); location.assign(url); }
+      if (local) { const { url } = await api<{ url: string }>('/api/dev/sign-in', { account, returnTo: playReturnPath(params.get('returnTo')) }); location.assign(url); }
       else { await api('/api/auth/sign-in/magic-link', { email, adult, callbackURL: `${location.origin}${playReturnPath(params.get('returnTo'))}` }); setSent(true); }
     } catch { setError(true); } finally { setPending(false); }
   }
@@ -214,7 +214,7 @@ export function Play() {
       </form>
       {sent && <p role="status" className="mt-4 text-sm">{c.sent}</p>}
       <p className="mt-4 text-xs text-muted leading-6">{c.invitation} <Link className="underline" to="/">{c.waitlist}</Link></p>
-      {identity.local && <div className="mt-8 border-t border-ink/15 pt-5"><p className="eyebrow mb-3">{c.localNote}</p><Button disabled={pending} className="game-secondary w-full" onClick={() => void signIn(true)}>{c.local}</Button></div>}
+      {identity.local && <div className="mt-8 border-t border-ink/15 pt-5"><p className="eyebrow mb-3">{c.localNote}</p><div className="grid gap-3"><Button disabled={pending} className="game-secondary w-full" onClick={() => void signIn(true)}>{c.local}</Button><Button disabled={pending} className="game-secondary w-full" onClick={() => void signIn(true, 'friend')}>{c.localFriend}</Button></div></div>}
     </section></div> : profileLoaded && !profile ? <section className="setup-card"><Link className="game-primary" to={`/account?returnTo=${encodeURIComponent(playReturnPath(params.get('returnTo')))}`}>{({ 'en-GB': 'Complete your profile to play', 'es-ES': 'Completa tu perfil para jugar', 'fr-FR': 'Complétez votre profil pour jouer' })[isLanguage(i18n.language) ? i18n.language : 'en-GB']}</Link></section> : !gameId ? <>
       <div className="lobby-heading"><div><p className="eyebrow mb-3">{identity.user.name} · Ludus</p><h1 className="lobby-title">{c.setup}.</h1></div><Button className="text-xs underline py-3" onClick={() => void api('/api/auth/sign-out', {}).then(() => location.assign('/play'))}>{c.signOut}</Button></div>
       <nav className="lobby-navigation" aria-label="Ludus"><Link to="/online">{({ 'en-GB': 'Play online', 'es-ES': 'Jugar en línea', 'fr-FR': 'Jouer en ligne' })[isLanguage(i18n.language) ? i18n.language : 'en-GB']}</Link><Link to="/account">{({ 'en-GB': 'Your profile', 'es-ES': 'Tu perfil', 'fr-FR': 'Votre profil' })[isLanguage(i18n.language) ? i18n.language : 'en-GB']}</Link></nav><div className="lobby-grid">

@@ -5,6 +5,7 @@ vi.mock('cloudflare:workers', () => ({ DurableObject: class { constructor(public
 vi.mock('../../worker/accounts', () => ({ recordActivity: vi.fn() }));
 import { recordActivity } from '../../worker/accounts';
 import { Matchmaking } from '../../worker/matchmaking';
+import { onlineApi } from '../../worker/online-api';
 import { HumanMatch } from '../../worker/human-match';
 import { createHumanGame, humanConnection, type HumanGame } from '../../shared/human-game';
 import type { Assignment } from '../../shared/matchmaking';
@@ -40,6 +41,7 @@ describe('SQLite matchmaking assignment races', () => {
     expect(matched.status).toBe('assigned'); expect(cancelled.status).toBe('assigned');
     if (matched.status !== 'assigned' || cancelled.status !== 'assigned') throw new Error('assigned');
     expect(cancelled.match.id).toBe(matched.match.id);
+    expect(matched.match.players).toEqual({ w: 'white', b: 'black' });
     expect((await f.coordinator.join('white', '10+5', false, 1500))).toMatchObject({ status: 'assigned', match: { id: matched.match.id } });
   });
   it('cancels before assignment and requires explicit delayed AI acceptance with exact token', async () => {
@@ -54,9 +56,9 @@ describe('SQLite matchmaking assignment races', () => {
     await f.coordinator.reserveComputer('one', 'computer');
     await expect(f.coordinator.reserveComputer('one', 'computer')).resolves.toEqual({ reserved: true });
     await expect(f.coordinator.join('one', '5+3', false, 1500)).rejects.toThrow('computer_active');
-    await expect(f.coordinator.createInvite('one', '5+3', 'w')).rejects.toThrow('busy');
-    const invite = await f.coordinator.createInvite('friend', '5+3', 'w');
-    await expect(f.coordinator.redeem('one', invite.token)).rejects.toThrow('busy');
+    await expect(f.coordinator.createInvite('one', '5+3')).rejects.toThrow('busy');
+    const invite = await f.coordinator.createInvite('friend', '5+3');
+    await expect(f.coordinator.redeem('one', invite.token, 'b')).rejects.toThrow('busy');
     await f.coordinator.releaseComputer('one', 'stale');
     expect(await f.coordinator.status('one')).toEqual({ status: 'computer', id: 'computer' });
     await f.coordinator.releaseComputer('one', 'computer');
@@ -64,27 +66,158 @@ describe('SQLite matchmaking assignment races', () => {
     await expect(f.coordinator.reserveComputer('one', 'another')).rejects.toThrow('busy');
     expect(queued.status).toBe('queued');
   });
-  it('redeems invitations only once and persists random colour and game ID over retries', async () => {
-    const f = coordinator(), invite = await f.coordinator.createInvite('owner', '10+5', 'random');
+  it('issues a new link when the saved invitation is gone', async () => {
+    const f = coordinator(), invite = await f.coordinator.createInvite('owner', '5+3');
+    f.db.prepare('DELETE FROM invites WHERE token=?').run(invite.token);
+    expect(await f.coordinator.status('owner')).toEqual({ status: 'idle' });
+    const next = await f.coordinator.createInvite('owner', '5+3');
+    expect(next.token).not.toBe(invite.token);
+    const joined = await f.coordinator.redeem('friend', next.token, 'b');
+    expect(joined.match.players).toEqual({ w: 'owner', b: 'friend' });
+  });
+  it('redeems invitations only once and keeps the first seats when the guest retries another colour', async () => {
+    const f = coordinator(), invite = await f.coordinator.createInvite('owner', '10+5');
     expect(invite.expiresAt).toBe(86401000);
-    await expect(f.coordinator.redeem('owner', invite.token)).rejects.toThrow('invalid_invite');
-    const first = await f.coordinator.redeem('friend', invite.token), retry = await f.coordinator.redeem('friend', invite.token);
+    await expect(f.coordinator.redeem('owner', invite.token, 'random')).rejects.toThrow('invalid_invite');
+    const first = await f.coordinator.redeem('friend', invite.token, 'w'), retry = await f.coordinator.redeem('friend', invite.token, 'b');
     expect(first).toEqual(retry); expect(first.match.rated).toBe(false);
+    expect(first.match.players).toEqual({ w: 'friend', b: 'owner' });
+    expect(retry.match.id).toBe(first.match.id); expect(retry.match.players).toEqual(first.match.players);
     expect(Object.values(first.match.players).sort()).toEqual(['friend', 'owner']);
-    await expect(f.coordinator.redeem('other', invite.token)).rejects.toThrow('redeemed');
+    await expect(f.coordinator.redeem('other', invite.token, 'w')).rejects.toThrow('redeemed');
     await f.coordinator.release(first.match.id, ['owner', 'friend']);
     expect(await f.coordinator.status('owner')).toEqual({ status: 'idle' });
   });
+  it('seats the guest on the requested side and keeps friend matches casual', async () => {
+    const original = crypto.getRandomValues.bind(crypto);
+    const spy = vi.spyOn(crypto, 'getRandomValues').mockImplementation((array) => {
+      if (array instanceof Uint8Array && array.length === 1) array[0] = 255; else return original(array);
+      return array;
+    });
+    try {
+      const white = coordinator(), whiteInvite = await white.coordinator.createInvite('host', '5+3');
+      const asWhite = await white.coordinator.redeem('guest', whiteInvite.token, 'w');
+      expect(asWhite.match.players).toEqual({ w: 'guest', b: 'host' }); expect(asWhite.match.rated).toBe(false);
+      spy.mockImplementation((array) => { if (array instanceof Uint8Array && array.length === 1) array[0] = 0; else return original(array); return array; });
+      const black = coordinator(), blackInvite = await black.coordinator.createInvite('host', '10+5');
+      const asBlack = await black.coordinator.redeem('guest', blackInvite.token, 'b');
+      expect(asBlack.match.players).toEqual({ w: 'host', b: 'guest' }); expect(asBlack.match.rated).toBe(false);
+    } finally { spy.mockRestore(); }
+  });
+  it('rolls random guest colour once on the server and ignores a later colour', async () => {
+    const original = crypto.getRandomValues.bind(crypto);
+    const spy = vi.spyOn(crypto, 'getRandomValues').mockImplementation((array) => {
+      if (array instanceof Uint8Array && array.length === 1) array[0] = 127; else return original(array);
+      return array;
+    });
+    const rolls = () => spy.mock.calls.filter((call) => call[0] instanceof Uint8Array && call[0].length === 1).length;
+    try {
+      const low = coordinator(), lowInvite = await low.coordinator.createInvite('host', '5+3');
+      const lowMatch = await low.coordinator.redeem('guest', lowInvite.token, 'random');
+      expect(lowMatch.match.players).toEqual({ w: 'guest', b: 'host' }); expect(rolls()).toBe(1);
+      const retry = await low.coordinator.redeem('guest', lowInvite.token, 'b');
+      expect(retry.match.id).toBe(lowMatch.match.id); expect(retry.match.players).toEqual(lowMatch.match.players); expect(rolls()).toBe(1);
+      spy.mockImplementation((array) => { if (array instanceof Uint8Array && array.length === 1) array[0] = 128; else return original(array); return array; });
+      const high = coordinator(), highInvite = await high.coordinator.createInvite('host', '10+5');
+      const highMatch = await high.coordinator.redeem('guest', highInvite.token, 'random');
+      expect(highMatch.match.players).toEqual({ w: 'host', b: 'guest' }); expect(highMatch.match.rated).toBe(false); expect(rolls()).toBe(2);
+    } finally { spy.mockRestore(); }
+  });
+  it('pushes one assigned match to both players after initialisation', async () => {
+    const f = coordinator();
+    const socket = (player: string) => ({ player, readyState: 1, send: vi.fn(), close: vi.fn(), deserializeAttachment: () => ({ player }) });
+    const waiting = socket('white'), joining = socket('black');
+    f.sockets.push(waiting, joining);
+    const order: string[] = [];
+    f.initialise.mockImplementation(async () => { order.push('ensure'); });
+    waiting.send.mockImplementation((payload: string) => { if (JSON.parse(payload).status === 'assigned') order.push('waiting'); });
+    joining.send.mockImplementation((payload: string) => { if (JSON.parse(payload).status === 'assigned') order.push('joining'); });
+    expect((await f.coordinator.join('white', '5+3', false, 1500)).status).toBe('queued');
+    const matched = await f.coordinator.join('black', '5+3', false, 1500);
+    if (matched.status !== 'assigned') throw new Error('assigned');
+    const assigned = (send: { mock: { calls: unknown[][] } }) => send.mock.calls.filter((call) => JSON.parse(String(call[0])).status === 'assigned');
+    expect(assigned(waiting.send)).toHaveLength(1); expect(assigned(joining.send)).toHaveLength(1);
+    expect(assigned(waiting.send)[0][0]).toBe(assigned(joining.send)[0][0]);
+    expect(JSON.parse(String(assigned(waiting.send)[0][0]))).toEqual({ status: 'assigned', match: matched.match });
+    expect(JSON.parse(String(assigned(waiting.send)[0][0])).match.id).toBe(matched.match.id);
+    expect(order.indexOf('ensure')).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf('ensure')).toBeLessThan(order.indexOf('waiting'));
+    expect(order.indexOf('ensure')).toBeLessThan(order.indexOf('joining'));
+  });
+  it('closes a socket that cannot accept a queue update', async () => {
+    const f = coordinator();
+    const socket = { player: 'one', readyState: 1, send: vi.fn(() => { throw new Error('gone'); }), close: vi.fn(), deserializeAttachment: () => ({ player: 'one' }) };
+    f.sockets.push(socket);
+    expect((await f.coordinator.join('one', '5+3', false, 1500)).status).toBe('queued');
+    expect(socket.close).toHaveBeenCalledWith(1011, 'Reconnect');
+  });
+  it('rejects a matchmaking socket without a player or a websocket upgrade', async () => {
+    const f = coordinator();
+    expect((await f.coordinator.fetch(new Request('https://ludus.test'))).status).toBe(404);
+    expect((await f.coordinator.fetch(new Request('https://ludus.test', { headers: { 'X-Player': 'white' } }))).status).toBe(426);
+  });
   it('rejects expired invites, mixed queue entry, and repairs interrupted assignment initialisation', async () => {
-    const f = coordinator(), invite = await f.coordinator.createInvite('owner', '5+3', 'w');
+    const f = coordinator(), invite = await f.coordinator.createInvite('owner', '5+3');
     await expect(f.coordinator.join('owner', '5+3', false, 1500)).rejects.toThrow('invite_active');
-    vi.setSystemTime(invite.expiresAt); await expect(f.coordinator.redeem('other', invite.token)).rejects.toThrow('invalid_invite');
+    vi.setSystemTime(invite.expiresAt); await expect(f.coordinator.redeem('other', invite.token, 'random')).rejects.toThrow('invalid_invite');
     expect(await f.coordinator.status('owner')).toEqual({ status: 'idle' });
     await f.coordinator.join('one', '5+3', false, 1500); f.initialise.mockRejectedValueOnce(new Error('network'));
     await expect(f.coordinator.join('two', '5+3', false, 1500)).rejects.toThrow('network');
     expect((await f.coordinator.status('one')).status).toBe('assigned');
     expect((await f.coordinator.status('two')).status).toBe('assigned');
     expect(f.initialise.mock.calls.at(-1)).toEqual(f.initialise.mock.calls.at(-2));
+  });
+});
+function onlineEnv() {
+  const createInvite = vi.fn(async () => ({ token: '11111111-1111-4111-8111-111111111111', expiresAt: 86401000 }));
+  const redeem = vi.fn(async () => ({ status: 'assigned' as const, match: assignment }));
+  const revokeInvite = vi.fn(async () => ({ status: 'idle' as const }));
+  const fetch = vi.fn(async (_request: Request) => new Response(null, { status: 426 }));
+  const env = { MATCHMAKING: { getByName: () => ({ createInvite, redeem, revokeInvite, fetch }) } } as unknown as Env;
+  return { env, createInvite, redeem, revokeInvite, fetch };
+}
+async function postOnline(env: Env, path: string, data: Record<string, unknown>) {
+  const origin = 'https://ludus.test';
+  const response = await onlineApi(new Request(`${origin}${path}`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(data) }), env, 'guest');
+  if (!response) throw new Error('missing');
+  return response;
+}
+describe('online invitation HTTP and matchmaking socket', () => {
+  it('accepts an invitation control and rejects a supplied colour', async () => {
+    const { env, createInvite } = onlineEnv();
+    const rejected = await postOnline(env, '/api/online/invitations', { control: '5+3', colour: 'w' });
+    expect(rejected.status).toBe(400); expect(await rejected.json()).toEqual({ error: 'invalid' });
+    expect(createInvite).not.toHaveBeenCalled();
+    expect((await postOnline(env, '/api/online/invitations', { control: '3+0' })).status).toBe(400);
+    const created = await postOnline(env, '/api/online/invitations', { control: '10+5' });
+    expect(created.status).toBe(200); expect(createInvite).toHaveBeenCalledWith('guest', '10+5');
+  });
+  it('reports a missing invitation instead of a generic outage', async () => {
+    const { env } = onlineEnv();
+    env.MATCHMAKING.getByName = () => ({ redeem: vi.fn(async () => { throw new Error('not_found'); }) }) as unknown as Env['MATCHMAKING']['getByName'];
+    const response = await postOnline(env, '/api/online/invitations/redeem', { token: '11111111-1111-4111-8111-111111111111', colour: 'w' });
+    expect(response.status).toBe(404); expect(await response.json()).toEqual({ error: 'not_found' });
+  });
+  it('requires a guest colour when redeeming an invitation', async () => {
+    const { env, redeem, revokeInvite } = onlineEnv();
+    const token = '11111111-1111-4111-8111-111111111111';
+    expect((await postOnline(env, '/api/online/invitations/redeem', { token })).status).toBe(400);
+    expect((await postOnline(env, '/api/online/invitations/redeem', { token, colour: 'white' })).status).toBe(400);
+    expect((await postOnline(env, '/api/online/invitations/redeem', { token: 'nope', colour: 'w' })).status).toBe(400);
+    expect(redeem).not.toHaveBeenCalled();
+    const redeemed = await postOnline(env, '/api/online/invitations/redeem', { token, colour: 'random' });
+    expect(redeemed.status).toBe(200); expect(redeem).toHaveBeenCalledWith('guest', token, 'random');
+    const cancelled = await postOnline(env, '/api/online/invitations/cancel', { token });
+    expect(cancelled.status).toBe(200); expect(revokeInvite).toHaveBeenCalledWith('guest', token);
+  });
+  it('upgrades the same-origin matchmaking socket with the player header', async () => {
+    const { env, fetch } = onlineEnv();
+    const origin = 'https://ludus.test';
+    expect((await onlineApi(new Request(`${origin}/api/online/socket`, { headers: { Origin: 'https://evil.test' } }), env, 'white'))?.status).toBe(403);
+    const response = await onlineApi(new Request(`${origin}/api/online/socket`, { headers: { Origin: origin } }), env, 'white');
+    expect(response?.status).toBe(426); expect(fetch).toHaveBeenCalledOnce();
+    const forwarded = fetch.mock.calls[0][0];
+    expect(forwarded.headers.get('Upgrade')).toBe('websocket'); expect(forwarded.headers.get('X-Player')).toBe('white');
   });
 });
 function humanFixture(initial?: HumanGame) {

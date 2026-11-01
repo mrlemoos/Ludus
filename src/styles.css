@@ -128,6 +128,19 @@
   .board-tools { @apply mx-auto mt-3 flex w-fit max-w-full flex-wrap justify-center gap-1 rounded-3xl border border-ink/10 bg-white/80 p-1.5 shadow-sm; }
   .board-tools .game-secondary { @apply border-transparent bg-transparent hover:bg-ink/5; }
   .match-sidebar { @apply rounded-3xl border border-ink/10 bg-white/80 p-5 shadow-[0_12px_40px_#203b3206] sm:p-6 lg:mt-19; }
+  .icon-row { @apply flex flex-wrap gap-1; }
+  .icon-button { @apply grid h-11 w-11 place-items-center rounded-full border border-ink/15 bg-white p-0; }
+  .icon-button[aria-pressed="true"] { @apply bg-ink text-paper; }
+  .piece-pip { @apply h-3 w-3 shrink-0 rounded-full border border-ink/30; }
+  .pip-w { background: #f4efe4; }
+  .pip-b { background: #2a2420; }
+  .swatch-row { @apply flex flex-wrap gap-2; }
+  .swatch { @apply h-8 w-8 rounded-full border-2 border-transparent p-0; }
+  .swatch[aria-pressed="true"] { border-color: var(--color-ink); }
+  .swatch-wood { background: #c4a574; }
+  .swatch-walnut { background: #6b4226; }
+  .swatch-marble { background: linear-gradient(135deg, #f7f4ef, #b9c4c8); }
+  .swatch-ebony { background: linear-gradient(90deg, #f4efe4 50%, #2a2420 50%); }
   .match-status { @apply mb-5 border-b border-ink/10 pb-5; }
   .moves-panel { @apply mt-5 max-h-72 overflow-y-auto; }
   .move-row { @apply grid grid-cols-[2rem_1fr_1fr] items-center rounded-lg px-2 text-sm odd:bg-ink/4; }
@@ -136,7 +149,7 @@
   .replay-controls { @apply flex rounded-lg border border-ink/20; }
   .replay-controls button { @apply min-h-11 flex-1 text-xl hover:bg-ink/5; }
   .three-board { @apply aspect-square w-full; touch-action: none; }
-  .accessible-board { @apply sr-only; }
+  .accessible-board, .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
   .accessible-board:focus-within { @apply not-sr-only absolute inset-0 z-10; }
   .promotion-overlay { @apply fixed inset-0 z-50 grid place-items-center bg-ink/50 p-5; }
   .promotion-panel { @apply w-full max-w-90 rounded-2xl bg-paper p-7 shadow-2xl; }
