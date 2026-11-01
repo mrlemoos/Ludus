@@ -12,8 +12,8 @@
 .home-page .text-muted { color: var(--home-muted); }
 .home-page .site-header > div { gap: 24px; }
 .home-page .site-header > div > span { display: none; }
-.home-page .header-play { background: transparent; color: var(--home-text); padding-inline: 0; border-radius: 4px; box-shadow: none; font-size: 12px; font-weight: 500; }
-@media (hover: hover) and (pointer: fine) { .home-page .header-play:hover { opacity: .6; box-shadow: none; } }
+.home-page .header-play { background: transparent; color: var(--home-text); padding-inline: 0; border-radius: 4px; font-size: 12px; font-weight: 500; }
+@media (hover: hover) and (pointer: fine) { .home-page .header-play:hover { opacity: .6; } }
 .home-page .language-trigger { min-width: 100px; padding-inline: 14px; border-color: var(--home-line); background: #fff; color: var(--home-text); border-radius: 24px; }
 .home-page :focus-visible { outline: 2px solid #35614a; outline-offset: 5px; }
 .home-hero { display: grid; grid-template-columns: 1.2fr 1fr; gap: clamp(32px, 6vw, 96px); padding-block: 78px 70px; align-items: center; }
@@ -27,8 +27,8 @@
 .home-page .game-input { min-height: 52px; border: 1px solid #cececb; background: #fff; color: var(--home-text); border-radius: 30px; box-shadow: none; font-size: 13px; padding-inline: 19px; }
 .home-page .game-input::placeholder { color: var(--home-muted); opacity: 1; }
 .home-page .game-input[aria-invalid="true"] { border-color: #ad2727; }
-.home-page .game-primary { min-height: 52px; padding-inline: 20px; gap: 12px; border: 1px solid #171717; border-radius: 30px; background: #171717; color: #fff; box-shadow: none; font-size: 12px; font-weight: 500; white-space: nowrap; }
-@media (hover: hover) and (pointer: fine) { .home-page .game-primary:hover { background: #373735; box-shadow: none; } }
+.home-page .game-primary { min-height: 52px; padding-inline: 20px; gap: 12px; border: 1px solid #171717; border-radius: 30px; background: #171717; color: #fff; font-size: 12px; font-weight: 500; white-space: nowrap; }
+@media (hover: hover) and (pointer: fine) { .home-page .game-primary:hover { background: #373735; } }
 .home-page .game-primary .action-arrow { width: 16px; }
 .home-page #invitation-language, .home-page #email-use { font-size: 10px; line-height: 1.6; color: var(--home-muted); }
 .home-page #invitation-language { margin-top: 13px; }
@@ -41,7 +41,7 @@
 .home-preview .skecher-tab-list { position: absolute; left: 24px; top: 24px; z-index: 2; width: 160px; padding: 4px; gap: 2px; background: #ffffffd9; backdrop-filter: blur(20px); border: 1px solid #ffffff80; border-radius: 30px; box-shadow: 0 2px 12px #17171708; }
 .home-preview .skecher-tab { min-height: 36px; font-size: 11px; border-radius: 24px; color: #575752; }
 .home-preview .skecher-tab[data-active] { color: #fff; }
-.home-preview .skecher-tab-pill { background: #282b27; border-radius: 24px; box-shadow: none; }
+.home-preview .skecher-tab-pill { background: #282b27; border-radius: 24px; }
 .home-preview .skecher-tab-content { gap: 6px; }
 .home-preview .control-icon { width: 16px; height: 16px; }
 .preview-stage { height: clamp(430px, 43vw, 660px); position: relative; background: #c5baa2; border-radius: 12px; overflow: hidden; }
