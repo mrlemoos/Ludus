@@ -194,7 +194,7 @@ describe('online invitation HTTP and matchmaking socket', () => {
   });
   it('reports a missing invitation instead of a generic outage', async () => {
     const { env } = onlineEnv();
-    env.MATCHMAKING.getByName = () => ({ redeem: vi.fn(async () => { throw new Error('not_found'); }) }) as unknown as Env['MATCHMAKING']['getByName'];
+    env.MATCHMAKING.getByName = (() => ({ redeem: async () => { throw new Error('not_found'); } })) as unknown as typeof env.MATCHMAKING.getByName;
     const response = await postOnline(env, '/api/online/invitations/redeem', { token: '11111111-1111-4111-8111-111111111111', colour: 'w' });
     expect(response.status).toBe(404); expect(await response.json()).toEqual({ error: 'not_found' });
   });
