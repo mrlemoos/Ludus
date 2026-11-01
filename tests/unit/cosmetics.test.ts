@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { appearanceMaterials, defaultAppearance, finishMaterials, parseAppearance, permittedAppearance } from '../../shared/cosmetics';
-describe('cosmetic entitlements', () => {
-  it('restores free appearance after expiry without altering a saved selection', () => {
+import { appearanceMaterials, finishMaterials, parseAppearance, permittedAppearance } from '../../shared/cosmetics';
+describe('free cosmetics', () => {
+  it('keeps every saved material available regardless of legacy Plus input', () => {
     const selected = { board: 'marble', pieces: 'ebony' } as const;
-    expect(permittedAppearance(selected, false)).toEqual(defaultAppearance);
+    expect(permittedAppearance(selected, false)).toEqual(selected);
     expect(permittedAppearance(selected, true)).toEqual(selected);
     expect(selected).toEqual({ board: 'marble', pieces: 'ebony' });
   });
@@ -27,24 +27,24 @@ describe('appearance API', () => {
     const { env } = environment(null);
     expect((await cosmeticsApi(new Request('https://ludus.test/api/appearance'), env, 'owner')).status).toBe(403);
   });
-  it('denies premium changes after trial expiry before writing', async () => {
+  it('allows every catalogue material after beta expiry', async () => {
     const { env, run } = environment(Date.now() - 1);
     const response = await cosmeticsApi(new Request('https://ludus.test/api/appearance', { method: 'POST', body: JSON.stringify({ board: 'marble', pieces: 'ebony' }) }), env, 'owner');
-    expect(response.status).toBe(403); expect(run).not.toHaveBeenCalled();
+    expect(response.status).toBe(200); expect(run).toHaveBeenCalledOnce();
   });
   it('accepts trusted paid access after beta without changing the beta grant', async () => {
     const { env, run } = environment(Date.now() - 1);
     const response = await cosmeticsApi(new Request('https://ludus.test/api/appearance', { method: 'POST', body: JSON.stringify({ board: 'marble', pieces: 'ebony' }) }), env, 'owner', Date.now() + 86400_000);
     expect(response.status).toBe(200); expect(run).toHaveBeenCalledOnce();
   });
-  it('falls back at exact beta expiry while leaving the saved appearance intact', async () => {
+  it('loads saved materials after beta expiry', async () => {
     const now = Date.now();
     const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
     try {
       const run = vi.fn();
       const env = { DB: { prepare: (query: string) => ({ bind: () => ({ first: async () => query.includes('trial_expires_at') ? { trial_expires_at: now } : { board: 'marble', pieces: 'ebony' }, run }) }) } } as unknown as Env;
       const response = await cosmeticsApi(new Request('https://ludus.test/api/appearance'), env, 'owner');
-      expect(await response.json()).toEqual({ appearance: defaultAppearance, plus: false });
+      expect(await response.json()).toEqual({ appearance: { board: 'marble', pieces: 'ebony' } });
       expect(run).not.toHaveBeenCalled();
     } finally { clock.mockRestore(); }
   });

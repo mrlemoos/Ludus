@@ -15,7 +15,7 @@ class AnalysisWorker {
     if (message.startsWith('go ')) queueMicrotask(() => {
       const move = new Chess(this.fen).moves({ verbose: true })[0];
       const uci = move.from + move.to + (move.promotion ?? '');
-      this.onmessage?.({ data: `info depth 12 score cp 10 pv ${uci}` });
+      this.onmessage?.({ data: `info depth 12 score cp 10 nodes 1000 pv ${uci}` });
       this.onmessage?.({ data: `bestmove ${uci}` });
     });
   });

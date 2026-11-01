@@ -20,7 +20,7 @@ function fixture() {
       all: async () => ({ results: sqlite.prepare(query).all(...values) }),
       run: async () => ({ meta: { changes: Number(sqlite.prepare(query).run(...values).changes) } }) };
   }
-  const env = { DB: { prepare: (query: string) => statement(query) }, STRIPE_WEBHOOK_SECRET: 'fixture-signing-secret', STRIPE_BILLING_ENABLED: 'true', STRIPE_TAX_READY: 'true', STRIPE_LIFECYCLE_READY: 'true' } as unknown as Env;
+  const env = { DB: { prepare: (query: string) => statement(query) }, STRIPE_WEBHOOK_SECRET: 'fixture-signing-secret', STRIPE_BILLING_ENABLED: 'true', STRIPE_TAX_READY: 'true', STRIPE_LIFECYCLE_READY: 'true', STRIPE_REVIEW_PACK_PRICE_ID: 'price_review_fixture' } as unknown as Env;
   const subscriptions = vi.fn().mockResolvedValue({ data: [], has_more: false });
   const create = vi.fn().mockResolvedValue({ id: 'cs_live_fixture', livemode: true, url: 'https://checkout.stripe.com/c/pay/fixture' });
   const customer = vi.fn().mockResolvedValue({ id: 'cus_fixture' });
@@ -35,7 +35,7 @@ function fixture() {
   } as unknown as Stripe;
   return { sqlite, env, stripe, subscriptions, create, customer, deps: { stripe, now: () => now } };
 }
-function request(path = '/api/billing/checkout') { return new Request(`https://ludus.test${path}`, { method: 'POST', headers: { Origin: 'https://ludus.test', 'Content-Type': 'application/json' }, body: '{}' }); }
+function request(path = '/api/billing/review-pack/checkout') { return new Request(`https://ludus.test${path}`, { method: 'POST', headers: { Origin: 'https://ludus.test', 'Content-Type': 'application/json' }, body: '{}' }); }
 function signed(value: unknown, timestamp = Math.floor(now / 1000)) {
   const body = JSON.stringify(value), signature = createHmac('sha256', 'fixture-signing-secret').update(`${timestamp}.${body}`).digest('hex');
   return new Request('https://ludus.test/api/billing/webhook', { method: 'POST', headers: { 'Stripe-Signature': `t=${timestamp},v1=${signature}` }, body });
@@ -61,20 +61,23 @@ describe('live Stripe purchase contracts', () => {
     expect((await billingApi(request(), f.env, 'owner', profile, f.deps)).status).toBe(503);
     expect(f.customer).not.toHaveBeenCalled(); expect(f.create).not.toHaveBeenCalled();
   });
-  it('reuses an open checkout and creates no entitlement from the redirect', async () => {
+  it('creates a hosted one-time pack Checkout and reuses the open session without granting credits', async () => {
     const f = fixture();
     expect((await billingApi(request(), f.env, 'owner', profile, f.deps)).status).toBe(200);
     expect((await billingApi(request(), f.env, 'owner', profile, f.deps)).status).toBe(200);
     expect(f.customer).toHaveBeenCalledOnce(); expect(f.create).toHaveBeenCalledOnce();
+    expect(f.create.mock.calls[0][0]).toMatchObject({ mode: 'payment', line_items: [{ price: 'price_review_fixture', quantity: 1 }], consent_collection: { terms_of_service: 'required' } });
+    expect(f.create.mock.calls[0][0].integration_identifier).toMatch(/^ludus_review_pack_[a-f]{8}$/);
     expect(f.sqlite.prepare('SELECT * FROM billing_subscriptions').all()).toEqual([]);
+    expect(f.sqlite.prepare('SELECT * FROM review_credit_packs').all()).toEqual([]);
   });
-  it('blocks concurrent create attempts and existing subscriptions', async () => {
+  it('serialises concurrent pack Checkouts and leaves legacy subscription purchases blocked', async () => {
     const f = fixture();
     const results = await Promise.all([billingApi(request(), f.env, 'owner', profile, f.deps), billingApi(request(), f.env, 'owner', profile, f.deps)]);
     expect(results.map((r) => r.status).sort()).toEqual([200, 503]);
     expect(f.create).toHaveBeenCalledOnce();
     f.subscriptions.mockResolvedValue({ data: [{ status: 'active' }], has_more: false });
-    expect((await billingApi(request(), f.env, 'owner', profile, f.deps)).status).toBe(409);
+    expect((await billingApi(request('/api/billing/checkout'), f.env, 'owner', profile, f.deps)).status).toBe(410);
   });
   it('blocks checkout after deletion starts', async () => {
     const f = fixture(); f.sqlite.prepare("INSERT INTO account_deletions(user_id,requested_at) VALUES('owner',0)").run();
@@ -119,6 +122,87 @@ describe('Stripe webhook authentication and durable processing', () => {
     ], has_more: false } as never);
     expect((await billingWebhook(signed(event), f.env, f.deps)).status).toBe(200);
     expect(f.sqlite.prepare('SELECT paid_until FROM billing_subscriptions').get()).toEqual({ paid_until: now + 86400_000 });
+  });
+  it('grants ten non-expiring credits only after provider-confirmed paid Checkout and only once', async () => {
+    const f = fixture(); storedAccount(f);
+    f.sqlite.prepare('INSERT INTO review_pack_checkouts(id,owner,generation,checkout,created_at) VALUES (?,?,?,?,?)').run('attempt', 'owner', 'generation', 'cs_paid', now);
+    const session = { id: 'cs_paid', mode: 'payment', livemode: true, status: 'complete', payment_status: 'paid', client_reference_id: 'attempt', customer: 'cus_fixture', currency: 'eur', amount_total: 499, consent: { terms_of_service: 'accepted' }, payment_intent: { id: 'pi_paid', latest_charge: { id: 'ch_paid' } } };
+    vi.mocked(f.stripe.checkout.sessions.retrieve).mockResolvedValue({ ...session, line_items: { data: [{ quantity: 1, price: { id: 'price_review_fixture' } }] } } as never);
+    const event = { id: 'evt_pack_paid', object: 'event', livemode: true, type: 'checkout.session.completed', data: { object: session } };
+    expect((await billingWebhook(signed(event), f.env, f.deps)).status).toBe(200);
+    expect((await billingWebhook(signed({ ...event, id: 'evt_pack_async', type: 'checkout.session.async_payment_succeeded' }), f.env, f.deps)).status).toBe(200);
+    expect(f.sqlite.prepare('SELECT owner,credits,charge FROM review_credit_packs').get()).toEqual({ owner: 'owner', credits: 10, charge: 'ch_paid' });
+  });
+  it('recovers a paid session whose Checkout ID was not persisted before webhook delivery', async () => {
+    const f = fixture(); storedAccount(f);
+    f.sqlite.prepare('INSERT INTO review_pack_checkouts(id,owner,generation,created_at) VALUES (?,?,?,?)').run('attempt', 'owner', 'generation', now);
+    const session = { id: 'cs_recovered', mode: 'payment', livemode: true, status: 'complete', payment_status: 'paid', client_reference_id: 'attempt', customer: 'cus_fixture', currency: 'eur', amount_total: 499, consent: { terms_of_service: 'accepted' }, payment_intent: { id: 'pi_recovered', latest_charge: { id: 'ch_recovered' } } };
+    vi.mocked(f.stripe.checkout.sessions.retrieve).mockResolvedValue({ ...session, line_items: { data: [{ quantity: 1, price: { id: 'price_review_fixture' } }] } } as never);
+    expect((await billingWebhook(signed({ id: 'evt_pack_recovered', object: 'event', livemode: true, type: 'checkout.session.completed', data: { object: session } }), f.env, f.deps)).status).toBe(200);
+    expect(f.sqlite.prepare('SELECT checkout,state FROM review_pack_checkouts').get()).toEqual({ checkout: 'cs_recovered', state: 'paid' });
+    expect(f.sqlite.prepare('SELECT credits FROM review_credit_packs').get()).toEqual({ credits: 10 });
+  });
+  it('recovers a missed paid webhook from scheduled provider reconciliation', async () => {
+    const f = fixture(); storedAccount(f);
+    f.sqlite.prepare('INSERT INTO review_pack_checkouts(id,owner,generation,checkout,created_at) VALUES (?,?,?,?,?)').run('attempt', 'owner', 'generation', 'cs_missed', now);
+    const session = { id: 'cs_missed', mode: 'payment', livemode: true, status: 'complete', payment_status: 'paid', client_reference_id: 'attempt', customer: 'cus_fixture', currency: 'eur', amount_total: 499, consent: { terms_of_service: 'accepted' }, payment_intent: { id: 'pi_missed', latest_charge: { id: 'ch_missed' } } };
+    vi.mocked(f.stripe.checkout.sessions.retrieve).mockResolvedValue({ ...session, line_items: { data: [{ quantity: 1, price: { id: 'price_review_fixture' } }] } } as never);
+    await reconcileBilling(f.env, f.deps);
+    expect(f.sqlite.prepare('SELECT credits FROM review_credit_packs').get()).toEqual({ credits: 10 });
+  });
+  it('retires a terminally failed async attempt so another purchase can proceed', async () => {
+    const f = fixture(); storedAccount(f);
+    f.sqlite.prepare('INSERT INTO review_pack_checkouts(id,owner,generation,checkout,created_at) VALUES (?,?,?,?,?)').run('failed-attempt', 'owner', 'failed-generation', 'cs_failed', now);
+    vi.mocked(f.stripe.checkout.sessions.retrieve).mockResolvedValue({ id: 'cs_failed', mode: 'payment', status: 'complete', payment_status: 'unpaid', payment_intent: 'pi_failed' } as never);
+    vi.mocked(f.stripe.paymentIntents.retrieve).mockResolvedValue({ status: 'requires_payment_method' } as never);
+    await reconcileBilling(f.env, f.deps);
+    expect(f.sqlite.prepare('SELECT state FROM review_pack_checkouts WHERE id=?').get('failed-attempt')).toEqual({ state: 'failed' });
+    expect((await billingApi(request(), f.env, 'owner', profile, f.deps)).status).toBe(200);
+  });
+  it('acknowledges completed asynchronous payment while unpaid without granting credits', async () => {
+    const f = fixture(); storedAccount(f);
+    f.sqlite.prepare('INSERT INTO review_pack_checkouts(id,owner,generation,checkout,created_at) VALUES (?,?,?,?,?)').run('attempt', 'owner', 'generation', 'cs_pending', now);
+    const session = { id: 'cs_pending', mode: 'payment', livemode: true, status: 'complete', payment_status: 'unpaid', client_reference_id: 'attempt', customer: 'cus_fixture', currency: 'eur', amount_total: 499 };
+    vi.mocked(f.stripe.checkout.sessions.retrieve).mockResolvedValue(session as never);
+    expect((await billingWebhook(signed({ id: 'evt_pack_pending', object: 'event', livemode: true, type: 'checkout.session.completed', data: { object: session } }), f.env, f.deps)).status).toBe(200);
+    expect(f.sqlite.prepare('SELECT * FROM review_credit_packs').all()).toEqual([]);
+  });
+  it('does not fulfil a payment when hosted terms consent is absent', async () => {
+    const f = fixture(); storedAccount(f);
+    f.sqlite.prepare('INSERT INTO review_pack_checkouts(id,owner,generation,checkout,created_at) VALUES (?,?,?,?,?)').run('attempt', 'owner', 'generation', 'cs_no_consent', now);
+    const session = { id: 'cs_no_consent', mode: 'payment', livemode: true, status: 'complete', payment_status: 'paid', client_reference_id: 'attempt', customer: 'cus_fixture', currency: 'eur', amount_total: 499, payment_intent: { id: 'pi_no_consent', latest_charge: { id: 'ch_no_consent' } } };
+    vi.mocked(f.stripe.checkout.sessions.retrieve).mockResolvedValue({ ...session, line_items: { data: [{ quantity: 1, price: { id: 'price_review_fixture' } }] } } as never);
+    expect((await billingWebhook(signed({ id: 'evt_pack_no_consent', object: 'event', livemode: true, type: 'checkout.session.completed', data: { object: session } }), f.env, f.deps)).status).toBe(503);
+    expect(f.sqlite.prepare('SELECT * FROM review_credit_packs').all()).toEqual([]);
+  });
+  it('applies disputes to only the affected pack and resolves from current provider dispute state', async () => {
+    const f = fixture(); storedAccount(f);
+    f.sqlite.prepare('INSERT INTO review_pack_checkouts(id,owner,generation,checkout,created_at) VALUES (?,?,?,?,?)').run('attempt', 'owner', 'generation', 'cs_paid', now);
+    const session = { id: 'cs_paid', mode: 'payment', livemode: true, status: 'complete', payment_status: 'paid', client_reference_id: 'attempt', customer: 'cus_fixture', currency: 'eur', amount_total: 499, consent: { terms_of_service: 'accepted' }, payment_intent: { id: 'pi_paid', latest_charge: { id: 'ch_fixture' } } };
+    vi.mocked(f.stripe.checkout.sessions.retrieve).mockResolvedValue({ ...session, line_items: { data: [{ quantity: 1, price: { id: 'price_review_fixture' } }] } } as never);
+    expect((await billingWebhook(signed({ id: 'evt_pack_paid', object: 'event', livemode: true, type: 'checkout.session.completed', data: { object: session } }), f.env, f.deps)).status).toBe(200);
+    vi.mocked(f.stripe.disputes.list).mockResolvedValue({ data: [{ status: 'needs_response' }], has_more: false } as never);
+    expect((await billingWebhook(signed({ id: 'evt_pack_dispute', object: 'event', livemode: true, type: 'charge.dispute.created', data: { object: { id: 'dp_fixture', charge: 'ch_fixture', payment_intent: 'pi_paid' } } }), f.env, f.deps)).status).toBe(200);
+    expect(f.sqlite.prepare('SELECT frozen FROM review_credit_packs').get()).toEqual({ frozen: 1 });
+    vi.mocked(f.stripe.disputes.list).mockResolvedValue({ data: [{ status: 'won' }], has_more: false } as never);
+    expect((await billingWebhook(signed({ id: 'evt_pack_dispute_won', object: 'event', livemode: true, type: 'charge.dispute.closed', data: { object: { id: 'dp_fixture', charge: 'ch_fixture', payment_intent: 'pi_paid', status: 'lost' } } }), f.env, f.deps)).status).toBe(200);
+    expect(f.sqlite.prepare('SELECT frozen,refunded FROM review_credit_packs').get()).toEqual({ frozen: 0, refunded: 0 });
+    vi.mocked(f.stripe.disputes.list).mockResolvedValue({ data: [{ status: 'warning_closed' }], has_more: false } as never);
+    expect((await billingWebhook(signed({ id: 'evt_pack_warning_closed', object: 'event', livemode: true, type: 'charge.dispute.closed', data: { object: { id: 'dp_fixture', charge: 'ch_fixture', payment_intent: 'pi_paid' } } }), f.env, f.deps)).status).toBe(200);
+    expect(f.sqlite.prepare('SELECT frozen,refunded FROM review_credit_packs').get()).toEqual({ frozen: 0, refunded: 0 });
+  });
+  it('serialises dispute state with paid Checkout fulfilment', async () => {
+    const f = fixture(); storedAccount(f);
+    f.sqlite.prepare('INSERT INTO review_pack_checkouts(id,owner,generation,created_at) VALUES (?,?,?,?)').run('attempt', 'owner', 'generation', now);
+    const session = { id: 'cs_race', mode: 'payment', livemode: true, status: 'complete', payment_status: 'paid', client_reference_id: 'attempt', customer: 'cus_fixture', currency: 'eur', amount_total: 499, consent: { terms_of_service: 'accepted' }, payment_intent: { id: 'pi_paid', latest_charge: { id: 'ch_fixture' } } };
+    vi.mocked(f.stripe.checkout.sessions.retrieve).mockResolvedValue({ ...session, line_items: { data: [{ quantity: 1, price: { id: 'price_review_fixture' } }] } } as never);
+    vi.mocked(f.stripe.paymentIntents.retrieve).mockResolvedValue({ latest_charge: 'ch_fixture', metadata: { checkout_attempt: 'attempt' } } as never);
+    vi.mocked(f.stripe.disputes.list).mockResolvedValue({ data: [{ status: 'needs_response' }], has_more: false } as never);
+    const purchase = { id: 'evt_pack_race', object: 'event', livemode: true, type: 'checkout.session.completed', data: { object: session } };
+    const dispute = { id: 'evt_dispute_race', object: 'event', livemode: true, type: 'charge.dispute.created', data: { object: { id: 'dp_race', charge: 'ch_fixture', payment_intent: 'pi_paid' } } };
+    const results = await Promise.all([billingWebhook(signed(purchase), f.env, f.deps), billingWebhook(signed(dispute), f.env, f.deps)]);
+    for (const [index, result] of results.entries()) if (result.status === 503) expect((await billingWebhook(signed(index === 0 ? purchase : dispute), f.env, f.deps)).status).toBe(200);
+    expect(f.sqlite.prepare('SELECT frozen FROM review_credit_packs').get()).toEqual({ frozen: 1 });
   });
   it('does not accept mutated body bytes', async () => {
     const original = signed(event), header = original.headers.get('Stripe-Signature')!;
@@ -249,12 +333,15 @@ describe('billing cancellation and scheduled reconciliation', () => {
   it('expires open sessions and retries failed cancellation without erasing ownership', async () => {
     const f = fixture(); storedAccount(f);
     f.subscriptions.mockResolvedValue({ data: [subscription()], has_more: false });
+    f.sqlite.prepare('INSERT INTO review_pack_checkouts(id,owner,generation,checkout,created_at) VALUES (?,?,?,?,?)').run('pack-attempt', 'owner', 'pack-generation', 'cs_pack_open', now);
     vi.mocked(f.stripe.checkout.sessions.list).mockResolvedValue({ data: [{ id: 'cs_open', status: 'open' }], has_more: false } as never);
+    vi.mocked(f.stripe.checkout.sessions.retrieve).mockImplementation(async (id) => ({ id, status: 'open' } as never));
     vi.mocked(f.stripe.subscriptions.cancel).mockRejectedValueOnce(new Error('offline'));
     await expect(cancelAccountBilling(f.env, 'owner', f.deps)).rejects.toThrow();
     expect(f.sqlite.prepare('SELECT customer FROM billing_accounts').get()).toEqual({ customer: 'cus_fixture' });
     await cancelAccountBilling(f.env, 'owner', f.deps);
     expect(f.stripe.checkout.sessions.expire).toHaveBeenCalledWith('cs_open');
+    expect(f.stripe.checkout.sessions.expire).toHaveBeenCalledWith('cs_pack_open');
     expect(f.stripe.subscriptions.cancel).toHaveBeenCalledTimes(2);
   });
   it('reconciles without browser visits and isolates failed accounts for retry', async () => {

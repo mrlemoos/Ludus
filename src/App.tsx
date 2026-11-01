@@ -120,7 +120,7 @@ export function App() {
         </div>
       </section>
     </main>
-    <footer className="home-footer"><Wordmark /><p>{t('note')}</p><p>{t('soon')}</p></footer>
+    <footer className="home-footer"><Wordmark /><p>{t('note')}</p><p>{t('soon')}</p><p><Link to="/terms">{isLanguage(i18n.language) ? ({ 'en-GB': 'Terms', 'es-ES': 'Condiciones', 'fr-FR': 'Conditions' }[i18n.language]) : 'Terms'}</Link> · <Link to="/privacy">{isLanguage(i18n.language) ? ({ 'en-GB': 'Privacy', 'es-ES': 'Privacidad', 'fr-FR': 'Confidentialité' }[i18n.language]) : 'Privacy'}</Link></p></footer>
   </div></div>;
 }
 

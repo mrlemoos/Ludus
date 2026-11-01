@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { check, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { languages } from '../shared/waitlist';
 
 export const waitlist = sqliteTable('waitlist', {
@@ -33,10 +33,10 @@ export const invitations = sqliteTable('invitations', {
 });
 export const matches = sqliteTable('matches', {
   id: text('id').primaryKey(), owner: text('owner').notNull().references(() => user.id),
-  createdAt: integer('created_at').notNull(), result: text('result'),
+  createdAt: integer('created_at').notNull(), result: text('result'), finishedAt: integer('finished_at'),
   control: text('control', { enum: ['5+3', '10+5'] }).notNull().default('5+3'),
   difficulty: integer('difficulty').notNull().default(1), colour: text('colour', { enum: ['w', 'b'] }).notNull().default('w'),
-});
+}, (table) => [index('matches_owner_finished').on(table.owner, table.finishedAt)]);
 
 export * from './player-schema';
 export * from './online-schema';

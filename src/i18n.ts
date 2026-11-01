@@ -38,7 +38,7 @@ const en = {
   opponents: 'Invite a friend, meet an online opponent or find your pace against four computer levels.',
   coachTitle: 'Play first. Understand after.',
   coach: 'A move-by-move replay and a coach who explains the why. Coaching starts only when your game ends.',
-  trial: 'Beta players get 30 days of Plus. No card needed.',
+  trial: 'Beta access includes 30 free AI reviews each month. No card needed.',
   footer: 'Made for the love of the game.',
   soon: 'Invite-only beta · Coming soon',
   notFound: 'This table isn’t here.',
@@ -66,7 +66,7 @@ const es: Copy = {
   playTitle: 'Siéntete como en casa.', play: 'Piezas de madera tradicionales en un café inspirado en el centro de Madrid. Cambia a 2D cuando prefieras.',
   opponentsTitle: 'Elige a tu rival.', opponents: 'Invita a un amigo, encuentra un rival en línea o elige entre cuatro niveles del ordenador.',
   coachTitle: 'Primero juega. Después aprende.', coach: 'Repite la partida jugada a jugada con un entrenador que explica el porqué. El análisis empieza cuando termina tu partida.',
-  trial: 'La beta incluye 30 días de Plus. Sin tarjeta.', footer: 'Por amor al ajedrez.', soon: 'Beta por invitación · Próximamente',
+  trial: 'La beta incluye 30 análisis con IA gratuitos al mes. Sin tarjeta.', footer: 'Por amor al ajedrez.', soon: 'Beta por invitación · Próximamente',
   notFound: 'Esta mesa no está aquí.', home: 'Volver a Ludus',
 };
 
@@ -90,7 +90,7 @@ const fr: Copy = {
   playTitle: 'Faites comme chez vous.', play: 'Des pièces traditionnelles en bois dans un café inspiré du centre de Madrid. Passez en 2D quand vous le souhaitez.',
   opponentsTitle: 'Choisissez votre adversaire.', opponents: 'Invitez un ami, trouvez un adversaire en ligne ou choisissez parmi quatre niveaux de l’ordinateur.',
   coachTitle: 'Jouez d’abord. Comprenez ensuite.', coach: 'Revivez la partie coup par coup avec un coach qui explique le pourquoi. Le coaching commence après la fin de la partie.',
-  trial: 'La bêta inclut 30 jours de Plus. Sans carte bancaire.', footer: 'Pour l’amour du jeu.', soon: 'Bêta sur invitation · Bientôt',
+  trial: 'La bêta comprend 30 analyses IA gratuites par mois. Sans carte bancaire.', footer: 'Pour l’amour du jeu.', soon: 'Bêta sur invitation · Bientôt',
   notFound: 'Cette table n’est pas ici.', home: 'Retour à Ludus',
 };
 

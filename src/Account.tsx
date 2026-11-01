@@ -11,11 +11,12 @@ import { ActivityGrid, Ratings, ShareProfile, PublicProfilePage, profileCopy } f
 import type { PublicActivity as Activity, PublicRating as Rating, PublicPlayerProfile } from '../shared/public-profile';
 import { profilePath } from '../shared/profile-seo';
 import { readInitialPublicProfile, usePublicProfileMetadata } from './profile-metadata';
+import type { ReviewCreditStatus } from '../shared/review-credits';
 
 const labels = {
-  'en-GB': { privacy: 'Email, reviews and coach conversations stay private. You control whether activity is public.', streak: 'Daily streak', title: 'Your profile', username: 'Public username', timezone: 'Timezone', language: 'Language', level: 'Chess level', teaching: 'Teaching profile', activity: 'Show my activity publicly', adult: 'I am aged 18 or over', save: 'Save profile', saved: 'Profile saved.', error: 'Could not save. Check your details and try again.', signIn: 'Sign in to complete your profile.', deletion: 'Delete account', confirmation: 'Type DELETE to permanently delete your account', deleteNote: 'This revokes sessions, deletes private reviews and profile data, and anonymises retained matches. Abuse reports expire after 90 days; invitation delivery metadata after 30 days. Uninvited waitlist entries expire after 180 days.', pending: 'Timezone changes start at the next midnight in your current timezone.', plus: 'Beta Plus ends', days: 'Activity', hidden: 'Activity is private.', noProfile: 'Profile not found.', back: 'Play chess' },
-  'es-ES': { privacy: 'El correo, los análisis y las conversaciones son privados. Tú decides si tu actividad es pública.', streak: 'Racha diaria', title: 'Tu perfil', username: 'Nombre público', timezone: 'Zona horaria', language: 'Idioma', level: 'Nivel de ajedrez', teaching: 'Perfil del entrenador', activity: 'Mostrar mi actividad públicamente', adult: 'Tengo 18 años o más', save: 'Guardar perfil', saved: 'Perfil guardado.', error: 'No se ha podido guardar. Revisa los datos e inténtalo de nuevo.', signIn: 'Inicia sesión para completar tu perfil.', deletion: 'Eliminar cuenta', confirmation: 'Escribe DELETE para eliminar tu cuenta definitivamente', deleteNote: 'Se revocan las sesiones, se eliminan los análisis privados y el perfil, y se anonimizan las partidas conservadas. Los informes se borran a los 90 días; los datos de envío, a los 30 días. La lista de espera sin invitación caduca a los 180 días.', pending: 'Los cambios de zona horaria se aplican a medianoche en tu zona actual.', plus: 'Plus de la beta termina', days: 'Actividad', hidden: 'La actividad es privada.', noProfile: 'Perfil no encontrado.', back: 'Jugar al ajedrez' },
-  'fr-FR': { privacy: 'Votre e-mail, vos analyses et vos conversations restent privés. Vous choisissez de rendre votre activité publique.', streak: 'Série quotidienne', title: 'Votre profil', username: 'Pseudo public', timezone: 'Fuseau horaire', language: 'Langue', level: 'Niveau aux échecs', teaching: 'Profil du coach', activity: 'Afficher mon activité publiquement', adult: 'J’ai 18 ans ou plus', save: 'Enregistrer le profil', saved: 'Profil enregistré.', error: 'Enregistrement impossible. Vérifiez les informations et réessayez.', signIn: 'Connectez-vous pour compléter votre profil.', deletion: 'Supprimer le compte', confirmation: 'Saisissez DELETE pour supprimer définitivement votre compte', deleteNote: 'Les sessions sont révoquées, les analyses privées et le profil supprimés, les parties conservées anonymisées. Les signalements expirent après 90 jours et les données d’envoi après 30 jours. Les inscriptions sans invitation expirent après 180 jours.', pending: 'Le changement de fuseau prend effet à minuit dans votre fuseau actuel.', plus: 'Fin de Plus bêta', days: 'Activité', hidden: 'L’activité est privée.', noProfile: 'Profil introuvable.', back: 'Jouer aux échecs' },
+  'en-GB': { privacy: 'Your email, reviews and coach conversations stay private. Coaching uses the selected game and, when available, up to three earlier finished games. You control whether activity is public.', streak: 'Daily streak', title: 'Your profile', username: 'Public username', timezone: 'Timezone', language: 'Language', level: 'Chess level', teaching: 'Teaching profile', activity: 'Show my activity publicly', adult: 'I am aged 18 or over', save: 'Save profile', saved: 'Profile saved.', error: 'Could not save. Check your details and try again.', signIn: 'Sign in to complete your profile.', deletion: 'Delete account', confirmation: 'Type DELETE to permanently delete your account', deleteNote: 'This revokes sessions, deletes private reviews and profile data, and anonymises retained matches. Abuse reports expire after 90 days; invitation delivery metadata after 30 days. Uninvited waitlist entries expire after 180 days.', pending: 'Timezone changes start at the next midnight in your current timezone.', betaCredits: 'Beta monthly credits end', days: 'Activity', hidden: 'Activity is private.', noProfile: 'Profile not found.', back: 'Play chess' },
+  'es-ES': { privacy: 'El correo, los análisis y las conversaciones son privados. Para analizar una partida se usan esa partida y, si están disponibles, hasta tres partidas terminadas anteriores. Tú decides si tu actividad es pública.', streak: 'Racha diaria', title: 'Tu perfil', username: 'Nombre público', timezone: 'Zona horaria', language: 'Idioma', level: 'Nivel de ajedrez', teaching: 'Perfil del entrenador', activity: 'Mostrar mi actividad públicamente', adult: 'Tengo 18 años o más', save: 'Guardar perfil', saved: 'Perfil guardado.', error: 'No se ha podido guardar. Revisa los datos e inténtalo de nuevo.', signIn: 'Inicia sesión para completar tu perfil.', deletion: 'Eliminar cuenta', confirmation: 'Escribe DELETE para eliminar tu cuenta definitivamente', deleteNote: 'Se revocan las sesiones, se eliminan los análisis privados y el perfil, y se anonimizan las partidas conservadas. Los informes se borran a los 90 días; los datos de envío, a los 30 días. La lista de espera sin invitación caduca a los 180 días.', pending: 'Los cambios de zona horaria se aplican a medianoche en tu zona actual.', betaCredits: 'Los créditos mensuales de beta terminan', days: 'Actividad', hidden: 'La actividad es privada.', noProfile: 'Perfil no encontrado.', back: 'Jugar al ajedrez' },
+  'fr-FR': { privacy: 'Votre e-mail, vos analyses et vos conversations restent privés. Une analyse utilise la partie choisie et, si elles sont disponibles, jusqu’à trois parties terminées précédentes. Vous choisissez de rendre votre activité publique.', streak: 'Série quotidienne', title: 'Votre profil', username: 'Pseudo public', timezone: 'Fuseau horaire', language: 'Langue', level: 'Niveau aux échecs', teaching: 'Profil du coach', activity: 'Afficher mon activité publiquement', adult: 'J’ai 18 ans ou plus', save: 'Enregistrer le profil', saved: 'Profil enregistré.', error: 'Enregistrement impossible. Vérifiez les informations et réessayez.', signIn: 'Connectez-vous pour compléter votre profil.', deletion: 'Supprimer le compte', confirmation: 'Saisissez DELETE pour supprimer définitivement votre compte', deleteNote: 'Les sessions sont révoquées, les analyses privées et le profil supprimés, les parties conservées anonymisées. Les signalements expirent après 90 jours et les données d’envoi après 30 jours. Les inscriptions sans invitation expirent après 180 jours.', pending: 'Le changement de fuseau prend effet à minuit dans votre fuseau actuel.', betaCredits: 'Fin des crédits mensuels bêta', days: 'Activité', hidden: 'L’activité est privée.', noProfile: 'Profil introuvable.', back: 'Jouer aux échecs' },
 };
 
 const deletionCopy = {
@@ -23,20 +24,15 @@ const deletionCopy = {
   'es-ES': { pending: 'La eliminación está pendiente. Se reintentará cancelar la facturación automáticamente. También puedes reintentarlo ahora.', retry: 'Reintentar eliminación' },
   'fr-FR': { pending: 'La suppression est en attente. L’annulation de la facturation sera réessayée automatiquement. Vous pouvez aussi réessayer maintenant.', retry: 'Réessayer la suppression' },
 };
-const complimentaryCopy = { 'en-GB': 'Complimentary Plus · No expiry', 'es-ES': 'Plus de cortesía · Sin caducidad', 'fr-FR': 'Plus offert · Sans expiration' };
-const billingDates = {
-  'en-GB': { next: 'Next payment', end: 'Access ends', grace: 'Payment overdue. Plus grace ends', refresh: 'Refresh billing status', status: { active: 'Active', trialing: 'Scheduled after beta', past_due: 'Payment overdue', canceled: 'Cancelled', incomplete: 'Payment pending', incomplete_expired: 'Payment expired', unpaid: 'Unpaid', paused: 'Paused' } },
-  'es-ES': { next: 'Próximo pago', end: 'El acceso termina', grace: 'Pago pendiente. El periodo de gracia de Plus termina', refresh: 'Actualizar facturación', status: { active: 'Activa', trialing: 'Programada tras la beta', past_due: 'Pago pendiente', canceled: 'Cancelada', incomplete: 'Pago en curso', incomplete_expired: 'Pago caducado', unpaid: 'Sin pagar', paused: 'En pausa' } },
-  'fr-FR': { next: 'Prochain paiement', end: 'Fin de l’accès', grace: 'Paiement en retard. Fin du délai de grâce Plus', refresh: 'Actualiser la facturation', status: { active: 'Actif', trialing: 'Prévu après la bêta', past_due: 'Paiement en retard', canceled: 'Annulé', incomplete: 'Paiement en attente', incomplete_expired: 'Paiement expiré', unpaid: 'Impayé', paused: 'En pause' } },
-};
 const billingCopy = {
-  'en-GB': { title: 'Ludus Plus', unavailable: 'Subscriptions are not available yet.', buy: 'Subscribe to Plus', manage: 'Manage subscription', error: 'Could not open billing. Try again.', monthly: 'per month, including applicable tax', renewal: 'Cancel anytime. Your remaining beta days stay free. Billing starts after beta ends.', returned: 'Checking subscription status. Payment confirmation can take a moment.' },
-  'es-ES': { title: 'Ludus Plus', unavailable: 'Las suscripciones aún no están disponibles.', buy: 'Suscribirme a Plus', manage: 'Gestionar suscripción', error: 'No se ha podido abrir la facturación. Inténtalo de nuevo.', monthly: 'al mes, impuestos aplicables incluidos', renewal: 'Cancela cuando quieras. Los días restantes de la beta siguen siendo gratuitos. La facturación comienza al terminar la beta.', returned: 'Comprobando la suscripción. La confirmación del pago puede tardar un momento.' },
-  'fr-FR': { title: 'Ludus Plus', unavailable: 'Les abonnements ne sont pas encore disponibles.', buy: 'S’abonner à Plus', manage: 'Gérer l’abonnement', error: 'Impossible d’ouvrir la facturation. Réessayez.', monthly: 'par mois, taxes applicables comprises', renewal: 'Annulez à tout moment. Les jours restants de la bêta restent gratuits. La facturation commence à la fin de la bêta.', returned: 'Vérification de l’abonnement. La confirmation du paiement peut prendre un moment.' },
+  'en-GB': { title: 'Coach review credits', unavailable: 'Purchases are paused while billing checks are completed.', buy: 'Buy 10 reviews · €4.99', error: 'Could not open secure checkout. Try again.', description: 'Ten coach reviews cost €4.99. The pack does not expire. You always get one introductory review. Monthly free reviews are used before paid reviews. Accounts with a complimentary grant keep 30 monthly reviews after beta.', returned: 'Payment is being confirmed. Credits appear after Stripe confirms it.', intro: 'Introductory review', paid: 'Paid reviews', refund: 'Unused paid packs are refunded on request. Refunds are processed manually. Requests for partly used packs are reviewed individually. See the refund policy.', policies: 'Terms', privacy: 'Privacy', refresh: 'Refresh balance' },
+  'es-ES': { title: 'Créditos para análisis del entrenador', unavailable: 'Las compras están pausadas mientras se completan las comprobaciones de facturación.', buy: 'Comprar 10 análisis · 4,99 €', error: 'No se ha podido abrir el pago seguro. Inténtalo de nuevo.', description: 'Diez análisis del entrenador cuestan 4,99 €. El paquete no caduca. Siempre tienes un análisis de bienvenida. Los análisis mensuales gratuitos se usan antes que los comprados. Las cuentas con una concesión de cortesía conservan 30 análisis mensuales después de la beta.', returned: 'Se está confirmando el pago. Los créditos aparecerán cuando Stripe lo confirme.', intro: 'Análisis de bienvenida', beta: 'Análisis mensuales de beta', paid: 'Análisis comprados', refund: 'Los paquetes pagados sin usar se devuelven si lo solicitas. Las devoluciones se tramitan manualmente. Las solicitudes para paquetes usados parcialmente se revisan de forma individual. Consulta la política de reembolsos.', policies: 'Condiciones', privacy: 'Privacidad', refresh: 'Actualizar saldo' },
+  'fr-FR': { title: 'Crédits d’analyse du coach', unavailable: 'Les achats sont suspendus pendant les vérifications de facturation.', buy: 'Acheter 10 analyses · 4,99 €', error: 'Impossible d’ouvrir le paiement sécurisé. Réessayez.', description: 'Dix analyses du coach coûtent 4,99 €. Le pack n’expire pas. Vous recevez toujours une analyse de bienvenue. Les analyses mensuelles gratuites sont utilisées avant les analyses payées. Les comptes bénéficiant d’un crédit offert conservent 30 analyses mensuelles après la bêta.', returned: 'Le paiement est en cours de confirmation. Les crédits apparaîtront après confirmation de Stripe.', intro: 'Analyse de bienvenue', beta: 'Analyses mensuelles bêta', paid: 'Analyses achetées', refund: 'Les packs payés non utilisés sont remboursés sur demande. Les remboursements sont traités manuellement. Les demandes concernant un pack partiellement utilisé sont examinées au cas par cas. Consultez la politique de remboursement.', policies: 'Conditions', privacy: 'Confidentialité', refresh: 'Actualiser le solde' },
 };
-type BillingStatus = { enabled: boolean; complimentaryPlus?: boolean; canManage: boolean; amount: number; currency: string; subscription: { status: string; paid_until: number | null; cancel_at: number | null; grace_until: number | null; next_charge_at: number | null; amount: number | null; currency: string | null } | null };
+type BillingStatus = { enabled: boolean; reviewCredits?: ReviewCreditStatus };
 function BillingSection({ language }: { language: Language }) {
   const copy = billingCopy[language];
+  const [params] = useSearchParams();
   const [status, setStatus] = useState<BillingStatus | null>(null), [error, setError] = useState(false), [busy, setBusy] = useState(false);
   async function refresh() {
     setBusy(true); setError(false);
@@ -51,30 +47,31 @@ function BillingSection({ language }: { language: Language }) {
     }).catch(() => { if (!controller.signal.aborted) setError(true); });
     return () => controller.abort();
   }, []);
-  async function open(action: 'checkout' | 'portal') {
+  async function open() {
     setBusy(true); setError(false);
     try {
-      const response = await fetch(`/api/billing/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const response = await fetch('/api/billing/review-pack/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       if (!response.ok) throw new Error();
       const data = await response.json() as { url: string };
       const url = new URL(data.url);
-      if (url.protocol !== 'https:' || !['checkout.stripe.com', 'billing.stripe.com'].includes(url.hostname)) throw new Error();
+      if (url.protocol !== 'https:' || url.hostname !== 'checkout.stripe.com') throw new Error();
       location.assign(url.href);
     } catch { setError(true); setBusy(false); }
   }
-  const subscribed = status?.subscription && !['canceled', 'incomplete_expired'].includes(status.subscription.status);
-  const dates = billingDates[language], sub = status?.subscription;
-  const date = (value: number) => new Intl.DateTimeFormat(language, { dateStyle: 'long', timeStyle: 'short' }).format(value);
+  const credits = status?.reviewCredits;
   return <section className="profile-billing" aria-label={copy.title}>
     <h2>{copy.title}</h2>
     {!status ? <p role="status" aria-busy={!error}>{error ? copy.error : '…'}</p> : <>
-      {status.complimentaryPlus ? <p>{complimentaryCopy[language]}</p> : <p>{new Intl.NumberFormat(language, { style: 'currency', currency: sub?.currency ?? status.currency }).format((sub?.amount ?? status.amount) / 100)} {copy.monthly}</p>}
-      {sub && <p>{dates.status[sub.status as keyof typeof dates.status] ?? copy.returned}</p>}
-      {sub?.cancel_at ? <p>{dates.end}: {date(sub.cancel_at)}</p> : subscribed && sub?.next_charge_at ? <p>{dates.next}: {date(sub.next_charge_at)}</p> : null}
-      {sub?.grace_until && sub.grace_until > Date.now() && <p>{dates.grace}: {date(sub.grace_until)}</p>}
-      {!status.complimentaryPlus && (!status.enabled ? <p>{copy.unavailable}</p> : !subscribed && <><p>{copy.renewal}</p><button disabled={busy} onClick={() => void open('checkout')}>{copy.buy}</button></>)}
-      {status.canManage && <button disabled={busy} onClick={() => void open('portal')}>{copy.manage}</button>}
-      <button disabled={busy} onClick={() => void refresh()}>{dates.refresh}</button>
+      <p>{copy.description}</p>
+      <p className="profile-credit-balance"><strong>{credits?.available ?? '…'}</strong> {language === 'es-ES' ? 'análisis disponibles' : language === 'fr-FR' ? 'analyses disponibles' : 'reviews available'}</p>
+      {credits?.introAvailable && <p>{copy.intro}: 1</p>}
+      {credits && credits.monthlyFreeRemaining > 0 && <p>{language === 'es-ES' ? 'Créditos gratuitos de este mes' : language === 'fr-FR' ? 'Crédits gratuits ce mois-ci' : 'Monthly free reviews'}: {credits.monthlyFreeRemaining}</p>}
+      {credits && credits.paidRemaining > 0 && <p>{copy.paid}: {credits.paidRemaining}</p>}
+      {status.enabled ? <button disabled={busy} onClick={() => void open()}>{copy.buy}</button> : <p>{copy.unavailable}</p>}
+      <p className="text-sm">{copy.refund}</p>
+      <p className="text-sm"><Link to="/terms">{copy.policies}</Link> · <Link to="/privacy">{copy.privacy}</Link></p>
+      <button disabled={busy} onClick={() => void refresh()}>{copy.refresh}</button>
+      {params.get('credits') === 'purchased' && <p role="status">{copy.returned}</p>}
       {error && <p role="alert">{copy.error}</p>}
     </>}
   </section>;
@@ -115,6 +112,7 @@ export function Account() {
     <div className="profile-identity"><div><p className="profile-eyebrow">{copy.title}</p><h1>{profile ? `@${profile.username}` : copy.title}</h1></div>{profile && <ShareProfile username={profile.username} language={language} />}</div>
     {loaded && signedIn && !deletionPending && profile && (activity ? <ActivityGrid activity={activity} language={language} privateActivity={!profile.activityPublic} /> : <p>{profileCopy[language].unavailable}</p>)}
     {!loaded ? <p aria-busy="true">…</p> : !signedIn ? <p>{copy.signIn}</p> : deletionPending ? <><p>{deletionCopy[language].pending}</p><button disabled={pending} onClick={() => void remove()}>{deletionCopy[language].retry}</button></> : <>
+      {profile && <BillingSection language={language} />}
       {ratings && <Ratings ratings={ratings} language={language} />}
       <div className="profile-account-layout"><section className="profile-settings"><h2>{profileCopy[language].settings}</h2><form className="profile-form" onSubmit={(event) => void save(event)} key={profile?.userId ?? 'new'}>
         <label>{copy.username}<input name="username" required minLength={3} maxLength={24} pattern="[a-zA-Z0-9_]{3,24}" defaultValue={profile?.username} autoComplete="nickname" /></label>
@@ -127,8 +125,7 @@ export function Account() {
         <p>{copy.privacy}</p><label className="profile-check"><input type="checkbox" name="adult" required defaultChecked={!!profile} /> {copy.adult}</label>
         <button type="submit" disabled={pending}>{copy.save}</button>
       </form></section><aside className="profile-account-side">
-      {profile && <><p className="profile-trial">{copy.plus}: {new Intl.DateTimeFormat(language, { dateStyle: 'long' }).format(profile.trialExpiresAt)}</p></>}
-      {profile && <BillingSection language={language} />}
+      {profile && <><p className="profile-trial">{copy.betaCredits}: {new Intl.DateTimeFormat(language, { dateStyle: 'long' }).format(profile.trialExpiresAt)}</p></>}
       {operator && <p><Link to="/operator">Operator</Link></p>}
       {profile && <details className="profile-danger"><summary>{copy.deletion}</summary><p>{copy.deleteNote}</p><label>{copy.confirmation}<input value={confirmation} onChange={(e) => setConfirmation(e.target.value)} /></label><button disabled={pending || confirmation !== 'DELETE'} onClick={() => void remove()}>{copy.deletion}</button></details>}</aside></div>
     </>}<p role="status">{message}</p></main></div>;

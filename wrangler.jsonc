@@ -13,6 +13,12 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
+  "vars": {
+    "STRIPE_REVIEW_PACK_PRICE_ID": "price_1UWweXBVWchHmktzXDsCNIaA",
+    "STRIPE_BILLING_ENABLED": "false",
+    "STRIPE_TAX_READY": "false",
+    "STRIPE_LIFECYCLE_READY": "false"
+  },
   "assets": {
     "not_found_handling": "single-page-application",
     "binding": "ASSETS",

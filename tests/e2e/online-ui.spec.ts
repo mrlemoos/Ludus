@@ -9,7 +9,7 @@ test('online lobby exposes friend links and requires explicit acceptance to leav
     const request = route.request(), path = new URL(request.url()).pathname;
     if (request.method() !== 'GET') writes.push(path);
     if (path === '/api/me') return route.fulfill({ json: { user: { id: 'one', name: 'Player one' } } });
-    if (path === '/api/appearance') return route.fulfill({ json: { appearance: { board: 'wood', pieces: 'wood' }, plus: false } });
+    if (path === '/api/appearance') return route.fulfill({ json: { appearance: { board: 'wood', pieces: 'wood' } } });
     if (path.endsWith('/history')) return route.fulfill({ json: [] });
     if (path === '/api/online/invitations') { state = { status: 'invited', token: '11111111-1111-4111-8111-111111111111', expiresAt: Date.now() + 86400000 }; return route.fulfill({ json: state }); }
     if (path.endsWith('/invitations/cancel') || path.endsWith('/queue/cancel')) state = { status: 'idle' };

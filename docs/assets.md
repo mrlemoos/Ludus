@@ -1,8 +1,8 @@
 # Assets and appearance
 
-The café, pieces, board, generated wood grain and material variants are project-authored TypeScript geometry and materials. No external model or reference photograph is redistributed. The traditional wooden appearance stays free. Beta Plus unlocks walnut and marble board colours and an ivory/ebony finish on the same traditional geometry. The finish names describe colours; no ivory or stone asset is imported.
+The café, pieces, board, generated wood grain and material variants are project-authored TypeScript geometry and materials. No external model or reference photograph is redistributed. Traditional wood, walnut, marble and ivory/ebony colour finishes are free for every account. The finish names describe colours; no ivory or stone asset is imported.
 
-Appearance entitlement is checked on the Worker. Trial expiry resolves saved premium selections to traditional wood without changing moves, clocks or replay. Selection is saved separately from match state. No cosmetic affects ratings or activity. The server rejects premium selection by free accounts.
+Appearance preferences are checked against the shared material catalogue on the Worker. Every supported board and piece finish remains available without a subscription or payment. Selection is saved separately from match state. No cosmetic affects ratings or activity.
 
 | Asset | Source | Licence/rights |
 | --- | --- | --- |

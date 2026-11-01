@@ -4,6 +4,7 @@ interface Env {
   STRIPE_BILLING_ENABLED?: string;
   STRIPE_TAX_READY?: string;
   STRIPE_LIFECYCLE_READY?: string;
+  STRIPE_REVIEW_PACK_PRICE_ID?: string;
   OPERATOR_IDS?: string;
   COACH_API_KEY?: string;
   COACH_API_URL?: string;

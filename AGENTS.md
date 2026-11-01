@@ -137,3 +137,14 @@ Single-context layout with root `GLOSSARY.md` and `docs/adr/`. See `docs/agents/
 - One Ludus Plus product, EUR 8 monthly with inclusive-tax price behaviour; local currency conversion remains subject to verified account eligibility.
 - Purchase remains supported throughout beta, including its final 48 hours. Preserve original beta expiry and explicit purchase consent.
 - Tax, account activation, currency eligibility and provider verification still block charging. See `.scratch/ludus/stripe-spec.md`, `.scratch/stripe/` and `docs/stripe.md` for agreed terms, gates and current evidence.
+
+## Confirmed review-pack update, 2026-11-01
+
+- Supersedes the subscription offer above. Remove Plus purchase/paywalls; all boards/materials and unlimited Stockfish reviews are free.
+- Sell 10 coach reviews for EUR 4.99 as a one-time Stripe-hosted Checkout purchase. Credits never expire. Give each account one introductory coach review.
+- One coach credit covers one completed match, its three preceding completed matches where available, and five successful follow-up questions. Failed generation consumes no credit or follow-up allowance.
+- Reopen saved reviews free. No paid regeneration or automatic translation in the MVP.
+- Preserve beta grants at 30 reviews per UTC month until original expiry, and permanent complimentary grants at 30 per month indefinitely. Spend free allowance before purchased credits.
+- Refund unused packs on request; manually review partially used packs and honour mandatory consumer rights. Disputes freeze only the affected pack's remaining credits.
+- Update pricing, terms, refunds and privacy disclosures, including server-side model processing and prior-match analysis. Preserve the existing charging gates.
+- Implementation and live catalogue configuration authorised. Commit, push, remote migration, deployment and charging activation require separate authorisation.

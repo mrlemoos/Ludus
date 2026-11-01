@@ -9,8 +9,8 @@ export function parseAppearance(value: unknown): Appearance | null {
   return materials.includes(value.board as BoardMaterial) && finishes.includes(value.pieces as PieceFinish)
     ? { board: value.board as BoardMaterial, pieces: value.pieces as PieceFinish } : null;
 }
-export function permittedAppearance(appearance: Appearance, plus: boolean): Appearance {
-  return plus ? { ...appearance } : { ...defaultAppearance };
+export function permittedAppearance(appearance: Appearance, _plus = true): Appearance {
+  return { ...appearance };
 }
 export const appearanceMaterials = {
   wood: { light: '#d9c59e', dark: '#6c7355', edge: '#5b3929', roughness: .5, white: '#dbb780', black: '#634734' },

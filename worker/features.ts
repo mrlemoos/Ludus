@@ -5,14 +5,14 @@ import { coachApi } from './coach';
 import { cosmeticsApi } from './cosmetics';
 import { apiJson, boundedRequest } from './http';
 import { billingApi } from './billing';
-import { paidAccessUntil } from './billing-access';
-import { hasComplimentaryPlus } from './complimentary-plus';
+import { loadCoachHistory } from './coach-history';
+import type { SavedCoachMatch } from '../shared/coaching';
 export async function featuresApi(original: Request, env: Env): Promise<Response | null> {
   const path = new URL(original.url).pathname;
   const accountRoute = path === '/api/account' || path.startsWith('/api/profiles/') || path.startsWith('/api/operator/');
   const billingRoute = path === '/api/billing' || path.startsWith('/api/billing/');
   if (!accountRoute && !billingRoute && path !== '/api/appearance' && !path.startsWith('/api/online/') && !path.startsWith('/api/coach/')) return null;
-  const request = await boundedRequest(original);
+  const request = await boundedRequest(original, path.startsWith('/api/coach/') ? 200_000 : 65_536);
   if (request instanceof Response) return request;
   try {
     if (accountRoute) return await accountsApi(request, env);
@@ -24,18 +24,19 @@ export async function featuresApi(original: Request, env: Env): Promise<Response
     if (!profile) return apiJson({ error: 'onboarding_required' }, 403);
     if (billingRoute) return await billingApi(request, env, owner, profile);
     if (path.startsWith('/api/online/')) return await onlineApi(request, env, owner);
-    const [paidUntil, complimentary] = await Promise.all([paidAccessUntil(env.DB, owner), hasComplimentaryPlus(env.DB, owner)]);
-    if (path === '/api/appearance') return await cosmeticsApi(request, env, owner, paidUntil, complimentary);
+    if (path === '/api/appearance') return await cosmeticsApi(request, env, owner);
+    const loadMatch = async (player: string, id: string): Promise<SavedCoachMatch | null> => {
+      const computer = await env.MATCHES.getByName(id).read(player);
+      if (computer) return { ...computer.game, kind: 'computer', completedAt: computer.game.result ? computer.game.updatedAt : undefined };
+      const human = await env.HUMAN_MATCHES.getByName(id).read(player);
+      if (!human) return null;
+      return { kind: 'human', id: human.game.id, moves: human.game.moves, result: human.game.result, colour: human.game.players.w === player ? 'w' : 'b', completedAt: human.game.result?.at };
+    };
     return await coachApi(request, env, {
       session: async () => ({ id: owner }),
-      account: async () => ({ trialExpiresAt: profile.trialExpiresAt, paidAccessUntil: paidUntil, complimentaryPlus: complimentary, teachingProfile: profile.teachingProfile }),
-      loadMatch: async (player, id) => {
-        const computer = await env.MATCHES.getByName(id).read(player);
-        if (computer) return computer.game;
-        const human = await env.HUMAN_MATCHES.getByName(id).read(player);
-        if (!human) return null;
-        return { kind: 'human', id: human.game.id, moves: human.game.moves, result: human.game.result, colour: human.game.players.w === player ? 'w' : 'b' };
-      },
+      account: async () => ({ teachingProfile: profile.teachingProfile }),
+      loadMatch,
+      loadHistory: (player, _id, current) => loadCoachHistory(env.DB, player, current, loadMatch),
     });
   } catch {
     return apiJson({ error: 'unavailable' }, 503);

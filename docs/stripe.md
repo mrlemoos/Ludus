@@ -1,102 +1,53 @@
-# Stripe billing
+# Stripe review packs
 
-## Complimentary Plus
+## Current offer
 
-Explicitly granted accounts can receive Plus with no expiry and no Stripe subscription. Grants are stored by normalised email in `complimentary_plus`; only verified ownership unlocks them. A pending recipient still completes email sign-in, age confirmation and onboarding normally. The original beta expiry remains unchanged. Standard Plus review/conversation limits apply.
+The current offer is a one-time pack of 10 AI coach reviews for EUR 4.99. The pack never expires. It does not unlock Plus, cosmetics, or recurring service access. Browser Stockfish analysis remains free and unlimited.
 
-After applying migrations and deploying the matching Worker, grant access with:
+The connected Stripe account readback supplied on 2026-11-01 shows:
 
-```sh
-node scripts/grant-plus.ts --remote player@example.test
-```
-
-Use `--local` for development. The script grants access and creates/refreshes the invitation without sending email, creating a session, marking email verified or fabricating onboarding. An active grant keeps that invitation redeemable after its usual expiry. Revoking the grant removes permanent Plus; remaining beta/paid access remains independent. Account deletion removes the grant. Paid Checkout is blocked while complimentary Plus is active; an existing subscription is never silently changed.
-
-## Current delivery
-
-Live catalogue and local purchase, paid access, renewal grace, refunds/disputes, deletion cancellation and scheduled reconciliation are implemented. Charging remains disabled by default. Provider journey verification, account activation, tax/consumer terms, retention policy and currency eligibility remain release gates. Local checks do not prove a complete live integration.
-
-Leo explicitly replaced the separate-sandbox requirement with live-mode development on 2026-10-31. Local mocks and signed fixtures do not prove actual live payments. Never use test card numbers against live Stripe or create real charges as an automated check.
-
-## Provisioned live resources
-
-Created through the connected Stripe plugin in account `acct_1UWNJpBVWchHmktz`:
-
-| Resource | ID | Verified settings |
+| Resource | ID | Readback |
 | --- | --- | --- |
-| Product | `ludus_plus` | Ludus Plus, service |
-| Price | `price_1UWeBDBVWchHmktzPeGqPM30` | EUR 800 cents, monthly, inclusive tax behaviour |
-| Portal configuration | `bpc_1UWeBnBVWchHmktzjD7skdf0` | Payment method updates, invoice history, cancellation at period end, no prorated refund |
+| Product | `ludus_coach_reviews_10` | Active one-time review pack |
+| Price | `price_1UWweXBVWchHmktzXDsCNIaA` | EUR 4.99 (499 cents), one-time, inclusive tax behaviour |
+| Former subscription product | `ludus_plus` | Archived; recurring offer retired |
 
-These identifiers are configuration, not credentials. Localised currency conversion remains subject to verified account settlement and Adaptive Pricing eligibility. Inclusive Price configuration does not establish tax registration, calculation or collection.
+No Checkout session or charge was created. On 2026-11-01, the repository owner read the live Stripe account's subscriptions using the old monthly Price, `status=all`, `limit=100`; Stripe returned no subscriptions and `has_more=false`. No active Ludus monthly subscriptions exist in that account. Archiving the old product did not cancel or alter any customer subscription. Do not cancel subscriptions as part of this product change.
 
-## Runtime configuration
+Stripe may show an inclusive tax behaviour on the Price, but this is not evidence of tax registration, correct tax treatment or collection. The product owner reported that the Stripe account has charges and payouts disabled, card capability inactive and verification requirements past due. Stripe Tax country lookup did not report the country as supported. Confirm current account state and tax treatment before enabling purchases.
 
-Store `STRIPE_API_KEY` as a Cloudflare Worker secret. Use a restricted live key with only the required customer, Checkout, Portal, subscription and invoice permissions. Never store keys in source, public frontend variables or this document.
+## Runtime gates
 
-Store `STRIPE_WEBHOOK_SECRET` as a separate Worker secret for the deployed endpoint. No endpoint or runtime key has been provisioned by this change. A connected Stripe plugin does not supply the Worker with credentials.
-
-The application requires all three configuration values to equal `true` before allowing a new purchase. Existing customers can still open Portal when new purchases are disabled:
+Store `STRIPE_API_KEY` and `STRIPE_WEBHOOK_SECRET` as separate Cloudflare Worker secrets. Never put them in source or browser variables. A purchase requires all three feature flags to be true and the review-pack Price ID to be configured:
 
 - `STRIPE_BILLING_ENABLED`
 - `STRIPE_TAX_READY`
 - `STRIPE_LIFECYCLE_READY`
 
-Leave them unset until evidence supports activation. Flags are release gates, not proof of readiness. Do not enable them to bypass outstanding implementation or legal/tax decisions.
+The repository owner confirmed the flags remain false. Leave them false until account verification, tax handling, consumer disclosures, refund operations and payment-data retention are ready. A flag is a release gate, not evidence that a requirement passed.
 
-Stripe SDK is pinned to `23.1.0`, API to `2026-10-28.endive`. The server uses the SDK Fetch HTTP client and asynchronous Web Crypto signature verification.
+## Routes and fulfilment
 
-## Routes and event processing
+- Authenticated `GET /api/billing` returns the current offer availability and review-credit balance.
+- Authenticated, same-origin `POST /api/billing/review-pack/checkout` creates a Stripe-hosted one-time Checkout Session and returns its URL. The Worker fixes the Price, customer, locale and return URLs.
+- `POST /api/billing/webhook` validates the bounded original request body and Stripe signature. It rejects test-mode events.
+- Paid credits are granted only after the Worker retrieves and verifies a live, completed, paid session, matching customer, currency, amount, Price and quantity. The browser redirect never grants credits.
+- Incomplete payment sessions do not grant credits. Checkout retries reuse the durable attempt and provider idempotency key. Uncertain attempts require reconciliation before another attempt.
 
-- Authenticated `GET /api/billing` returns release availability, the EUR base price and stored subscription snapshot.
-- Authenticated, same-origin `POST /api/billing/checkout` and `/api/billing/portal` return account-owned hosted URLs. Server selects catalogue and return URLs.
-- `POST /api/billing/webhook` verifies the bounded original body and signature without browser session/Origin requirements. Test-mode events are rejected. Successful events are durably identified, and incomplete events remain retryable.
-- Handled lifecycle events: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`.
-- Handled risk events: `charge.refunded`, `charge.dispute.created`, `charge.dispute.updated`, `charge.dispute.closed`, `radar.early_fraud_warning.created`.
-- Endpoint registration and real provider delivery have not been verified. Do not treat local signed fixtures as live proof.
+Handled risk events include full or partial refunds, disputes and early-fraud warnings. A full refund or lost dispute removes unused affected credits. A partial refund or open dispute freezes unused affected credits for manual review. Winning a dispute releases the freeze unless another risk remains. A freeze never reaches credits from another pack.
 
-An account lease serialises purchase/reconciliation work. Checkout retries reuse immutable parameters and provider idempotency keys. Uncertain creations older than 23 hours require reconciliation rather than risking a fresh purchase after Stripe forgets an idempotency key.
+Unused packs are refunded on request. Refunds are processed manually. Requests for partly used packs receive individual manual review. Preserve mandatory consumer rights. The support contact for these requests must be published before charging is enabled; do not invent an email address. Stripe dispute events also freeze the affected pack's unused balance while the dispute remains open.
 
-Webhooks resolve customer ownership through the local Stripe customer mapping and fetch current provider state. Unrelated business customers never become Ludus accounts. Positive paid periods for the approved Price grant access through a shared server-side check in coaching and cosmetics. Account deletion tombstones block paid access. Beta access remains independent.
+## Legacy subscription implementation
 
-## Beta timing
+Subscription, portal and paid-period code remains for legacy reconciliation and deletion cleanup. It is not the current product offer and does not grant coach credits or premium cosmetics. Do not present Plus pricing or a subscription purchase flow in the app. The old product is archived; no cancellation or customer migration was performed by the review-pack change.
 
-Preserve onboarding's original expiry. Use exact `trial_end` when at least 49 hours remain, leaving margin above Checkout's 48-hour minimum. For shorter remainders, set the billing cycle anchor to beta expiry with `proration_behavior: none`; the initial period is free. Round milliseconds upwards to provider seconds so no first charge precedes beta expiry.
+Legacy infrastructure and lifecycle evidence recorded before 2026-11-01 remains in Git history. This file no longer treats that implementation as the active catalogue. The old subscription Price was EUR 800/month and used ID `price_1UWeBDBVWchHmktzPeGqPM30`; the portal configuration was `bpc_1UWeBnBVWchHmktzjD7skdf0`. These resources are historical and must not be used for new purchases.
 
-This supports purchase throughout beta, including the final hour. Sessions completed after their anchor may charge for the period that has started, never before original beta expiry. Provider behaviour still requires verification before activation. See [Stripe billing-cycle documentation](https://docs.stripe.com/payments/checkout/billing-cycle?ui=full-page).
+## Validation boundary
 
-## Local validation
+Local verification on 2026-11-01 passed: TypeScript, 305 unit tests, production build, local migration 0012 and all 44 Chromium journeys. Hosted Checkout navigation uses a browser fixture; payment and webhook tests use mocked provider responses and signed fixtures. Stripe catalogue configuration and readback are live; no live Checkout Session or charge was created. No commit, push, remote migration or deployment was performed.
 
-Run `pnpm typecheck`, `pnpm test` and `WRANGLER_LOG_PATH=/tmp/ludus-stripe-wrangler.log pnpm build`. Apply local migrations with the existing seed/migration workflow. Account Playwright coverage checks that disabled billing cannot create Checkout and the account shows its unavailable state.
+Mocked local tests can check route authentication, idempotency, webhook validation and credit updates. They do not prove live Checkout, a real payment, live webhook delivery, tax calculation, consumer-law compliance or deployment. Never use test card details against live mode or create an automated live charge.
 
-Do not claim live payment, webhook delivery or deployment from these checks. No live customer, Checkout Session, charge, webhook endpoint or deployment was created during catalogue provisioning.
-
-## Lifecycle and manual review
-
-Leo accepted manual review for late payments, historical refunds, overlapping payment risk and fraud warnings on 2026-10-31, preserving newer valid purchases. Cases appear under the authenticated operator billing review section. Marking reviewed changes no money or entitlement; financial actions remain manual in Stripe.
-
-- First-payment failure grants no extra access. Renewal failure after a successful paid period grants seven days from the failed invoice period start. Duplicate/delayed events cannot extend it. Recovery inside grace restores current paid access.
-- At the exact deadline, request-time access checks remove grace. Provider cancellation intent is persisted before cancellation I/O; outages cannot extend access. Scheduled work retries cancellation. Late renewal settlements require manual review and do not restore the cancelled subscription.
-- Full refunds revoke the affected paid period; partial refunds preserve it. Disputes suspend the affected period until won. Older refunds never remove a newer valid purchase. Invoice Payments resolve risk through payment/charge relationships; metadata is not the ownership boundary.
-- Deletion creates a tombstone before provider calls. Pending deletion permits account-status/retry only, blocks play/purchases, and preserves the original session until billing cancellation succeeds. Open Checkout sessions are expired and subscriptions cancelled before private account cleanup. The original sessions are then revoked.
-- Minimal customer/subscription/invoice/event linkage remains for reconciliation of delayed events. No email, name, address, card data or webhook body is copied into billing tables. Exact retention duration still requires verification before release; indefinite retention has not been agreed.
-
-The Worker schedules reconciliation every five minutes, oldest-first in batches of ten, independently from daily personal-data purging. Each account failure is isolated and queued for operator review. Request-time access expiry is exact; cancellation delivery can lag during outages or backlog. Monitor backlog before inviting users. See [Cloudflare Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/).
-
-Lease fencing prevents an expired worker from overwriting a newer owner. Uncertain Checkout creates are recovered by their durable attempt reference; new attempts require a completed provider lookup. Uncertain customer creation older than the provider idempotency window requires operator review, never a duplicate customer create. Histories exceeding the bounded 100-item provider reads also require review rather than silently ignoring data. These operating limits must be checked against beta capacity before release.
-
-## Verified account blockers, 2026-10-31
-
-Read through the Stripe plugin: country BR, default currency BRL, charges disabled, payouts disabled, card capability inactive, requirements past due. Stripe lists failed verification for the representative name and address. Resolve these in the business Stripe Dashboard; no identity details were changed here.
-
-Stripe Tax lookup reports country unsupported. EUR Price creation does not prove EUR settlement or Adaptive Pricing eligibility. Checkout requests Adaptive Pricing for eligible sessions, but conversion remains unverified for this account. Tax readiness, account activation, currency eligibility, consumer disclosures, billing-record retention, Worker secrets, webhook registration and real provider journeys must pass before enabling charging.
-
-## Local evidence
-
-Typecheck, unit suite, production build and local migrations run during implementation. Nine Chromium journeys passed for account changes, unavailable Checkout, billing/grace/management in en-GB/es-ES/fr-FR, deletion retry and saved coaching during model outage. Billing-specific browser states use mocked API responses; the unavailable-purchase journey reaches the real local Worker. No real payment, remote migration, webhook endpoint, commit, push or deployment performed.
-
-Final local verification on 2026-10-31: TypeScript passed; 32 unit files / 279 tests passed; nine targeted Chromium account/billing/coaching journeys passed; production build and local migration 0010 passed; whitespace check passed. Provider activation, real payment/webhook delivery and remote deployment remain unverified.
-
-Pre-commit verification: full pnpm check passed on 2026-10-31: TypeScript, 279 unit tests, production build and all 31 Chromium journeys, including 3D/mobile and two-session multiplayer. No premium grants, push or deployment performed.
-
-Complimentary-grant activation on 2026-10-31: migration 0011 applied to production, Worker version 1f197d17-99ed-4c45-ab6d-9240f4b9ee57 deployed, and exactly three requested email grants read back with revoked_at NULL. No fabricated onboarding or Stripe subscriptions. Paid Checkout gates explicitly set false. Validation passed: TypeScript, 283 unit tests, production build and all 32 Chromium journeys. Grant-specific code remains uncommitted; no push performed.
+Before charging, verify account activation and permissions in Stripe, webhook registration and delivery, tax treatment, checkout disclosures, refund and dispute operation, privacy disclosures for the chosen AI provider, and the precise retention period for payment records. Set the Stripe Dashboard Terms of Service URL to `https://ludus.mrlemoos.dev/terms` and the privacy URL to `https://ludus.mrlemoos.dev/privacy` only after the registered controller identity/address and contact details have been added and verified. Current live customer, Checkout, charge and webhook delivery remain unverified.

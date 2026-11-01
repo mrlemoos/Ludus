@@ -51,13 +51,13 @@ test('account controls fit a narrow phone with usable touch targets', async ({ p
   await page.addInitScript(() => localStorage.setItem('ludus-language', 'en-GB'));
   await page.route('**/api/account', (route) => route.fulfill({ json: { profile: { userId: 'fixture', username: 'leo', language: 'en-GB', timezone: 'Europe/Madrid', chessLevel: 'casual', teachingProfile: 'developing', activityPublic: true, trialExpiresAt: Date.UTC(2026, 11, 1) }, activity: profile.activity, operator: false } }));
   await page.route('**/api/profiles/leo', (route) => route.fulfill({ json: profile }));
-  await page.route('**/api/billing', (route) => route.fulfill({ json: { enabled: false, canManage: false, amount: 800, currency: 'eur', subscription: null } }));
+  await page.route('**/api/billing', (route) => route.fulfill({ json: { enabled: false, reviewCredits: { available: 31, monthlyFreeRemaining: 30, introAvailable: true, paidRemaining: 0 } } }));
   for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/account');
     await expect(page.getByRole('heading', { name: '@leo', exact: true })).toBeVisible();
     await expect(page.getByLabel('Public username')).toHaveValue('leo');
-    await expect(page.getByText('Subscriptions are not available yet.')).toBeVisible();
+    await expect(page.getByText('Purchases are paused while billing checks are completed.')).toBeVisible();
     await page.getByText('Delete account', { exact: true }).first().click();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     for (const button of await page.getByRole('button').all()) {

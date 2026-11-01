@@ -16,6 +16,7 @@ const PublicProfile = React.lazy(() => import('./Account').then((module) => ({ d
 const Operator = React.lazy(() => import('./Operator').then((module) => ({ default: module.Operator })));
 const Online = React.lazy(() => import('./Online').then((module) => ({ default: module.Online })));
 const Coach = React.lazy(() => import('./Coach').then((module) => ({ default: module.Coach })));
+const Policy = React.lazy(() => import('./Policy').then((module) => ({ default: module.Policy })));
 
 
 function HandleProfile() {
@@ -26,7 +27,7 @@ function HandleProfile() {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <React.Suspense fallback={<p role="status" className="p-8">Ludus…</p>}><Routes><Route path="/account" element={<Account />} /><Route path="/players/:username" element={<PublicProfile />} /><Route path="/:handle" element={<HandleProfile />} /><Route path="/operator" element={<Operator />} /><Route path="/online" element={<Online />} /><Route path="/coach/:matchId" element={<Coach />} /><Route path="/" element={<App />} /><Route path="/play" element={<Play />} /><Route path="*" element={<NotFound />} /></Routes></React.Suspense>
+      <React.Suspense fallback={<p role="status" className="p-8">Ludus…</p>}><Routes><Route path="/account" element={<Account />} /><Route path="/terms" element={<Policy />} /><Route path="/privacy" element={<Policy />} /><Route path="/players/:username" element={<PublicProfile />} /><Route path="/:handle" element={<HandleProfile />} /><Route path="/operator" element={<Operator />} /><Route path="/online" element={<Online />} /><Route path="/coach/:matchId" element={<Coach />} /><Route path="/" element={<App />} /><Route path="/play" element={<Play />} /><Route path="*" element={<NotFound />} /></Routes></React.Suspense>
     </BrowserRouter>
   </React.StrictMode>,
 );

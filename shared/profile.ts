@@ -1,7 +1,7 @@
 import { isLanguage, type Language } from './waitlist';
 import type { ChessLevel } from './computer';
 
-export const policyVersion = '2026-10-30';
+export const policyVersion = '2026-11-01';
 export const teachingProfiles = ['beginner', 'developing', 'club', 'advanced'] as const;
 export type TeachingProfile = typeof teachingProfiles[number];
 export type PlayerProfile = {

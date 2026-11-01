@@ -2,6 +2,8 @@
 
 Implementation policies were approved on 30 October 2026 in `.scratch/beta-completion/policies.md`. This page separates implemented behaviour from release evidence that is still missing.
 
+The 2026-11-01 review-pack policy supersedes this page's earlier Plus wording. See `specs/review-credits.md` and `stripe.md` for the current offer and billing gates.
+
 ## Implemented
 
 - Invitation-gated magic-link authentication, adult attestation, onboarding and immutable 30-day card-free Plus.
@@ -25,7 +27,7 @@ Implementation policies were approved on 30 October 2026 in `.scratch/beta-compl
 | Mobile acceptance | iPhone 13/Safari and Pixel 6/Chrome actual-device FPS/input/strength measurements remain absent. See `mobile-validation.md`. |
 | Final artwork | Original procedural café/set and materials implemented. Final realistic art acceptance remains for visual review. |
 | Operational release | Production email sender/secrets, provider costs, Cloudflare/Resend capacity and actual live workflows need validation before inviting batches. No production invitation was sent by this implementation. |
-| Billing | Deliberately disabled for beta under approved policy. No payment provider, tax/renewal/refund terms or charging flow selected. No card required for trial. |
+| Billing | Stripe-hosted one-time review packs are provisioned, but charging remains disabled. Account verification, tax, published controller/contact details, Checkout terms/privacy URLs, AI-provider retention disclosures, refund operation and exact payment-record retention still need review. No card is needed for beta access. |
 
 See `coaching.md`, `assets.md`, `development.md` and `deployment.md` for exact configuration and validation boundaries. A local commit is not a deployment or a decision to admit players.
 

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 const id = '11111111-1111-4111-8111-111111111111';
 const review = { id: 'saved-review', matchId: id, language: 'es-ES', profile: 'beginner', createdAt: Date.UTC(2026, 9, 30), document: { summary: 'Desarrolla las piezas antes de atacar.', variations: [{ ply: 0, moves: ['e2e4', 'e7e5'], explanation: 'Ocupa el centro.' }], mistakes: [] } };
-const status = { available: false, plus: false, limit: 3, usage: { reviews: 1, replies: 0 }, profile: 'beginner', suggestedProfile: null, recurring: [], reviews: [review] };
+const status = { available: false, reviewCredits: { available: 1, monthlyFreeRemaining: 0, introAvailable: false, paidRemaining: 1 }, replyLimit: 5, usage: { reviews: 1, replies: 0 }, profile: 'beginner', suggestedProfile: null, recurring: [], reviews: [review] };
 test('saved review survives model outage, preserves language and replays legal variations', async ({ page }) => {
   const writes: string[] = [], errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(() => localStorage.setItem('ludus-language', 'en-GB'));
@@ -9,12 +9,13 @@ test('saved review survives model outage, preserves language and replays legal v
     if (route.request().method() !== 'GET') writes.push(route.request().url());
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith('/status')) return route.fulfill({ json: status });
-    if (path.includes('/matches/')) return route.fulfill({ json: { match: { id, moves: ['e4', 'e5', 'Nf3'], colour: 'w', result: { reason: 'resignation' } } } });
+    if (path.endsWith(`/matches/${id}/review`)) return route.fulfill({ json: { review, replies: [] } });
+    if (path.endsWith(`/matches/${id}`)) return route.fulfill({ json: { match: { id, moves: ['e4', 'e5', 'Nf3'], colour: 'w', result: { reason: 'resignation' } } } });
     return route.fulfill({ json: { review, replies: [] } });
   });
   await page.goto(`/coach/${id}`);
   await expect(page.getByRole('heading', { name: 'Review with Lucía' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Generate review', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Generate AI coach review · 1 credit', exact: true })).toHaveCount(0);
   await expect(page.getByText(review.document.summary, { exact: true })).toBeVisible();
   await expect(page.getByRole('note')).toContainText('Spanish');
   await page.getByRole('button', { name: '1. e2e4 e7e5', exact: true }).click();
@@ -41,8 +42,9 @@ test('conversation outage retries manually with one stable request key', async (
       const reply = { id: 'reply-1', reviewId: review.id, language: body.language, question: body.question, createdAt: Date.now(), document: { summary: 'Developing brings more pieces into the centre.', variations: [], mistakes: [] } }; replies.push(reply);
       return route.fulfill({ json: { reply } });
     }
-    if (path.endsWith('/status')) return route.fulfill({ json: { ...status, available: true, plus: true, limit: 30 } });
-    if (path.includes('/matches/')) return route.fulfill({ json: { match: { id, moves: ['e4', 'e5'], colour: 'w', result: { reason: 'resignation' } } } });
+    if (path.endsWith('/status')) return route.fulfill({ json: { ...status, available: true } });
+    if (path.endsWith(`/matches/${id}/review`)) return route.fulfill({ json: { review, replies } });
+    if (path.endsWith(`/matches/${id}`)) return route.fulfill({ json: { match: { id, moves: ['e4', 'e5'], colour: 'w', result: { reason: 'resignation' } } } });
     return route.fulfill({ json: { review, replies } });
   });
   await page.goto(`/coach/${id}`);
@@ -90,7 +92,7 @@ test('local engine analysis remains available during model outage without review
   const writes: string[] = [];
   page.on('request', (request) => { if (request.method() === 'POST' && request.url().includes('/api/coach/')) writes.push(request.url()); });
   await page.goto(`/coach/${matchId}`);
-  await expect(page.getByRole('button', { name: 'Generate review', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Generate AI coach review · 1 credit', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Analyse locally', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Analyse locally', exact: true })).toBeEnabled({ timeout: 30_000 });
   await expect(page.locator('section[aria-label^="Stockfish analyses"] button').first()).toBeVisible();

@@ -1,12 +1,14 @@
 import { Chess } from 'chess.js';
-import { positionAt, validateAnalysis, type AnalysisLine, type SavedCoachMatch } from '../shared/coaching';
+import { positionAt, STOCKFISH_ENGINE_VERSION, validateAnalysis, type AnalysisLine, type SavedCoachMatch } from '../shared/coaching';
 
-export function parseEngineInfo(line: string, ply: number): AnalysisLine | null {
-  const depth = /\bdepth (\d+)\b/.exec(line), score = /\bscore (cp|mate) (-?\d+)\b/.exec(line), pv = /\bpv (.+)$/.exec(line);
-  if (!depth || !score || !pv || /\b(lowerbound|upperbound)\b/.test(line)) return null;
+export const STOCKFISH_VERSION = STOCKFISH_ENGINE_VERSION;
+
+export function parseEngineInfo(line: string, ply: number, fen = new Chess().fen()): AnalysisLine | null {
+  const depth = /\bdepth (\d+)\b/.exec(line), nodes = /\bnodes (\d+)\b/.exec(line), score = /\bscore (cp|mate) (-?\d+)\b/.exec(line), pv = /\bpv (.+)$/.exec(line);
+  if (!depth || !nodes || !score || !pv || /\b(lowerbound|upperbound)\b/.test(line)) return null;
   const moves = pv[1].trim().split(/\s+/).slice(0, 8);
   if (!moves.every((move) => /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move))) return null;
-  return { ply, depth: Number(depth[1]), cp: score[1] === 'cp' ? Number(score[2]) : null, mate: score[1] === 'mate' ? Number(score[2]) : null, moves };
+  return { ply, fen, engineVersion: STOCKFISH_VERSION, perspective: 'side-to-move', depth: Number(depth[1]), nodes: Number(nodes[1]), cp: score[1] === 'cp' ? Number(score[2]) : null, mate: score[1] === 'mate' ? Number(score[2]) : null, moves, variations: [moves] };
 }
 export function analysisPlies(moveCount: number): number[] {
   if (!Number.isInteger(moveCount) || moveCount < 1 || moveCount > 2000) throw new Error('invalid_match');
@@ -43,7 +45,7 @@ export async function analyseMatch(match: SavedCoachMatch, signal: AbortSignal, 
         timer = setTimeout(() => reject(new Error('engine_unavailable')), 15_000);
         worker.onerror = () => { clearTimeout(timer); reject(new Error('engine_unavailable')); };
         worker.onmessage = ({ data }) => {
-          const text = String(data), next = parseEngineInfo(text, ply);
+          const text = String(data), next = parseEngineInfo(text, ply, chess.fen());
           if (next) best = next;
           if (text.startsWith('bestmove ')) { clearTimeout(timer); if (best) resolve(best); else reject(new Error('engine_analysis_missing')); }
         };

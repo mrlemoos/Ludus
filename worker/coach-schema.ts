@@ -7,7 +7,7 @@ export const coachRequests = sqliteTable('coach_requests', {
 });
 export const coachReviews = sqliteTable('coach_reviews', {
   id: text('id').primaryKey(), owner: text('owner').notNull(), matchId: text('match_id').notNull(), language: text('language').notNull(),
-  profile: text('profile').notNull(), document: text('document').notNull(), analysis: text('analysis').notNull(), createdAt: integer('created_at').notNull(),
+  profile: text('profile').notNull(), document: text('document').notNull(), analysis: text('analysis').notNull(), history: text('history').notNull().default('[]'), historyGaps: integer('history_gaps').notNull().default(0), createdAt: integer('created_at').notNull(),
 });
 export const coachReplies = sqliteTable('coach_replies', {
   id: text('id').primaryKey(), owner: text('owner').notNull(), reviewId: text('review_id').notNull(), language: text('language').notNull(),

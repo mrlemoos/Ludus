@@ -1,5 +1,7 @@
 # Ludus product specification
 
+Billing and coaching-credit behaviour is superseded by [AI coach review credits](review-credits.md), accepted 2026-11-01. Its one-time review-pack rules replace the Plus subscription, review caps and cosmetic gating described in this older product spec. Other product decisions here remain in scope.
+
 ## Problem Statement
 
 Adult chess players want online competition and practice against a computer in a convincing 3D setting. They also want to understand their mistakes after each game through explanations suited to their level, and track their playing habits and rank.
@@ -8,7 +10,7 @@ Adult chess players want online competition and practice against a computer in a
 
 Build a responsive chess website set at a table in a café with Baroque architecture inspired by central Madrid. Players use realistic wooden pieces, play human or computer opponents, and request an interactive review and written summary after the match. A conversational coach explains engine analysis at the player's selected teaching level. Coaching is unavailable during play.
 
-Launch through a waitlist and manually invited beta. Keep play free; sell expanded coaching and cosmetics through Plus.
+Launch through a waitlist and manually invited beta. Keep play free; sell optional AI coach review packs under the current credit policy linked above.
 
 ## User Stories
 

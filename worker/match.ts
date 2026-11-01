@@ -23,7 +23,7 @@ export class Match extends DurableObject<Env> {
     for (const socket of this.ctx.getWebSockets()) { try { socket.send(message); } catch { socket.close(1011, 'Reconnect'); } }
     if (game.result) {
       await this.ctx.storage.setAlarm(Date.now() + 5000);
-      await drizzle(this.env.DB).update(matches).set({ result: JSON.stringify(game.result) }).where(eq(matches.id, game.id));
+      await drizzle(this.env.DB).update(matches).set({ result: JSON.stringify(game.result), finishedAt: game.updatedAt }).where(eq(matches.id, game.id));
       await recordActivity(this.env.DB, { gameId: game.id, players: [game.owner], reason: game.result.reason, moves: game.moves.length, completedAt: game.updatedAt });
       await this.env.MATCHMAKING.getByName('beta').releaseComputer(game.owner, game.id);
       await this.ctx.storage.deleteAlarm();
