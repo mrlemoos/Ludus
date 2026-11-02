@@ -16,15 +16,25 @@ const profile = {
   activity: { today, days, streak: 12 },
 };
 
-for (const width of [390, 1440])
-  {test(`profile hierarchy and controls at ${width}px`, async ({ page, context }) => {
+for (const width of [390, 1440]) {
+  test(`profile hierarchy and controls at ${width}px`, async ({ page, context }) => {
     await page.setViewportSize({ width, height: 1000 });
-    await page.addInitScript(() =>{  localStorage.setItem('ludus-language', 'en-GB'); });
+    await page.addInitScript(() => {
+      localStorage.setItem('ludus-language', 'en-GB');
+    });
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.route('**/api/profiles/leo', (route) => route.fulfill({ json: profile }));
     await page.goto('/@leo');
     await page.reload();
     await expect(page.getByRole('heading', { name: '@leo', exact: true })).toBeVisible();
+    const avatar = page.locator('.profile-avatar');
+    await expect(avatar).toHaveText('L');
+    expect(await avatar.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(
+      'rgb(108, 101, 111)',
+    );
+    expect(await avatar.evaluate((element) => getComputedStyle(element).color)).toBe(
+      'rgb(242, 245, 241)',
+    );
     const graph = page.getByRole('region', { name: 'Activity', exact: true });
     await expect(graph).toBeVisible();
     expect(await graph.locator('.activity-cell').count()).toBe(370);
@@ -65,8 +75,8 @@ for (const width of [390, 1440])
       ];
     });
     await page.goto('/');
-    for (const logo of await page.locator('.wordmark').all())
-      {expect(
+    for (const logo of await page.locator('.wordmark').all()) {
+      expect(
         await logo.evaluate((element) => {
           const style = getComputedStyle(element);
           return [
@@ -77,14 +87,18 @@ for (const width of [390, 1440])
             element.textContent,
           ];
         }),
-      ).toEqual(profileLogo);}
-  });}
+      ).toEqual(profileLogo);
+    }
+  });
+}
 
 test('private activity and long handles remain shareable without exposing a graph', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 850 });
-  await page.addInitScript(() =>{  localStorage.setItem('ludus-language', 'en-GB'); });
+  await page.addInitScript(() => {
+    localStorage.setItem('ludus-language', 'en-GB');
+  });
   await page.route('**/api/profiles/*', (route) =>
     route.fulfill({ json: { username: 'abcdefghijklmnopqrstuvwx', ratings: [] } }),
   );
@@ -95,7 +109,9 @@ test('private activity and long handles remain shareable without exposing a grap
 });
 
 test('account controls fit a narrow phone with usable touch targets', async ({ page }) => {
-  await page.addInitScript(() =>{  localStorage.setItem('ludus-language', 'en-GB'); });
+  await page.addInitScript(() => {
+    localStorage.setItem('ludus-language', 'en-GB');
+  });
   await page.route('**/api/account', (route) =>
     route.fulfill({
       json: {
@@ -145,16 +161,19 @@ test('account controls fit a narrow phone with usable touch targets', async ({ p
       expect(box?.height).toBeGreaterThanOrEqual(44);
       expect(box?.width).toBeGreaterThanOrEqual(44);
     }
-    for (const input of await page.locator('input:not([type="checkbox"]), select').all())
-      {expect(
+    for (const input of await page.locator('input:not([type="checkbox"]), select').all()) {
+      expect(
         await input.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
-      ).toBeGreaterThanOrEqual(16);}
+      ).toBeGreaterThanOrEqual(16);
+    }
     await page.screenshot({ path: `.scratch/account-${width}.png`, fullPage: true });
   }
 });
 
 test('legacy profile links work and unknown paths keep the not-found page', async ({ page }) => {
-  await page.addInitScript(() =>{  localStorage.setItem('ludus-language', 'en-GB'); });
+  await page.addInitScript(() => {
+    localStorage.setItem('ludus-language', 'en-GB');
+  });
   await page.route('**/api/profiles/leo', (route) => route.fulfill({ json: profile }));
   await page.goto('/players/leo');
   await expect(page.getByRole('heading', { name: '@leo', exact: true })).toBeVisible();

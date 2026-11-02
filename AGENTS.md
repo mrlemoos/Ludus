@@ -159,3 +159,7 @@ Startup review fallback: run `node .galicia/check.ts` once per session if no sta
 - Refund unused packs on request; manually review partially used packs and honour mandatory consumer rights. Disputes freeze only the affected pack's remaining credits.
 - Update pricing, terms, refunds and privacy disclosures, including server-side model processing and prior-match analysis. Preserve the existing charging gates.
 - Implementation and live catalogue configuration authorised. Commit, push, remote migration, deployment and charging activation require separate authorisation.
+
+## Confirmed profile avatar, 2026-11-02
+
+- Profile avatars use a colour generated from the hexadecimal encoding of the player's username. Fold the UTF-8 bytes by XOR into red, green and blue. Pick paper or ink text by the higher contrast.

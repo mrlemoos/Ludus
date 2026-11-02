@@ -12,6 +12,7 @@ import { isLanguage } from '../shared/waitlist';
 import type { Language } from '../shared/waitlist';
 import { Header } from './app';
 import { Button } from './components/button';
+import { ProfileAvatar } from './components/profile-avatar';
 import { languageNames } from './i18n';
 import { readInitialPublicProfile, usePublicProfileMetadata } from './profile-metadata';
 import {
@@ -459,9 +460,12 @@ export function Account() {
           )}
         </nav>
         <div className="profile-identity">
-          <div>
-            <p className="profile-eyebrow">{copy.title}</p>
-            <h1>{profile ? `@${profile.username}` : copy.title}</h1>
+          <div className="profile-heading">
+            {profile && <ProfileAvatar username={profile.username} />}
+            <div>
+              <p className="profile-eyebrow">{copy.title}</p>
+              <h1>{profile ? `@${profile.username}` : copy.title}</h1>
+            </div>
           </div>
           {profile && <ShareProfile username={profile.username} language={language} />}
         </div>

@@ -6,6 +6,7 @@ import type {
 } from '../shared/public-profile';
 import type { Language } from '../shared/waitlist';
 import { Button } from './components/button';
+import { ProfileAvatar } from './components/profile-avatar';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
@@ -174,11 +175,7 @@ interface ActivityGridProps {
   privateActivity?: boolean;
 }
 
-export function ActivityGrid({
-  activity,
-  language,
-  privateActivity = false,
-}: ActivityGridProps) {
+export function ActivityGrid({ activity, language, privateActivity = false }: ActivityGridProps) {
   const copy = profileCopy[language];
   const grid = useRef<HTMLDivElement>(null);
   const today = activity.today ?? new Date().toISOString().slice(0, 10);
@@ -355,7 +352,10 @@ export function PublicProfilePage({
           <Link to="/account">{text.account}</Link>
         </nav>
         <div className="profile-identity">
-          <h1>@{data?.username ?? username}</h1>
+          <div className="profile-heading">
+            <ProfileAvatar username={data?.username ?? username} />
+            <h1>@{data?.username ?? username}</h1>
+          </div>
           {data && <ShareProfile username={data.username} language={language} />}
         </div>
         {missing ? (
