@@ -4,23 +4,28 @@ import { invitations, matches } from './schema';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 
-function json(data: unknown, status = 200) { return Response.json(data, { status, headers: { 'Cache-Control': 'no-store' } }); }
+function json(data: unknown, status = 200) {
+  return Response.json(data, { status, headers: { 'Cache-Control': 'no-store' } });
+}
 export async function gameApi(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   if (
     !['/api/me', '/api/dev/sign-in', '/api/games'].includes(url.pathname) &&
     !url.pathname.startsWith('/api/auth/') &&
     !/^\/api\/games\/[0-9a-f-]{36}(\/socket)?$/.test(url.pathname)
-  )
-    {return json({ error: 'not_found' }, 404);}
+  ) {
+    return json({ error: 'not_found' }, 404);
+  }
   if (request.method !== 'GET') {
     if (
       request.headers.get('Origin') !== url.origin ||
       request.headers.get('Sec-Fetch-Site') === 'cross-site'
-    )
-      {return json({ error: 'forbidden' }, 403);}
-    if (Number(request.headers.get('Content-Length')) > 4096)
-      {return json({ error: 'too_large' }, 413);}
+    ) {
+      return json({ error: 'forbidden' }, 403);
+    }
+    if (Number(request.headers.get('Content-Length')) > 4096) {
+      return json({ error: 'too_large' }, 413);
+    }
   }
   try {
     if (url.pathname === '/api/me' && request.method === 'GET') {
@@ -31,7 +36,9 @@ export async function gameApi(request: Request, env: Env): Promise<Response> {
       });
     }
     if (url.pathname === '/api/dev/sign-in' && request.method === 'POST') {
-      if (!localDevelopment(request, env)) {return json({ error: 'not_found' }, 404);}
+      if (!localDevelopment(request, env)) {
+        return json({ error: 'not_found' }, 404);
+      }
       let link: string | undefined;
       const auth = authFor(request, env, (url) => {
         link = url;
@@ -39,14 +46,18 @@ export async function gameApi(request: Request, env: Env): Promise<Response> {
       // Two fixed seeded identities allow real multiplayer checks; arbitrary email input is forbidden.
       const body = await boundedJson(request);
       const identity = body && typeof body === 'object' && 'account' in body ? body.account : 'leo';
-      if (identity !== 'leo' && identity !== 'friend') {return json({ error: 'invalid' }, 400);}
+      if (identity !== 'leo' && identity !== 'friend') {
+        return json({ error: 'invalid' }, 400);
+      }
       const email = identity === 'friend' ? 'ludus-friend@example.test' : 'leo.lemos.ds@icloud.com';
       const invited = await drizzle(env.DB)
         .select()
         .from(invitations)
         .where(eq(invitations.email, email))
         .get();
-      if (!invited) {return json({ error: 'seed_required' }, 409);}
+      if (!invited) {
+        return json({ error: 'seed_required' }, 409);
+      }
       await auth.api.signInMagicLink({
         body: {
           email,
@@ -60,12 +71,15 @@ export async function gameApi(request: Request, env: Env): Promise<Response> {
     if (url.pathname.startsWith('/api/auth/')) {
       if (request.method === 'POST') {
         const body = await boundedJson(request);
-        if (!body || typeof body !== 'object') {return json({ error: 'invalid' }, 400);}
+        if (!body || typeof body !== 'object') {
+          return json({ error: 'invalid' }, 400);
+        }
         if (
           url.pathname === '/api/auth/sign-in/magic-link' &&
           (!('adult' in body) || body.adult !== true)
-        )
-          {return json({ error: 'adult_confirmation_required' }, 400);}
+        ) {
+          return json({ error: 'adult_confirmation_required' }, 400);
+        }
         const headers = new Headers(request.headers);
         headers.delete('Content-Length');
         return authFor(request, env).handler(
@@ -75,30 +89,38 @@ export async function gameApi(request: Request, env: Env): Promise<Response> {
       return authFor(request, env).handler(request);
     }
     const session = await authFor(request, env).api.getSession({ headers: request.headers });
-    if (!session) {return json({ error: 'unauthorised' }, 401);}
+    if (!session) {
+      return json({ error: 'unauthorised' }, 401);
+    }
     const owner = session.user.id;
     if (
       await env.DB.prepare('SELECT user_id FROM account_deletions WHERE user_id=?')
         .bind(owner)
         .first()
-    )
-      {return json({ error: 'account_deleted' }, 403);}
+    ) {
+      return json({ error: 'account_deleted' }, 403);
+    }
     const db = drizzle(env.DB);
     if (url.pathname === '/api/games') {
-      if (request.method === 'GET')
-        {return json(
+      if (request.method === 'GET') {
+        return json(
           await db
             .select()
             .from(matches)
             .where(eq(matches.owner, owner))
             .orderBy(desc(matches.createdAt))
             .limit(30),
-        );}
-      if (request.method !== 'POST') {return json({ error: 'method' }, 405);}
+        );
+      }
+      if (request.method !== 'POST') {
+        return json({ error: 'method' }, 405);
+      }
       const profile = await env.DB.prepare('SELECT user_id FROM player_profiles WHERE user_id=?')
         .bind(owner)
         .first();
-      if (!profile) {return json({ error: 'onboarding_required' }, 403);}
+      if (!profile) {
+        return json({ error: 'onboarding_required' }, 403);
+      }
       const input = await boundedJson(request);
       if (
         !input ||
@@ -110,8 +132,9 @@ export async function gameApi(request: Request, env: Env): Promise<Response> {
         ![1, 2, 3, 4].includes(input.difficulty) ||
         !('colour' in input) ||
         !['w', 'b'].includes(String(input.colour))
-      )
-        {return json({ error: 'invalid' }, 400);}
+      ) {
+        return json({ error: 'invalid' }, 400);
+      }
       // Resume an unfinished game instead of silently abandoning it.
       const active = await db
         .select()
@@ -124,7 +147,9 @@ export async function gameApi(request: Request, env: Env): Promise<Response> {
         const current = await env.MATCHES.getByName(active.id).read(owner);
         if (!current || !current.game.result) {
           await env.MATCHMAKING.getByName('beta').reserveComputer(owner, active.id);
-          if (current) {return json(current);}
+          if (current) {
+            return json(current);
+          }
           const recovered = await env.MATCHES.getByName(active.id).initialise(
             active.id,
             owner,
@@ -162,10 +187,14 @@ export async function gameApi(request: Request, env: Env): Promise<Response> {
       return json({ game, serverNow: Date.now() });
     }
     const match = /^\/api\/games\/([0-9a-f-]{36})(\/socket)?$/.exec(url.pathname);
-    if (!match) {return json({ error: 'not_found' }, 404);}
+    if (!match) {
+      return json({ error: 'not_found' }, 404);
+    }
     const stub = env.MATCHES.getByName(match[1]);
     if (match[2]) {
-      if (request.headers.get('Origin') !== url.origin) {return json({ error: 'forbidden' }, 403);}
+      if (request.headers.get('Origin') !== url.origin) {
+        return json({ error: 'forbidden' }, 403);
+      }
       return stub.fetch(
         new Request(request.url, { headers: { Upgrade: 'websocket', 'X-Player': owner } }),
       );
@@ -174,7 +203,9 @@ export async function gameApi(request: Request, env: Env): Promise<Response> {
       const current = await stub.read(owner);
       return current ? json(current) : json({ error: 'not_found' }, 404);
     }
-    if (request.method !== 'POST') {return json({ error: 'method' }, 405);}
+    if (request.method !== 'POST') {
+      return json({ error: 'method' }, 405);
+    }
     const result = await stub.act(owner, await boundedJson(request));
     return json(result, 'error' in result ? 409 : 200);
   } catch (error) {
@@ -186,14 +217,20 @@ export async function gameApi(request: Request, env: Env): Promise<Response> {
   }
 }
 async function boundedJson(request: Request): Promise<unknown> {
-  if (request.headers.get('Content-Type')?.split(';')[0] !== 'application/json') {return null;}
+  if (request.headers.get('Content-Type')?.split(';')[0] !== 'application/json') {
+    return null;
+  }
   const reader = request.body?.getReader();
-  if (!reader) {return null;}
+  if (!reader) {
+    return null;
+  }
   const bytes = new Uint8Array(4096);
   let size = 0;
   while (true) {
     const { done, value } = await reader.read();
-    if (done) {break;}
+    if (done) {
+      break;
+    }
     if (size + value.length > bytes.length) {
       await reader.cancel();
       return null;

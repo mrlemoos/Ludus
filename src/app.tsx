@@ -134,7 +134,7 @@ export function App() {
       });
       if (!response.ok) {
         setError(
-          response.status === 429 ? 'limited' : (response.status === 400 ? 'invalid' : 'unavailable'),
+          response.status === 429 ? 'limited' : response.status === 400 ? 'invalid' : 'unavailable',
         );
         setState('idle');
         return;

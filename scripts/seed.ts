@@ -3,15 +3,19 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
 const vars = existsSync('.dev.vars') ? readFileSync('.dev.vars', 'utf8') : '';
-if (!/^LOCAL_DEV=/m.test(vars)) {writeFileSync('.dev.vars', `${vars}\nLOCAL_DEV="true"\n`);}
-if (!/^OPERATOR_IDS=/m.test(readFileSync('.dev.vars', 'utf8')))
-  {writeFileSync('.dev.vars', `${readFileSync('.dev.vars', 'utf8')}OPERATOR_IDS="local-leo"\n`);}
+if (!/^LOCAL_DEV=/m.test(vars)) {
+  writeFileSync('.dev.vars', `${vars}\nLOCAL_DEV="true"\n`);
+}
+if (!/^OPERATOR_IDS=/m.test(readFileSync('.dev.vars', 'utf8'))) {
+  writeFileSync('.dev.vars', `${readFileSync('.dev.vars', 'utf8')}OPERATOR_IDS="local-leo"\n`);
+}
 const configured = readFileSync('.dev.vars', 'utf8');
-if (!/^BETTER_AUTH_SECRET=/m.test(configured))
-  {writeFileSync(
+if (!/^BETTER_AUTH_SECRET=/m.test(configured)) {
+  writeFileSync(
     '.dev.vars',
     `${configured}BETTER_AUTH_SECRET="${randomBytes(32).toString('hex')}"\n`,
-  );}
+  );
+}
 execFileSync('pnpm', ['db:migrate'], { stdio: 'inherit' });
 execFileSync(
   'pnpm',

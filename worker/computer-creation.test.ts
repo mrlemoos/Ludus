@@ -1,18 +1,21 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
 vi.mock('./auth', () => ({
   authFor: () => ({ api: { getSession: async () => ({ user: { id: 'owner' } }) } }),
   localDevelopment: () => false,
 }));
 import { createGame } from '../shared/game';
 import { gameApi } from './game-api';
+
 function fixture() {
   const db = new DatabaseSync(':memory:');
   for (const file of readdirSync('drizzle')
     .filter((name) => name.endsWith('.sql'))
-    .sort())
-    {db.exec(readFileSync(`drizzle/${file}`, 'utf8'));}
+    .sort()) {
+    db.exec(readFileSync(`drizzle/${file}`, 'utf8'));
+  }
   db.prepare(
     "INSERT INTO user(id,name,email,created_at,updated_at) VALUES('owner','Owner','owner@example.test',0,0)",
   ).run();
@@ -32,8 +35,8 @@ function fixture() {
       run: async () => ({ meta: { changes: db.prepare(sql).run(...values).changes } }),
     };
   }
-  const reserveComputer = vi.fn().mockResolvedValue({ reserved: true }),
-    releaseComputer = vi.fn();
+  const reserveComputer = vi.fn().mockResolvedValue({ reserved: true });
+  const releaseComputer = vi.fn();
   const stub = {
     read: vi.fn().mockResolvedValue(null),
     initialise: vi.fn(async (id, owner, control, difficulty, colour) =>
@@ -47,11 +50,13 @@ function fixture() {
   } as unknown as Env;
   return { db, stub, env, reserveComputer, releaseComputer };
 }
-function request(control = '10+5', difficulty = 4) { return new Request('https://ludus.test/api/games', {
+function request(control = '10+5', difficulty = 4) {
+  return new Request('https://ludus.test/api/games', {
     method: 'POST',
     headers: { Origin: 'https://ludus.test', 'Content-Type': 'application/json' },
     body: JSON.stringify({ control, difficulty, colour: 'b' }),
-  }); }
+  });
+}
 afterEach(() => vi.restoreAllMocks());
 describe('computer creation recovery', () => {
   it('resumes the same persisted creation settings after interrupted durable initialisation', async () => {
@@ -65,6 +70,7 @@ describe('computer creation recovery', () => {
     expect(f.stub.initialise).toHaveBeenLastCalledWith(persisted.id, 'owner', '10+5', 4, 'b');
     expect(f.db.prepare('SELECT count(*) AS count FROM matches').get()).toEqual({ count: 1 });
   });
+
   it('blocks a late creation after deletion and releases its coordinator reservation', async () => {
     const f = fixture();
     f.reserveComputer.mockImplementation(async () => {
@@ -73,7 +79,7 @@ describe('computer creation recovery', () => {
     });
     expect((await gameApi(request(), f.env)).status).toBe(403);
     expect(f.stub.initialise).not.toHaveBeenCalled();
-    expect(f.releaseComputer).toHaveBeenCalledOnce();
+    expect(f.releaseComputer).toHaveBeenCalledTimes(1);
     expect(f.db.prepare('SELECT count(*) AS count FROM matches').get()).toEqual({ count: 0 });
   });
 });

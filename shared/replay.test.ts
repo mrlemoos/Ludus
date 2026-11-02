@@ -3,10 +3,12 @@ import { replayMove, replayPosition, savedReplay, stepReplay } from './replay';
 import { Chess } from 'chess.js';
 import { describe, expect, it } from 'vitest';
 
-function finished(moves = ['e4', 'e5', 'Nf3', 'Nc6']): Pick<Game, 'moves' | 'result'>  { return ({
-  moves,
-  result: { winner: 'b', reason: 'resignation' },
-}); }
+function finished(moves = ['e4', 'e5', 'Nf3', 'Nc6']): Pick<Game, 'moves' | 'result'> {
+  return {
+    moves,
+    result: { winner: 'b', reason: 'resignation' },
+  };
+}
 
 describe('private replay variations', () => {
   it('branches from a saved position without mutating recorded moves or results', () => {

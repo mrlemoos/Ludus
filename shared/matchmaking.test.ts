@@ -2,15 +2,17 @@ import { canAcceptAI, matchingOpponent, ratingTolerance } from './matchmaking';
 import type { QueueEntry } from './matchmaking';
 import { describe, expect, it } from 'vitest';
 
-function entry(changes: Partial<QueueEntry> = {}): QueueEntry  { return ({
-  user: 'one',
-  control: '5+3',
-  rated: true,
-  rating: 1500,
-  joinedAt: 0,
-  token: 'token',
-  ...changes,
-}); }
+function entry(changes: Partial<QueueEntry> = {}): QueueEntry {
+  return {
+    user: 'one',
+    control: '5+3',
+    rated: true,
+    rating: 1500,
+    joinedAt: 0,
+    token: 'token',
+    ...changes,
+  };
+}
 describe('public matchmaking policy', () => {
   it('widens tolerance at exact fifteen-second boundaries up to six hundred', () => {
     expect(ratingTolerance(14_999)).toBe(200);

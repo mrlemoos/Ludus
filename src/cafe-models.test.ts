@@ -4,11 +4,13 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 const models = createCafeModels();
 
-afterAll(() =>{ 
+afterAll(() => {
   Object.values(models)
     .flat()
-    .forEach(({ geometry }) => geometry.dispose()); },
-);
+    .forEach(({ geometry }) => {
+      geometry.dispose();
+    });
+});
 
 describe('café model geometry', () => {
   for (const [name, parts] of Object.entries(models)) {
@@ -20,14 +22,15 @@ describe('café model geometry', () => {
         expect(position.count % 3).toBe(0);
         expect(normal.count).toBe(position.count);
         expect(uv.count).toBe(position.count);
-        for (const attribute of [position, normal, uv])
-          {expect(Array.from(attribute.array).every(Number.isFinite)).toBe(true);}
+        for (const attribute of [position, normal, uv]) {
+          expect([...attribute.array].every(Number.isFinite)).toBe(true);
+        }
         geometry.computeBoundingBox();
         bounds.union(geometry.boundingBox!);
       }
       // Mirror hangs at 2.2 m; coffee machine stands on the 1.13 m counter.
       bounds.translate(
-        new Vector3(0, name === 'mirror' ? 2.2 : (name === 'espressoMachine' ? 1.13 : 0), 0),
+        new Vector3(0, name === 'mirror' ? 2.2 : name === 'espressoMachine' ? 1.13 : 0, 0),
       );
       expect(bounds.min.y).toBeGreaterThanOrEqual(-0.001);
       expect(bounds.max.y).toBeLessThan(3.85);

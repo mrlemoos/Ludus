@@ -20,7 +20,9 @@ describe('free cosmetics', () => {
     { board: 'marble' },
     { board: 'external-url', pieces: 'wood' },
     { board: 'wood', pieces: 'unknown' },
-  ])('rejects unsupported appearance %j', (value) =>{  expect(parseAppearance(value)).toBeNull(); });
+  ])('rejects unsupported appearance %j', (value) => {
+    expect(parseAppearance(value)).toBeNull();
+  });
 
   it('accepts only catalogue entries with complete material definitions', () => {
     expect(parseAppearance({ board: 'walnut', pieces: 'ebony', owner: 'forged' })).toEqual({

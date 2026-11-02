@@ -73,8 +73,9 @@ test('plays Stockfish, recovers accepted moves, resigns, replays and downloads P
 }) => {
   let historyReads = 0;
   page.on('request', (request) => {
-    if (request.method() === 'GET' && new URL(request.url()).pathname === '/api/games')
-      {historyReads++;}
+    if (request.method() === 'GET' && new URL(request.url()).pathname === '/api/games') {
+      historyReads++;
+    }
   });
   await signIn(page);
   await finishActive(page);
@@ -124,7 +125,9 @@ test('server rejects illegal/stale actions and foreign sessions; finalises check
   await expect(page.getByRole('button', { name: 'Resign', exact: true })).toBeEnabled();
   const id = new URL(page.url()).searchParams.get('game');
   const path = `/api/games/${id}`;
-  function post(data: unknown) { return page.request.post(path, { data, headers: { Origin: baseURL! } }); }
+  function post(data: unknown) {
+    return page.request.post(path, { data, headers: { Origin: baseURL! } });
+  }
   expect((await post({ type: 'move', from: 'e2', to: 'e5', revision: 0 })).status()).toBe(409);
   expect((await post({ type: 'move', from: 'e7', to: 'e5', revision: 0 })).status()).toBe(409);
   const moves = ['f2f3', 'e7e5', 'g2g4', 'd8h4'];
@@ -133,8 +136,9 @@ test('server rejects illegal/stale actions and foreign sessions; finalises check
     expect(
       (await post({ type: 'move', from: uci.slice(0, 2), to: uci.slice(2), revision })).ok(),
     ).toBe(true);
-    if (!revision)
-      {expect((await post({ type: 'move', from: 'e7', to: 'e5', revision: 0 })).status()).toBe(409);}
+    if (!revision) {
+      expect((await post({ type: 'move', from: 'e7', to: 'e5', revision: 0 })).status()).toBe(409);
+    }
   }
   await expect(page.getByRole('heading', { name: 'Lucía won · Checkmate' })).toBeVisible();
   const finished = await page.request.get(path).then((r) => r.json());
@@ -301,7 +305,7 @@ test('2D board and graphics fallback keep every square clear of player overlays'
   await page.evaluate(() => {
     const original = HTMLCanvasElement.prototype.getContext;
     Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
-      value (this: HTMLCanvasElement, kind: string, options?: unknown) {
+      value(this: HTMLCanvasElement, kind: string, options?: unknown) {
         return kind.startsWith('webgl') ? null : original.call(this, kind, options);
       },
     });

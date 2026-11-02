@@ -19,7 +19,7 @@ import {
 } from './stripe';
 import type Stripe from 'stripe';
 
-type BillingAccount = {
+interface BillingAccount {
   owner: string;
   customer: string | null;
   generation: string;
@@ -27,9 +27,14 @@ type BillingAccount = {
   checkout_created_at: number | null;
   checkout_trial_expires_at: number | null;
   checkout_language: Language | null;
-};
-export type BillingDependencies = { stripe?: Stripe; now?: () => number };
-function idOf(value: string | { id: string } | null | undefined) { return typeof value === 'string' ? value : value?.id; }
+}
+export interface BillingDependencies {
+  stripe?: Stripe;
+  now?: () => number;
+}
+function idOf(value: string | { id: string } | null | undefined) {
+  return typeof value === 'string' ? value : value?.id;
+}
 const closed = new Set(['canceled', 'incomplete_expired']);
 
 async function account(db: D1Database, owner: string) {
@@ -50,7 +55,9 @@ async function locked<T>(
     .prepare('UPDATE billing_accounts SET lease=?,lease_until=? WHERE owner=? AND lease_until<=?')
     .bind(lease, now + 180_000, owner, now)
     .run();
-  if (!result.meta.changes) {throw new Error('billing_busy');}
+  if (!result.meta.changes) {
+    throw new Error('billing_busy');
+  }
   const started = performance.now();
   async function fence() {
     const current = now + Math.floor(performance.now() - started);
@@ -60,7 +67,9 @@ async function locked<T>(
       )
       .bind(current + 180_000, owner, lease, current)
       .run();
-    if (!touched.meta.changes) {throw new Error('billing_lease_lost');}
+    if (!touched.meta.changes) {
+      throw new Error('billing_lease_lost');
+    }
   }
   try {
     return await work(fence);
@@ -106,25 +115,32 @@ export async function billingApi(
     !['/api/billing/checkout', '/api/billing/portal', '/api/billing/review-pack/checkout'].includes(
       path,
     )
-  )
-    {return apiJson({ error: 'not_found' }, 404);}
+  ) {
+    return apiJson({ error: 'not_found' }, 404);
+  }
   if (
     request.headers.get('Origin') !== new URL(request.url).origin ||
     request.headers.get('Sec-Fetch-Site') === 'cross-site'
-  )
-    {return apiJson({ error: 'forbidden' }, 403);}
-  if (path === '/api/billing/checkout')
-    {return apiJson({ error: 'subscription_purchase_unavailable' }, 410);}
-  if (path === '/api/billing/review-pack/checkout')
-    {return reviewPackCheckout(env, owner, profile.language, deps);}
-  if (path.endsWith('/checkout') && (await hasComplimentaryPlus(env.DB, owner)))
-    {return apiJson({ error: 'complimentary_plus_active' }, 409);}
-  if (path.endsWith('/checkout') && !billingEnabled(env))
-    {return apiJson({ error: 'billing_unavailable' }, 503);}
-  if (path.endsWith('/portal') && !(await account(env.DB, owner))?.customer)
-    {return apiJson({ error: 'no_subscription' }, 409);}
-  const stripe = deps.stripe ?? stripeFor(env),
-    now = deps.now?.() ?? Date.now();
+  ) {
+    return apiJson({ error: 'forbidden' }, 403);
+  }
+  if (path === '/api/billing/checkout') {
+    return apiJson({ error: 'subscription_purchase_unavailable' }, 410);
+  }
+  if (path === '/api/billing/review-pack/checkout') {
+    return reviewPackCheckout(env, owner, profile.language, deps);
+  }
+  if (path.endsWith('/checkout') && (await hasComplimentaryPlus(env.DB, owner))) {
+    return apiJson({ error: 'complimentary_plus_active' }, 409);
+  }
+  if (path.endsWith('/checkout') && !billingEnabled(env)) {
+    return apiJson({ error: 'billing_unavailable' }, 503);
+  }
+  if (path.endsWith('/portal') && !(await account(env.DB, owner))?.customer) {
+    return apiJson({ error: 'no_subscription' }, 409);
+  }
+  const stripe = deps.stripe ?? stripeFor(env);
+  const now = deps.now?.() ?? Date.now();
   await env.DB.prepare('INSERT OR IGNORE INTO billing_accounts(owner,generation) VALUES (?,?)')
     .bind(owner, crypto.randomUUID())
     .run();
@@ -134,8 +150,9 @@ export async function billingApi(
         await env.DB.prepare('SELECT user_id FROM account_deletions WHERE user_id=?')
           .bind(owner)
           .first()
-      )
-        {return apiJson({ error: 'account_deleted' }, 403);}
+      ) {
+        return apiJson({ error: 'account_deleted' }, 403);
+      }
       let row = (await account(env.DB, owner))!;
       if (row.checkout_created_at === null) {
         await env.DB.prepare(
@@ -146,9 +163,12 @@ export async function billingApi(
         row = (await account(env.DB, owner))!;
       }
       if (!row.customer) {
-        if (path.endsWith('/portal')) {return apiJson({ error: 'no_subscription' }, 409);}
-        if (now - row.checkout_created_at! >= 23 * 3_600_000)
-          {return apiJson({ error: 'billing_reconciling' }, 409);}
+        if (path.endsWith('/portal')) {
+          return apiJson({ error: 'no_subscription' }, 409);
+        }
+        if (now - row.checkout_created_at! >= 23 * 3_600_000) {
+          return apiJson({ error: 'billing_reconciling' }, 409);
+        }
         const customer = await stripe.customers.create(
           {},
           { idempotencyKey: `ludus-customer-${row.generation}` },
@@ -176,19 +196,23 @@ export async function billingApi(
       if (
         subscriptions.has_more ||
         subscriptions.data.some((subscription) => !closed.has(subscription.status))
-      )
-        {return apiJson({ error: 'subscription_exists' }, 409);}
+      ) {
+        return apiJson({ error: 'subscription_exists' }, 409);
+      }
       if (row.checkout) {
         const previous = await stripe.checkout.sessions.retrieve(row.checkout);
-        if (previous.status === 'open') {return apiJson({ url: previous.url });}
+        if (previous.status === 'open') {
+          return apiJson({ url: previous.url });
+        }
         if (
           previous.status === 'complete' &&
           !subscriptions.data.some(
             (subscription) =>
               subscription.id === idOf(previous.subscription) && closed.has(subscription.status),
           )
-        )
-          {return apiJson({ error: 'billing_reconciling' }, 409);}
+        ) {
+          return apiJson({ error: 'billing_reconciling' }, 409);
+        }
         await env.DB.prepare(
           'UPDATE billing_accounts SET generation=?,checkout=NULL,checkout_created_at=NULL,checkout_trial_expires_at=NULL,checkout_language=NULL WHERE owner=?',
         )
@@ -205,10 +229,11 @@ export async function billingApi(
         row = (await account(env.DB, owner))!;
       }
       // After Stripe's idempotency retention window, an uncertain create needs reconciliation, never a new charge attempt.
-      if (now - row.checkout_created_at! >= 23 * 3_600_000)
-        {return apiJson({ error: 'billing_reconciling' }, 409);}
+      if (now - row.checkout_created_at! >= 23 * 3_600_000) {
+        return apiJson({ error: 'billing_reconciling' }, 409);
+      }
       const randomLetters = row.generation
-        .replace(/[^a-f]/g, '')
+        .replaceAll(/[^a-f]/g, '')
         .padEnd(8, 'a')
         .slice(0, 8);
       const params = checkoutParams(
@@ -223,13 +248,16 @@ export async function billingApi(
         await env.DB.prepare('SELECT user_id FROM account_deletions WHERE user_id=?')
           .bind(owner)
           .first()
-      )
-        {return apiJson({ error: 'account_deleted' }, 403);}
+      ) {
+        return apiJson({ error: 'account_deleted' }, 403);
+      }
       const session = await stripe.checkout.sessions.create(params, {
         idempotencyKey: `ludus-checkout-${row.generation}`,
       });
       await fence();
-      if (!session.livemode || !session.url) {throw new Error('wrong_environment');}
+      if (!session.livemode || !session.url) {
+        throw new Error('wrong_environment');
+      }
       await env.DB.prepare('UPDATE billing_accounts SET checkout=? WHERE owner=?')
         .bind(session.id, owner)
         .run();
@@ -238,7 +266,9 @@ export async function billingApi(
           .bind(owner)
           .first()
       ) {
-        if (session.status === 'open') {await stripe.checkout.sessions.expire(session.id);}
+        if (session.status === 'open') {
+          await stripe.checkout.sessions.expire(session.id);
+        }
         return apiJson({ error: 'account_deleted' }, 403);
       }
       return apiJson({ url: session.url });
@@ -254,10 +284,11 @@ async function reviewPackCheckout(
   language: Language,
   deps: BillingDependencies,
 ) {
-  if (!billingEnabled(env) || !env.STRIPE_REVIEW_PACK_PRICE_ID)
-    {return apiJson({ error: 'billing_unavailable' }, 503);}
-  const now = deps.now?.() ?? Date.now(),
-    stripe = deps.stripe ?? stripeFor(env);
+  if (!billingEnabled(env) || !env.STRIPE_REVIEW_PACK_PRICE_ID) {
+    return apiJson({ error: 'billing_unavailable' }, 503);
+  }
+  const now = deps.now?.() ?? Date.now();
+  const stripe = deps.stripe ?? stripeFor(env);
   await env.DB.prepare('INSERT OR IGNORE INTO billing_accounts(owner,generation) VALUES (?,?)')
     .bind(owner, crypto.randomUUID())
     .run();
@@ -267,8 +298,9 @@ async function reviewPackCheckout(
         await env.DB.prepare('SELECT user_id FROM account_deletions WHERE user_id=?')
           .bind(owner)
           .first()
-      )
-        {return apiJson({ error: 'account_deleted' }, 403);}
+      ) {
+        return apiJson({ error: 'account_deleted' }, 403);
+      }
       const billing = (await account(env.DB, owner))!;
       const latest = await env.DB.prepare(
         "SELECT * FROM review_pack_checkouts WHERE owner=? AND state='pending' ORDER BY created_at DESC,id DESC LIMIT 1",
@@ -277,31 +309,39 @@ async function reviewPackCheckout(
         .first<{ id: string; generation: string; checkout: string | null; created_at: number }>();
       if (latest?.checkout) {
         const existing = await stripe.checkout.sessions.retrieve(latest.checkout);
-        if (existing.status === 'open' && existing.url) {return apiJson({ url: existing.url });}
+        if (existing.status === 'open' && existing.url) {
+          return apiJson({ url: existing.url });
+        }
         if (
           existing.status === 'complete' &&
           !(await env.DB.prepare('SELECT id FROM review_credit_packs WHERE checkout=?')
             .bind(existing.id)
             .first())
-        )
-          {return apiJson({ error: 'billing_reconciling' }, 409);}
-        if (existing.status === 'expired')
-          {await env.DB.prepare(
+        ) {
+          return apiJson({ error: 'billing_reconciling' }, 409);
+        }
+        if (existing.status === 'expired') {
+          await env.DB.prepare(
             "UPDATE review_pack_checkouts SET state='failed' WHERE id=? AND state='pending'",
           )
             .bind(latest.id)
-            .run();}
+            .run();
+        }
       }
       let attempt = latest;
       if (attempt?.checkout) {
         attempt = null;
       } else if (attempt && now - attempt.created_at >= 23 * 3_600_000) {
-        if (!billing.customer) {return apiJson({ error: 'billing_reconciling' }, 409);}
+        if (!billing.customer) {
+          return apiJson({ error: 'billing_reconciling' }, 409);
+        }
         const sessions = await stripe.checkout.sessions.list({
           customer: billing.customer,
           limit: 100,
         });
-        if (sessions.has_more) {return apiJson({ error: 'billing_reconciling' }, 409);}
+        if (sessions.has_more) {
+          return apiJson({ error: 'billing_reconciling' }, 409);
+        }
         const recovered = sessions.data.find(
           (session) => session.client_reference_id === attempt!.id,
         );
@@ -310,20 +350,24 @@ async function reviewPackCheckout(
           await env.DB.prepare('UPDATE review_pack_checkouts SET checkout=? WHERE id=?')
             .bind(recovered.id, attempt.id)
             .run();
-          if (recovered.status === 'open' && recovered.url) {return apiJson({ url: recovered.url });}
+          if (recovered.status === 'open' && recovered.url) {
+            return apiJson({ url: recovered.url });
+          }
           if (
             recovered.status !== 'expired' &&
             !(await env.DB.prepare('SELECT id FROM review_credit_packs WHERE checkout=?')
               .bind(recovered.id)
               .first())
-          )
-            {return apiJson({ error: 'billing_reconciling' }, 409);}
-          if (recovered.status === 'expired')
-            {await env.DB.prepare(
+          ) {
+            return apiJson({ error: 'billing_reconciling' }, 409);
+          }
+          if (recovered.status === 'expired') {
+            await env.DB.prepare(
               "UPDATE review_pack_checkouts SET state='failed' WHERE id=? AND state='pending'",
             )
               .bind(attempt.id)
-              .run();}
+              .run();
+          }
         }
         attempt = null;
       }
@@ -337,8 +381,9 @@ async function reviewPackCheckout(
           .run();
       }
       if (!billing.customer) {
-        if (now - attempt.created_at >= 23 * 3_600_000)
-          {return apiJson({ error: 'billing_reconciling' }, 409);}
+        if (now - attempt.created_at >= 23 * 3_600_000) {
+          return apiJson({ error: 'billing_reconciling' }, 409);
+        }
         const customer = await stripe.customers.create(
           {},
           { idempotencyKey: `ludus-customer-${billing.generation}` },
@@ -350,7 +395,7 @@ async function reviewPackCheckout(
         billing.customer = customer.id;
       }
       const integrationId = attempt.generation
-        .replace(/[^a-f]/g, '')
+        .replaceAll(/[^a-f]/g, '')
         .padEnd(8, 'a')
         .slice(0, 8);
       const session = await stripe.checkout.sessions.create(
@@ -374,7 +419,9 @@ async function reviewPackCheckout(
         { idempotencyKey: `ludus-review-pack-${attempt.generation}` },
       );
       await fence();
-      if (!session.livemode || !session.url) {throw new Error('wrong_environment');}
+      if (!session.livemode || !session.url) {
+        throw new Error('wrong_environment');
+      }
       await env.DB.prepare('UPDATE review_pack_checkouts SET checkout=? WHERE id=?')
         .bind(session.id, attempt.id)
         .run();
@@ -383,7 +430,9 @@ async function reviewPackCheckout(
           .bind(owner)
           .first()
       ) {
-        if (session.status === 'open') {await stripe.checkout.sessions.expire(session.id);}
+        if (session.status === 'open') {
+          await stripe.checkout.sessions.expire(session.id);
+        }
         return apiJson({ error: 'account_deleted' }, 403);
       }
       return apiJson({ url: session.url });
@@ -418,15 +467,17 @@ async function reconcileCustomer(
 ) {
   if (!row.checkout && row.checkout_created_at !== null) {
     const sessions = await stripe.checkout.sessions.list({ customer: row.customer!, limit: 100 });
-    if (sessions.has_more) {throw new Error('checkout_history_requires_review');}
+    if (sessions.has_more) {
+      throw new Error('checkout_history_requires_review');
+    }
     const session = sessions.data.find((session) => session.client_reference_id === row.generation);
     await fence();
-    if (session)
-      {await db
+    if (session) {
+      await db
         .prepare('UPDATE billing_accounts SET checkout=? WHERE owner=?')
         .bind(session.id, row.owner)
-        .run();}
-    else if (now - row.checkout_created_at >= 24 * 3_600_000) {
+        .run();
+    } else if (now - row.checkout_created_at >= 24 * 3_600_000) {
       // Complete provider lookup proved no session survived the uncertain attempt.
       await db
         .prepare(
@@ -441,13 +492,16 @@ async function reconcileCustomer(
     status: 'all',
     limit: 100,
   });
-  if (subscriptions.has_more) {throw new Error('billing_history_requires_review');}
+  if (subscriptions.has_more) {
+    throw new Error('billing_history_requires_review');
+  }
   for (const subscription of subscriptions.data) {
     if (
       !subscription.livemode ||
       !subscription.items.data.some((item) => item.price.id === liveCatalogue.price)
-    )
-      {continue;}
+    ) {
+      continue;
+    }
     await fence();
     await reconcileSubscription(db, stripe, row.owner, subscription, now, fence);
   }
@@ -461,13 +515,19 @@ async function reconcileReviewPackCheckout(
   now: number,
   fence: () => Promise<void>,
 ): Promise<boolean> {
-  if (eventSession.mode !== 'payment' || !eventSession.client_reference_id) {return false;}
+  if (eventSession.mode !== 'payment' || !eventSession.client_reference_id) {
+    return false;
+  }
   const attempt = await db
     .prepare('SELECT id,owner FROM review_pack_checkouts WHERE id=?')
     .bind(eventSession.client_reference_id)
     .first<{ id: string; owner: string }>();
-  if (!attempt) {return false;}
-  if (!env.STRIPE_REVIEW_PACK_PRICE_ID) {throw new Error('review_pack_catalogue_missing');}
+  if (!attempt) {
+    return false;
+  }
+  if (!env.STRIPE_REVIEW_PACK_PRICE_ID) {
+    throw new Error('review_pack_catalogue_missing');
+  }
   const session = await stripe.checkout.sessions.retrieve(eventSession.id, {
     expand: ['line_items.data.price', 'payment_intent.latest_charge'],
   });
@@ -477,25 +537,34 @@ async function reconcileReviewPackCheckout(
     session.status !== 'complete' ||
     session.mode !== 'payment' ||
     session.client_reference_id !== attempt.id
-  )
-    {throw new Error('review_pack_payment_unverified');}
-  if (session.payment_status !== 'paid') {return false;}
-  if (session.consent?.terms_of_service !== 'accepted')
-    {throw new Error('review_pack_terms_consent_missing');}
-  if (session.currency !== 'eur' || session.amount_total !== REVIEW_PACK_PRICE_EUR_CENTS)
-    {throw new Error('review_pack_payment_unverified');}
+  ) {
+    throw new Error('review_pack_payment_unverified');
+  }
+  if (session.payment_status !== 'paid') {
+    return false;
+  }
+  if (session.consent?.terms_of_service !== 'accepted') {
+    throw new Error('review_pack_terms_consent_missing');
+  }
+  if (session.currency !== 'eur' || session.amount_total !== REVIEW_PACK_PRICE_EUR_CENTS) {
+    throw new Error('review_pack_payment_unverified');
+  }
   const accountRow = await account(db, attempt.owner);
-  if (!accountRow?.customer || idOf(session.customer) !== accountRow.customer)
-    {throw new Error('review_pack_customer_mismatch');}
+  if (!accountRow?.customer || idOf(session.customer) !== accountRow.customer) {
+    throw new Error('review_pack_customer_mismatch');
+  }
   const lines = session.line_items?.data ?? [];
   if (
     lines.length !== 1 ||
     lines[0].quantity !== 1 ||
     idOf(lines[0].price as string | { id: string }) !== env.STRIPE_REVIEW_PACK_PRICE_ID
-  )
-    {throw new Error('review_pack_price_mismatch');}
+  ) {
+    throw new Error('review_pack_price_mismatch');
+  }
   const paymentIntent = idOf(session.payment_intent as string | { id: string } | null);
-  if (!paymentIntent) {throw new Error('review_pack_payment_missing');}
+  if (!paymentIntent) {
+    throw new Error('review_pack_payment_missing');
+  }
   const expandedIntent =
     session.payment_intent && typeof session.payment_intent !== 'string'
       ? session.payment_intent
@@ -507,7 +576,9 @@ async function reconcileReviewPackCheckout(
     )
     .bind(session.id, attempt.id, attempt.owner, session.id)
     .run();
-  if (!linked.meta.changes) {throw new Error('review_pack_checkout_link_conflict');}
+  if (!linked.meta.changes) {
+    throw new Error('review_pack_checkout_link_conflict');
+  }
   const charge = idOf(expandedIntent.latest_charge as string | { id: string } | null);
   await fence();
   await addVerifiedReviewPack(db, {
@@ -547,7 +618,9 @@ async function reconcileReviewPackCheckouts(
     )
     .bind(row.owner)
     .all<{ id: string; checkout: string | null; created_at: number }>();
-  if (!attempts.results.length) {return;}
+  if (attempts.results.length === 0) {
+    return;
+  }
   if (!row.customer) {
     const latestCreated = Math.min(...attempts.results.map((attempt) => attempt.created_at));
     if (now - latestCreated >= 23 * 3_600_000) {
@@ -566,9 +639,11 @@ async function reconcileReviewPackCheckouts(
     row.customer = customer.id;
   }
   const withoutSession = attempts.results.filter((attempt) => !attempt.checkout);
-  if (withoutSession.length) {
+  if (withoutSession.length > 0) {
     const sessions = await stripe.checkout.sessions.list({ customer: row.customer, limit: 100 });
-    if (sessions.has_more) {throw new Error('review_pack_checkout_history_requires_review');}
+    if (sessions.has_more) {
+      throw new Error('review_pack_checkout_history_requires_review');
+    }
     for (const attempt of withoutSession) {
       const found = sessions.data.find((session) => session.client_reference_id === attempt.id);
       if (found) {
@@ -651,7 +726,9 @@ async function applyReviewPackWebhookRisk(
     });
     charge = idOf(intent.latest_charge as string | { id: string } | null);
   }
-  if (!charge) {return;}
+  if (!charge) {
+    return;
+  }
   const initialCharge = await stripe.charges.retrieve(charge);
   paymentIntent = idOf(initialCharge.payment_intent) ?? paymentIntent;
   const knownPack = await db
@@ -660,16 +737,22 @@ async function applyReviewPackWebhookRisk(
     .first<{ owner: string }>();
   let riskOwner = knownPack?.owner;
   if (!riskOwner) {
-    if (!paymentIntent) {return;}
+    if (!paymentIntent) {
+      return;
+    }
     const intent = await stripe.paymentIntents.retrieve(paymentIntent);
     const attemptId = intent.metadata?.checkout_attempt;
-    if (!attemptId) {return;}
+    if (!attemptId) {
+      return;
+    }
     const knownAttempt = await db
       .prepare(`SELECT r.owner FROM review_pack_checkouts r JOIN billing_accounts b ON b.owner=r.owner
       WHERE r.id=? AND b.customer=?`)
       .bind(attemptId, idOf(initialCharge.customer) ?? '')
       .first<{ owner: string }>();
-    if (!knownAttempt) {return;}
+    if (!knownAttempt) {
+      return;
+    }
     riskOwner = knownAttempt.owner;
   }
   await locked(db, riskOwner, now, async (fence) => {
@@ -685,14 +768,18 @@ async function applyReviewPackWebhookRisk(
     let lostDispute = false;
     if (event.type.startsWith('charge.dispute.')) {
       const disputes = await stripe.disputes.list({ charge: charge!, limit: 100 });
-      if (disputes.has_more) {throw new Error('review_pack_dispute_history_requires_review');}
+      if (disputes.has_more) {
+        throw new Error('review_pack_dispute_history_requires_review');
+      }
       lostDispute = disputes.data.some((dispute) => dispute.status === 'lost');
       const pending = disputes.data.some(
         (dispute) => !['won', 'lost', 'warning_closed'].includes(dispute.status),
       );
       frozen = frozen || pending || lostDispute;
     }
-    if (event.type === 'radar.early_fraud_warning.created') {frozen = true;}
+    if (event.type === 'radar.early_fraud_warning.created') {
+      frozen = true;
+    }
     await fence();
     await applyReviewPackRisk(db, {
       charge,
@@ -718,18 +805,26 @@ async function applyReviewPackWebhookRisk(
 }
 
 export async function billingWebhook(request: Request, env: Env, deps: BillingDependencies = {}) {
-  if (request.method !== 'POST') {return apiJson({ error: 'method' }, 405);}
-  if (!env.STRIPE_WEBHOOK_SECRET) {return apiJson({ error: 'billing_unavailable' }, 503);}
+  if (request.method !== 'POST') {
+    return apiJson({ error: 'method' }, 405);
+  }
+  if (!env.STRIPE_WEBHOOK_SECRET) {
+    return apiJson({ error: 'billing_unavailable' }, 503);
+  }
   const now = deps.now?.() ?? Date.now();
   let event: Stripe.Event;
   try {
     const reader = request.body?.getReader();
-    if (!reader) {return apiJson({ error: 'invalid' }, 400);}
+    if (!reader) {
+      return apiJson({ error: 'invalid' }, 400);
+    }
     const chunks: Uint8Array[] = [];
     let size = 0;
     while (true) {
       const { done, value } = await reader.read();
-      if (done) {break;}
+      if (done) {
+        break;
+      }
       size += value.length;
       if (size > 131_072) {
         await reader.cancel();
@@ -749,17 +844,22 @@ export async function billingWebhook(request: Request, env: Env, deps: BillingDe
       env.STRIPE_WEBHOOK_SECRET,
       now,
     );
-    if (!event.livemode) {return apiJson({ error: 'wrong_environment' }, 400);}
+    if (!event.livemode) {
+      return apiJson({ error: 'wrong_environment' }, 400);
+    }
   } catch {
     return apiJson({ error: 'invalid_signature' }, 400);
   }
-  if (!handled.has(event.type)) {return apiJson({ error: 'event_not_configured' }, 400);}
+  if (!handled.has(event.type)) {
+    return apiJson({ error: 'event_not_configured' }, 400);
+  }
   try {
     const previous = await env.DB.prepare('SELECT processed_at FROM billing_events WHERE id=?')
       .bind(event.id)
       .first<{ processed_at: number | null }>();
-    if (previous?.processed_at !== null && previous?.processed_at !== undefined)
-      {return apiJson({ ok: true });}
+    if (previous?.processed_at !== null && previous?.processed_at !== undefined) {
+      return apiJson({ ok: true });
+    }
     await env.DB.prepare('INSERT OR IGNORE INTO billing_events(id,type,received_at) VALUES (?,?,?)')
       .bind(event.id, event.type, now)
       .run();
@@ -778,8 +878,8 @@ export async function billingWebhook(request: Request, env: Env, deps: BillingDe
               .bind(session.client_reference_id)
               .first<{ owner: string }>()
           : null;
-        if (attempt)
-          {await locked(env.DB, attempt.owner, now, async (fence) => {
+        if (attempt) {
+          await locked(env.DB, attempt.owner, now, async (fence) => {
             await reconcileReviewPackCheckout(env.DB, stripe, session, env, now, fence);
             if (
               event.type === 'checkout.session.async_payment_failed' &&
@@ -792,19 +892,24 @@ export async function billingWebhook(request: Request, env: Env, deps: BillingDe
                 .run();
             }
             await fence();
-          });}
+          });
+        }
         await env.DB.prepare('UPDATE billing_events SET processed_at=? WHERE id=?')
           .bind(now, event.id)
           .run();
         return apiJson({ ok: true });
       }
     }
-    if (risk) {await applyReviewPackWebhookRisk(env.DB, stripe, event, now);}
+    if (risk) {
+      await applyReviewPackWebhookRisk(env.DB, stripe, event, now);
+    }
     const customer = risk
       ? await recordRiskEvent(env.DB, stripe, event, now)
       : idOf(resource.customer);
     if (!customer) {
-      if (!risk) {throw new Error('missing_customer');}
+      if (!risk) {
+        throw new Error('missing_customer');
+      }
       await env.DB.prepare('UPDATE billing_events SET processed_at=? WHERE id=?')
         .bind(now, event.id)
         .run();
@@ -825,9 +930,11 @@ export async function billingWebhook(request: Request, env: Env, deps: BillingDe
         await env.DB.prepare('SELECT user_id FROM account_deletions WHERE user_id=?')
           .bind(row.owner)
           .first()
-      )
-        {await cancelCustomer(env.DB, stripe, row, now, fence);}
-      else {await reconcileCustomer(env.DB, stripe, row, now, fence);}
+      ) {
+        await cancelCustomer(env.DB, stripe, row, now, fence);
+      } else {
+        await reconcileCustomer(env.DB, stripe, row, now, fence);
+      }
       await fence();
       await env.DB.prepare('UPDATE billing_events SET processed_at=? WHERE id=?')
         .bind(now, event.id)
@@ -855,8 +962,12 @@ async function cancelCustomer(
       .bind(row.owner)
       .first<{ created_at: number }>();
     const startedAt = row.checkout_created_at ?? packAttempt?.created_at ?? null;
-    if (startedAt === null) {return;}
-    if (now - startedAt >= 23 * 3_600_000) {throw new Error('uncertain_customer_requires_review');}
+    if (startedAt === null) {
+      return;
+    }
+    if (now - startedAt >= 23 * 3_600_000) {
+      throw new Error('uncertain_customer_requires_review');
+    }
     const customer = await stripe.customers.create(
       {},
       { idempotencyKey: `ludus-customer-${row.generation}` },
@@ -881,27 +992,35 @@ async function cancelCustomer(
   }
   // Find uncertain Session creation as well as sessions whose return never reached the app.
   const sessions = await stripe.checkout.sessions.list({ customer: row.customer, limit: 100 });
-  if (sessions.has_more) {throw new Error('checkout_history_requires_review');}
-  for (const session of sessions.data)
-    {if (session.status === 'open') {
+  if (sessions.has_more) {
+    throw new Error('checkout_history_requires_review');
+  }
+  for (const session of sessions.data) {
+    if (session.status === 'open') {
       await fence();
       await stripe.checkout.sessions.expire(session.id);
-    }}
+    }
+  }
   const subscriptions = await stripe.subscriptions.list({
     customer: row.customer,
     status: 'all',
     limit: 100,
   });
-  if (subscriptions.has_more) {throw new Error('subscription_history_requires_review');}
+  if (subscriptions.has_more) {
+    throw new Error('subscription_history_requires_review');
+  }
   for (const subscription of subscriptions.data) {
-    if (!subscription.items.data.some((item) => item.price.id === liveCatalogue.price)) {continue;}
+    if (!subscription.items.data.some((item) => item.price.id === liveCatalogue.price)) {
+      continue;
+    }
     await fence();
     await db
       .prepare('UPDATE billing_subscriptions SET cancel_requested_at=? WHERE id=?')
       .bind(now, subscription.id)
       .run();
-    if (!closed.has(subscription.status))
-      {await stripe.subscriptions.cancel(subscription.id, { prorate: false, invoice_now: false });}
+    if (!closed.has(subscription.status)) {
+      await stripe.subscriptions.cancel(subscription.id, { prorate: false, invoice_now: false });
+    }
   }
 }
 
@@ -933,9 +1052,11 @@ export async function cancelAccountBilling(
 }
 
 export async function reconcileBilling(env: Env, deps: BillingDependencies = {}) {
-  if (!env.STRIPE_API_KEY && !deps.stripe) {return;}
-  const now = deps.now?.() ?? Date.now(),
-    stripe = deps.stripe ?? stripeFor(env);
+  if (!env.STRIPE_API_KEY && !deps.stripe) {
+    return;
+  }
+  const now = deps.now?.() ?? Date.now();
+  const stripe = deps.stripe ?? stripeFor(env);
   // Bounded batches with oldest-first rotation keep scheduled work independent of browser visits.
   const rows = await env.DB.prepare(
     'SELECT * FROM billing_accounts ORDER BY reconciled_at,owner LIMIT 10',
@@ -947,10 +1068,12 @@ export async function reconcileBilling(env: Env, deps: BillingDependencies = {})
           await env.DB.prepare('SELECT user_id FROM account_deletions WHERE user_id=?')
             .bind(row.owner)
             .first()
-        )
-          {await cancelCustomer(env.DB, stripe, row, now, fence);}
-        else {
-          if (row.customer) {await reconcileCustomer(env.DB, stripe, row, now, fence);}
+        ) {
+          await cancelCustomer(env.DB, stripe, row, now, fence);
+        } else {
+          if (row.customer) {
+            await reconcileCustomer(env.DB, stripe, row, now, fence);
+          }
           await reconcileReviewPackCheckouts(env.DB, stripe, env, row, now, fence);
         }
         await fence();

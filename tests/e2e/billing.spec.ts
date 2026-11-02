@@ -49,14 +49,13 @@ const languages = [
   },
 ];
 
-for (const copy of languages)
-  {test(`shows review-credit balance and unavailable checkout in ${copy.language}`, async ({
+for (const copy of languages) {
+  test(`shows review-credit balance and unavailable checkout in ${copy.language}`, async ({
     page,
   }) => {
-    await page.addInitScript(
-      (language) =>{  localStorage.setItem('ludus-language', language); },
-      copy.language,
-    );
+    await page.addInitScript((language) => {
+      localStorage.setItem('ludus-language', language);
+    }, copy.language);
     await page.route('**/api/account', (route) =>
       route.fulfill({ json: { profile, operator: false } }),
     );
@@ -89,10 +88,13 @@ for (const copy of languages)
     );
     await billing.getByRole('button', { name: copy.refresh }).click();
     await expect.poll(() => reads).toBe(2);
-  });}
+  });
+}
 
 test('opens Stripe-hosted Checkout for the fixed review pack', async ({ page }) => {
-  await page.addInitScript(() =>{  localStorage.setItem('ludus-language', 'en-GB'); });
+  await page.addInitScript(() => {
+    localStorage.setItem('ludus-language', 'en-GB');
+  });
   await page.route('**/api/account', (route) =>
     route.fulfill({ json: { profile, operator: false } }),
   );
@@ -130,7 +132,9 @@ test('opens Stripe-hosted Checkout for the fixed review pack', async ({ page }) 
 });
 
 test('captures the review-credit account layout on desktop and mobile', async ({ page }) => {
-  await page.addInitScript(() =>{  localStorage.setItem('ludus-language', 'en-GB'); });
+  await page.addInitScript(() => {
+    localStorage.setItem('ludus-language', 'en-GB');
+  });
   await page.route('**/api/account', (route) =>
     route.fulfill({
       json: {
@@ -171,7 +175,9 @@ test('captures the review-credit account layout on desktop and mobile', async ({
 test('policy pages use the selected launch language and link back to the account', async ({
   page,
 }) => {
-  await page.addInitScript(() =>{  localStorage.setItem('ludus-language', 'fr-FR'); });
+  await page.addInitScript(() => {
+    localStorage.setItem('ludus-language', 'fr-FR');
+  });
   await page.goto('/terms');
   await expect(page.getByRole('heading', { name: 'Conditions d’utilisation' })).toBeVisible();
   await expect(page.getByText(/une analyse IA de bienvenue à vie/)).toBeVisible();
@@ -186,7 +192,9 @@ test('policy pages use the selected launch language and link back to the account
 test('pending deletion offers retry and never claims completion on cancellation failure', async ({
   page,
 }) => {
-  await page.addInitScript(() =>{  localStorage.setItem('ludus-language', 'en-GB'); });
+  await page.addInitScript(() => {
+    localStorage.setItem('ludus-language', 'en-GB');
+  });
   let retries = 0;
   await page.route('**/api/account', async (route) => {
     if (route.request().method() === 'DELETE') {

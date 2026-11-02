@@ -1,13 +1,18 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+
 async function resignActive(page: Page) {
-  const {origin} = new URL(page.url());
+  const { origin } = new URL(page.url());
   const status = await page.request.get('/api/online/status').then((response) => response.json());
-  if (status.status !== 'assigned') {return;}
+  if (status.status !== 'assigned') {
+    return;
+  }
   const snapshot = await page.request
     .get(`/api/online/games/${status.match.id}`)
     .then((response) => response.json());
-  if (!snapshot.game || snapshot.game.result) {return;}
+  if (!snapshot.game || snapshot.game.result) {
+    return;
+  }
   expect(
     (
       await page.request.post(`/api/online/games/${status.match.id}`, {
@@ -56,13 +61,15 @@ test('two accounts play a friend game, reject foreign access, exchange phrases a
     });
     expect(redeemed.ok()).toBe(true);
     const assigned = await redeemed.json();
-      const id = assigned.match.id;
+    const { id } = assigned.match;
     await page.goto(`/online?game=${id}`);
     await friend.goto(`/online?game=${id}`);
     await expect(page.locator('[data-square="e2"]')).toBeVisible();
     await expect(friend.locator('[data-square="e7"]')).toBeVisible();
     const gamePath = `/api/online/games/${id}`;
-    async function state() { return (await page.request.get(gamePath).then((r) => r.json())).game; }
+    async function state() {
+      return (await page.request.get(gamePath).then((r) => r.json())).game;
+    }
     await expect.poll(async () => (await state()).disconnected).toEqual({ w: false, b: false });
     expect((await foreignContext.request.get(`${origin}${gamePath}`)).status()).toBe(401);
     const illegal = await friend.request.post(gamePath, {
@@ -133,7 +140,7 @@ test('a guest who chooses white moves first and the host answers as black', asyn
       headers: { Origin: origin },
     });
     expect(redeemed.ok()).toBe(true);
-    const {id} = (await redeemed.json()).match;
+    const { id } = (await redeemed.json()).match;
     await page.goto(`/online?game=${id}`);
     await friend.goto(`/online?game=${id}`);
     await expect(page.locator('[data-square="e7"]')).toBeVisible();
@@ -218,16 +225,20 @@ test('a rejected move shows the piece and then puts it back', async ({ page }) =
   })();`);
   await page.route('**/api/**', async (route) => {
     const request = route.request();
-      const path = new URL(request.url()).pathname;
-    if (path === '/api/me') {return route.fulfill({ json: { user: { id: 'leo', name: 'Leo' } } });}
-    if (path === '/api/appearance')
-      {return route.fulfill({ json: { appearance: { board: 'wood', pieces: 'wood' } } });}
+    const path = new URL(request.url()).pathname;
+    if (path === '/api/me') {
+      return route.fulfill({ json: { user: { id: 'leo', name: 'Leo' } } });
+    }
+    if (path === '/api/appearance') {
+      return route.fulfill({ json: { appearance: { board: 'wood', pieces: 'wood' } } });
+    }
     if (request.method() === 'POST' && path === `/api/online/games/${game.id}`) {
       await hold;
       return route.fulfill({ status: 409, json: { error: 'conflict' } });
     }
-    if (path === `/api/online/games/${game.id}`)
-      {return route.fulfill({ json: { game, serverNow: now } });}
+    if (path === `/api/online/games/${game.id}`) {
+      return route.fulfill({ json: { game, serverNow: now } });
+    }
     return route.fulfill({ json: {} });
   });
   try {

@@ -12,7 +12,9 @@ function trackPress(
   disabled: boolean,
 ) {
   const next = pressFromPointer(event, disabled);
-  if (next !== null) {setPressed(next);}
+  if (next !== null) {
+    setPressed(next);
+  }
 }
 
 function buttonClass(className?: string) {

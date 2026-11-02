@@ -10,16 +10,16 @@ export const computerSettings = {
 } as const satisfies Record<Difficulty, { skill: number; depth: number; moveTimeMs: number }>;
 
 export type ChessLevel = 'beginner' | 'casual' | 'intermediate' | 'advanced';
-export type ComputerHistory = {
+export interface ComputerHistory {
   difficulty: Difficulty;
   colour: Color;
   result: Result | null;
   completedAt: number;
-};
-export type DifficultySuggestion = {
+}
+export interface DifficultySuggestion {
   difficulty: Difficulty;
   reason: 'onboarding' | 'recentWins' | 'recentLosses';
-};
+}
 
 // Suggestions never update a selection. Callers require an explicit player choice.
 // Thresholds are provisional until representative-device strength calibration.
@@ -37,13 +37,17 @@ export function suggestDifficulty(
     const losses = recent.filter(
       (game) => game.result!.winner !== null && game.result!.winner !== game.colour,
     ).length;
-    if (wins >= 4 && selected < 4)
-      {return { difficulty: (selected + 1) as Difficulty, reason: 'recentWins' };}
-    if (losses >= 4 && selected > 1)
-      {return { difficulty: (selected - 1) as Difficulty, reason: 'recentLosses' };}
+    if (wins >= 4 && selected < 4) {
+      return { difficulty: (selected + 1) as Difficulty, reason: 'recentWins' };
+    }
+    if (losses >= 4 && selected > 1) {
+      return { difficulty: (selected - 1) as Difficulty, reason: 'recentLosses' };
+    }
     return null;
   }
-  if (history.some((game) => game.result)) {return null;}
+  if (history.some((game) => game.result)) {
+    return null;
+  }
   const difficulty = { beginner: 1, casual: 2, intermediate: 3, advanced: 4 }[level] as Difficulty;
   return difficulty === selected ? null : { difficulty, reason: 'onboarding' };
 }

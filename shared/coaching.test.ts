@@ -1,6 +1,13 @@
-import { monthKey, positionAt, recurringMistakes, suggestedProfile, validateAnalysis, validateDocument } from './coaching';
-import type { SavedCoachMatch, SavedReview } from './coaching';
 import { analysisPlies, parseEngineInfo } from '../src/analysis';
+import {
+  monthKey,
+  positionAt,
+  recurringMistakes,
+  suggestedProfile,
+  validateAnalysis,
+  validateDocument,
+} from './coaching';
+import type { SavedCoachMatch, SavedReview } from './coaching';
 import { Chess } from 'chess.js';
 import { describe, expect, it } from 'vitest';
 

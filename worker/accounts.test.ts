@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 const authentication = vi.hoisted(() => ({ session: vi.fn() }));
 const billing = vi.hoisted(() => ({ cancel: vi.fn() }));
 vi.mock('./auth', () => ({
@@ -21,8 +22,9 @@ function fixture() {
   sqlite.exec('PRAGMA foreign_keys=ON');
   for (const file of readdirSync('drizzle')
     .filter((file) => file.endsWith('.sql'))
-    .sort())
-    {sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));}
+    .sort()) {
+    sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));
+  }
   sqlite
     .prepare(
       'INSERT INTO user(id,name,email,email_verified,created_at,updated_at) VALUES (?,?,?,?,?,?)',
@@ -48,7 +50,9 @@ function fixture() {
       sqlite.exec('BEGIN');
       try {
         const results = [];
-        for (const query of queries) {results.push(query.run());}
+        for (const query of queries) {
+          results.push(query.run());
+        }
         sqlite.exec('COMMIT');
         return results;
       } catch (error) {
@@ -57,8 +61,8 @@ function fixture() {
       }
     },
   } as unknown as D1Database;
-  const anonymise = vi.fn().mockResolvedValue(undefined),
-    removeUser = vi.fn().mockResolvedValue(undefined);
+  const anonymise = vi.fn().mockResolvedValue(undefined);
+  const removeUser = vi.fn().mockResolvedValue(undefined);
   return {
     sqlite,
     db,
@@ -119,7 +123,7 @@ describe('account lifecycle with real SQLite migrations', () => {
       env,
     );
     expect(pending!.status).toBe(202);
-    expect(await pending!.json()).toEqual({ deletionPending: true });
+    await expect(pending!.json()).resolves.toEqual({ deletionPending: true });
     expect(sqlite.prepare('SELECT * FROM player_profiles').all()).toHaveLength(1);
     expect(sqlite.prepare('SELECT * FROM session').all()).toHaveLength(1);
     expect((await accountsApi(request('/api/account', 'GET'), env))!.status).toBe(202);
@@ -131,6 +135,7 @@ describe('account lifecycle with real SQLite migrations', () => {
     expect(sqlite.prepare('SELECT * FROM player_profiles').all()).toHaveLength(0);
     expect(sqlite.prepare('SELECT * FROM session').all()).toHaveLength(0);
   });
+
   it('restricts billing review to operators and resolves cases without changing entitlements', async () => {
     const { env, sqlite } = fixture();
     sqlite
@@ -151,6 +156,7 @@ describe('account lifecycle with real SQLite migrations', () => {
     );
     expect(sqlite.prepare('SELECT * FROM billing_invoice_access').all()).toEqual([]);
   });
+
   it('serialises conflicting onboarding attempts without changing the winning timezone or trial', async () => {
     const { env, sqlite } = fixture();
     const results = await Promise.all([
@@ -162,12 +168,13 @@ describe('account lifecycle with real SQLite migrations', () => {
       sqlite.prepare('SELECT timezone FROM timezone_history').all(),
     );
   });
+
   it('starts the card-free trial once and never renews it on profile updates', async () => {
     const { env, db } = fixture();
     expect((await accountsApi(request('/api/account', 'POST', profile), env))?.status).toBe(200);
     const first = await loadPlayerProfile(db, 'owner');
-    expect(first?.trialExpiresAt).toBe(Date.now() + 30 * 86400000);
-    vi.advanceTimersByTime(86400000);
+    expect(first?.trialExpiresAt).toBe(Date.now() + 30 * 86_400_000);
+    vi.advanceTimersByTime(86_400_000);
     expect(
       (
         await accountsApi(
@@ -215,7 +222,7 @@ describe('account lifecycle with real SQLite migrations', () => {
     authentication.session.mockResolvedValue(null);
     const result = await accountsApi(request('/api/profiles/OwnerPlayer'), env);
     expect(result?.status).toBe(200);
-    expect(await result?.json()).toEqual({
+    await expect(result?.json()).resolves.toEqual({
       username: 'OwnerPlayer',
       activityPublic: false,
       ratings: [
@@ -269,7 +276,7 @@ describe('account lifecycle with real SQLite migrations', () => {
       .prepare(
         'INSERT INTO session(id,expires_at,token,created_at,updated_at,user_id) VALUES (?,?,?,?,?,?)',
       )
-      .run('session', 9999999999999, 'secret', 0, 0, 'owner');
+      .run('session', 9_999_999_999_999, 'secret', 0, 0, 'owner');
     const result = await accountsApi(
       request('/api/account', 'DELETE', { confirmation: 'DELETE' }),
       env,
@@ -291,23 +298,25 @@ describe('account lifecycle with real SQLite migrations', () => {
     });
     expect((await accountsApi(request('/api/profiles/OwnerPlayer'), env))?.status).toBe(404);
     const other = await accountsApi(request('/api/account'), env);
-    expect(await other?.json()).toMatchObject({
+    await expect(other?.json()).resolves.toMatchObject({
       profile: { userId: 'other', username: 'OtherPlayer' },
     });
   });
+
   it('cleans expired personal data while keeping admitted and recently invited members', async () => {
     const { db, sqlite } = fixture();
-    const old = Math.floor((Date.now() - 181 * 86400000) / 1000);
-    for (const email of ['old@example.com', 'admitted@example.com', 'expired@example.com'])
-      {sqlite
+    const old = Math.floor((Date.now() - 181 * 86_400_000) / 1000);
+    for (const email of ['old@example.com', 'admitted@example.com', 'expired@example.com']) {
+      sqlite
         .prepare('INSERT INTO waitlist(email,language,created_at) VALUES (?,?,?)')
-        .run(email, 'en-GB', old);}
+        .run(email, 'en-GB', old);
+    }
     sqlite
       .prepare('INSERT INTO invitations(email,expires_at,redeemed_by) VALUES (?,?,?)')
       .run('admitted@example.com', 0, 'owner');
     sqlite
       .prepare('INSERT INTO invitations(email,expires_at) VALUES (?,?)')
-      .run('expired@example.com', Date.now() - 31 * 86400000);
+      .run('expired@example.com', Date.now() - 31 * 86_400_000);
     await purgeExpiredPersonalData(db);
     expect(sqlite.prepare('SELECT email FROM waitlist').all()).toEqual([
       { email: 'admitted@example.com' },
@@ -321,8 +330,9 @@ describe('account lifecycle with real SQLite migrations', () => {
 describe('operator invitation batches', () => {
   it('does not merge different recipient lists racing for one batch ID', async () => {
     const { env, sqlite } = fixture();
-    for (const email of ['first@example.com', 'second@example.com'])
-      {sqlite.prepare('INSERT INTO waitlist(email,language) VALUES (?,?)').run(email, 'en-GB');}
+    for (const email of ['first@example.com', 'second@example.com']) {
+      sqlite.prepare('INSERT INTO waitlist(email,language) VALUES (?,?)').run(email, 'en-GB');
+    }
     const batchId = crypto.randomUUID();
     const results = await Promise.all(
       ['first@example.com', 'second@example.com'].map((email) =>
@@ -337,10 +347,12 @@ describe('operator invitation batches', () => {
       count: 1,
     });
   });
+
   it('stops at delivery failure and refuses a blind retry beyond the provider idempotency window', async () => {
     const { env, sqlite } = fixture();
-    for (const email of ['first@example.com', 'second@example.com'])
-      {sqlite.prepare('INSERT INTO waitlist(email,language) VALUES (?,?)').run(email, 'en-GB');}
+    for (const email of ['first@example.com', 'second@example.com']) {
+      sqlite.prepare('INSERT INTO waitlist(email,language) VALUES (?,?)').run(email, 'en-GB');
+    }
     const batchId = crypto.randomUUID();
     await accountsApi(
       request('/api/operator/invitations/preview', 'POST', {
@@ -359,8 +371,8 @@ describe('operator invitation batches', () => {
         )
       )?.status,
     ).toBe(503);
-    expect(send).toHaveBeenCalledOnce();
-    vi.advanceTimersByTime(24 * 3600000);
+    expect(send).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(24 * 3_600_000);
     expect(
       (
         await accountsApi(
@@ -369,12 +381,13 @@ describe('operator invitation batches', () => {
         )
       )?.status,
     ).toBe(409);
-    expect(send).toHaveBeenCalledOnce();
+    expect(send).toHaveBeenCalledTimes(1);
     expect(sqlite.prepare('SELECT sent_at FROM invitation_deliveries').all()).toEqual([
       { sent_at: null },
       { sent_at: null },
     ]);
   });
+
   it('requires explicit reissue before replacing a still-valid pending invitation', async () => {
     const { env, sqlite } = fixture();
     sqlite
@@ -382,7 +395,7 @@ describe('operator invitation batches', () => {
       .run('beta@example.com', 'en-GB');
     sqlite
       .prepare('INSERT INTO invitations(email,expires_at,delivery_id) VALUES (?,?,?)')
-      .run('beta@example.com', Date.now() + 86400000, 'old-delivery');
+      .run('beta@example.com', Date.now() + 86_400_000, 'old-delivery');
     const send = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
     vi.stubGlobal('fetch', send);
     const first = crypto.randomUUID();
@@ -425,8 +438,9 @@ describe('operator invitation batches', () => {
         )
       )?.status,
     ).toBe(200);
-    expect(send).toHaveBeenCalledOnce();
+    expect(send).toHaveBeenCalledTimes(1);
   });
+
   it('denies unverified or unlisted operators before accessing the waitlist', async () => {
     const { env } = fixture();
     authentication.session.mockResolvedValue({ user: { id: 'owner', emailVerified: false } });
@@ -434,6 +448,7 @@ describe('operator invitation batches', () => {
     authentication.session.mockResolvedValue({ user: { id: 'other', emailVerified: true } });
     expect((await accountsApi(request('/api/operator/waitlist'), env))?.status).toBe(403);
   });
+
   it('previews and delivers at most ten with stable idempotency keys and safe retries', async () => {
     const { env, sqlite } = fixture();
     sqlite
@@ -467,13 +482,13 @@ describe('operator invitation batches', () => {
         )
       )?.status,
     ).toBe(200);
-    expect(send).toHaveBeenCalledOnce();
+    expect(send).toHaveBeenCalledTimes(1);
     expect(send.mock.calls[0][1].headers['Idempotency-Key']).toBe(
       `ludus-invite/${(sqlite.prepare('SELECT id FROM invitation_deliveries').get() as { id: string }).id}`,
     );
     expect(
       sqlite.prepare('SELECT expires_at FROM invitations WHERE email=?').get('beta@example.com'),
-    ).toEqual({ expires_at: Date.now() + 7 * 86400000 });
+    ).toEqual({ expires_at: Date.now() + 7 * 86_400_000 });
     expect(
       (
         await accountsApi(
@@ -517,14 +532,15 @@ describe('public profile SEO privacy and discovery', () => {
     const data = await readPublicProfile(db, profile.username);
     expect(data).toMatchObject({ username: profile.username, activityPublic: false });
     expect(data).not.toHaveProperty('activity');
-    for (const privateKey of ['email', 'userId', 'timezone', 'teachingProfile', 'trialExpiresAt'])
-      {expect(data).not.toHaveProperty(privateKey);}
-    expect(await (await profileSitemap(db, '/sitemaps/profiles-1.xml')).text()).toContain(
+    for (const privateKey of ['email', 'userId', 'timezone', 'teachingProfile', 'trialExpiresAt']) {
+      expect(data).not.toHaveProperty(privateKey);
+    }
+    await expect((await profileSitemap(db, '/sitemaps/profiles-1.xml')).text()).resolves.toContain(
       '/@ownerplayer',
     );
     sqlite.prepare("INSERT INTO account_deletions(user_id,requested_at) VALUES('owner',0)").run();
-    expect(await readPublicProfile(db, profile.username)).toBeNull();
-    expect(await (await profileSitemap(db, '/sitemap.xml')).text()).not.toContain(
+    await expect(readPublicProfile(db, profile.username)).resolves.toBeNull();
+    await expect((await profileSitemap(db, '/sitemap.xml')).text()).resolves.not.toContain(
       '/sitemaps/profiles-1.xml',
     );
     expect((await profileSitemap(db, '/sitemaps/profiles-1.xml')).status).toBe(404);

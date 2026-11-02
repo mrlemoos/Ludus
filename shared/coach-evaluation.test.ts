@@ -31,7 +31,9 @@ describe('coach model evaluation release gate', () => {
   it('has forty fixed distinct legal positions and a complete 480-cell matrix', () => {
     expect(coachFixtures).toHaveLength(40);
     expect(new Set(coachFixtures.map((position) => position.fen)).size).toBe(40);
-    for (const fixture of coachFixtures) {expect(new Chess(fixture.fen).isGameOver()).toBe(false);}
+    for (const fixture of coachFixtures) {
+      expect(new Chess(fixture.fen).isGameOver()).toBe(false);
+    }
     expect(observations()).toHaveLength(480);
   });
 

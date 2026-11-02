@@ -52,7 +52,7 @@ describe('browser computer worker', () => {
       worker.send('bestmove e2e4 ponder e7e5');
       await expect(pending).resolves.toBe('e2e4');
       computer.dispose();
-      expect(worker.terminate).toHaveBeenCalledTimes(1);
+      expect(worker.terminate).toHaveBeenCalledOnce();
     },
   );
 
@@ -74,7 +74,7 @@ describe('browser computer worker', () => {
     await rejected;
     worker.send('bestmove d2d4');
     await expect(computer.move(new Chess().fen(), 2)).rejects.toThrow('Engine unavailable');
-    expect(worker.terminate).toHaveBeenCalledTimes(1);
+    expect(worker.terminate).toHaveBeenCalledOnce();
     const fresh = ready();
     const retry = fresh.computer.move(new Chess().fen(), 2);
     await Promise.resolve();

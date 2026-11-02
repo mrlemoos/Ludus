@@ -4,7 +4,9 @@ import { expect, it } from 'vitest';
 
 it('captures retain actual piece identity and follow replay, including en passant', () => {
   const chess = new Chess();
-  for (const move of ['e4', 'd5', 'exd5', 'Qxd5']) {chess.move(move);}
+  for (const move of ['e4', 'd5', 'exd5', 'Qxd5']) {
+    chess.move(move);
+  }
   expect(capturedPieces(chess)).toEqual([
     { type: 'p', colour: 'b' },
     { type: 'p', colour: 'w' },
@@ -12,7 +14,9 @@ it('captures retain actual piece identity and follow replay, including en passan
   chess.undo();
   expect(capturedPieces(chess)).toEqual([{ type: 'p', colour: 'b' }]);
   chess.reset();
-  for (const move of ['e4', 'a6', 'e5', 'd5', 'exd6']) {chess.move(move);}
+  for (const move of ['e4', 'a6', 'e5', 'd5', 'exd6']) {
+    chess.move(move);
+  }
   expect(capturedPieces(chess)).toEqual([{ type: 'p', colour: 'b' }]);
   chess.reset();
   expect(capturedPieces(chess)).toEqual([]);

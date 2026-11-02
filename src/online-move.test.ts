@@ -4,7 +4,8 @@ import { predictMove, shouldApplySnapshot } from './online-move';
 import { Chess } from 'chess.js';
 import { describe, expect, it } from 'vitest';
 
-function fresh() { return humanConnection(
+function fresh() {
+  return humanConnection(
     humanConnection(
       createHumanGame('id', { w: 'white', b: 'black' }, '5+3', false, 1),
       'w',
@@ -14,14 +15,17 @@ function fresh() { return humanConnection(
     'b',
     true,
     1,
-  ); }
-function sample(revision: number, moves: string[], updatedAt = 10, id = 'id'): HumanGame  { return ({
-  ...fresh(),
-  id,
-  revision,
-  moves,
-  updatedAt,
-}); }
+  );
+}
+function sample(revision: number, moves: string[], updatedAt = 10, id = 'id'): HumanGame {
+  return {
+    ...fresh(),
+    id,
+    revision,
+    moves,
+    updatedAt,
+  };
+}
 
 describe('optimistic online moves', () => {
   it('appends the SAN and position without touching clocks, revision, or the original game', () => {

@@ -4,12 +4,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const [target, ...input] = process.argv.slice(2);
-if (!['--local', '--remote'].includes(target) || input.length === 0)
-  {throw new Error('Usage: node scripts/grant-plus.ts --local|--remote email [email ...]');}
+if (!['--local', '--remote'].includes(target) || input.length === 0) {
+  throw new Error('Usage: node scripts/grant-plus.ts --local|--remote email [email ...]');
+}
 const emails = [...new Set(input.map((email) => email.trim().toLowerCase()))];
-if (emails.some((email) => email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)))
-  {throw new Error('Invalid email');}
-function quote(email: string) { return `'${email.replaceAll("'", "''")}'`; }
+if (emails.some((email) => email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+  throw new Error('Invalid email');
+}
+function quote(email: string) {
+  return `'${email.replaceAll("'", "''")}'`;
+}
 const dir = mkdtempSync(join(tmpdir(), 'ludus-plus-'));
 const now = Date.now();
 const sql = emails
@@ -27,11 +31,13 @@ const env = {
   ...process.env,
   WRANGLER_LOG_PATH: process.env.WRANGLER_LOG_PATH ?? '/tmp/ludus-plus-wrangler.log',
 };
-function run(args: string[]) { return execFileSync(
+function run(args: string[]) {
+  return execFileSync(
     process.execPath,
     ['node_modules/wrangler/bin/wrangler.js', 'd1', 'execute', 'ludus', target, ...args],
     { env, encoding: 'utf8' },
-  ); }
+  );
+}
 try {
   const file = join(dir, 'grants.sql');
   writeFileSync(file, sql, { mode: 0o600 });
@@ -43,8 +49,9 @@ try {
       '--json',
     ]),
   ) as { results: { total: number }[] }[];
-  if (result[0]?.results[0]?.total !== emails.length)
-    {throw new Error('Some grants were not applied; check pending deletions');}
+  if (result[0]?.results[0]?.total !== emails.length) {
+    throw new Error('Some grants were not applied; check pending deletions');
+  }
   console.log(
     `${emails.length} complimentary Plus grants verified in ${target === '--remote' ? 'production' : 'local D1'}. No expiry, subscriptions or charges. Email verification and onboarding remain required.`,
   );

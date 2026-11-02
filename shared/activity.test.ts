@@ -1,16 +1,10 @@
-import {
-  dailyActivity,
-  earnsActivity,
-  localDate,
-  nextMidnight,
-  timezoneChange,
-} from './activity';
+import { dailyActivity, earnsActivity, localDate, nextMidnight, timezoneChange } from './activity';
 import { describe, expect, it } from 'vitest';
 
 describe('activity eligibility', () => {
-  it.each(['checkmate', 'stalemate'])('always credits %s', (reason) =>{ 
-    expect(earnsActivity(reason, 0)).toBe(true); },
-  );
+  it.each(['checkmate', 'stalemate'])('always credits %s', (reason) => {
+    expect(earnsActivity(reason, 0)).toBe(true);
+  });
 
   it.each(['resignation', 'timeout', 'agreement', 'material', 'repetition', 'fiftyMoves'])(
     'requires five moves from each player for %s',
@@ -20,18 +14,18 @@ describe('activity eligibility', () => {
     },
   );
 
-  it.each(['abort', 'aborted', 'review', 'unknown'])('never credits %s', (reason) =>{ 
-    expect(earnsActivity(reason, 99)).toBe(false); },
-  );
+  it.each(['abort', 'aborted', 'review', 'unknown'])('never credits %s', (reason) => {
+    expect(earnsActivity(reason, 99)).toBe(false);
+  });
 });
 describe('player timezones', () => {
   it.each([
     ['2026-03-29T00:00:00Z', 'Europe/Madrid', '2026-03-29T22:00:00.000Z'],
     ['2026-10-25T00:00:00Z', 'Europe/Madrid', '2026-10-25T23:00:00.000Z'],
     ['2026-10-30T00:00:00Z', 'America/Sao_Paulo', '2026-10-30T03:00:00.000Z'],
-  ])('finds actual next midnight through DST: %s %s', (now, zone, expected) =>{ 
-    expect(new Date(nextMidnight(Date.parse(now), zone)).toISOString()).toBe(expected); },
-  );
+  ])('finds actual next midnight through DST: %s %s', (now, zone, expected) => {
+    expect(new Date(nextMidnight(Date.parse(now), zone)).toISOString()).toBe(expected);
+  });
 
   it('repeated requests replace the zone without postponing activation', () => {
     const now = Date.parse('2026-10-30T12:00:00Z');

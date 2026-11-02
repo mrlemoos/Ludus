@@ -1,4 +1,5 @@
-import { type Game, connection, createGame } from '../shared/game';
+import { connection, createGame } from '../shared/game';
+import type { Game } from '../shared/game';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const database = vi.hoisted(() => ({ write: vi.fn() }));
@@ -25,7 +26,9 @@ function fixture(
   let revoked = false;
   const sockets: { send: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> }[] = [];
   const sql = vi.fn((query: string, value?: string) => {
-    if (query.startsWith('INSERT')) {stored = value;}
+    if (query.startsWith('INSERT')) {
+      stored = value;
+    }
     return { toArray: () => (stored ? [{ data: stored }] : []) };
   });
   const ctx = {
@@ -66,8 +69,8 @@ describe('match ownership', () => {
   it('rejects another account before reads, actions or socket admission mutate state', async () => {
     const { match, ctx, saved } = fixture();
     const before = saved();
-    expect(await match.read('intruder')).toBeNull();
-    expect(await match.act('intruder', { type: 'resign', revision: 0 })).toEqual({
+    await expect(match.read('intruder')).resolves.toBeNull();
+    await expect(match.act('intruder', { type: 'resign', revision: 0 })).resolves.toEqual({
       error: 'not_found',
     });
     const response = await match.fetch(
@@ -83,8 +86,8 @@ describe('match ownership', () => {
 
   it('does not expose missing games and requires an actual socket upgrade', async () => {
     const missing = fixture(null).match;
-    expect(await missing.read('owner')).toBeNull();
-    expect(await missing.act('owner', { type: 'resign', revision: 0 })).toEqual({
+    await expect(missing.read('owner')).resolves.toBeNull();
+    await expect(missing.act('owner', { type: 'resign', revision: 0 })).resolves.toEqual({
       error: 'not_found',
     });
     expect((await missing.fetch(new Request('https://example.com'))).status).toBe(404);
@@ -113,19 +116,19 @@ describe('durable finalisation', () => {
     expect(saved()).toEqual(completed);
     expect(database.write).toHaveBeenCalledTimes(2);
     expect(database.write.mock.calls[0]).toEqual(database.write.mock.calls[1]);
-    expect(ctx.storage.deleteAlarm).toHaveBeenCalledOnce();
+    expect(ctx.storage.deleteAlarm).toHaveBeenCalledTimes(1);
   });
 
   it('finalises timeout on read and keeps the result and revision stable on repeated alarms', async () => {
     const { match, ctx, saved } = fixture();
-    vi.setSystemTime(301000);
+    vi.setSystemTime(301_000);
     const result = await match.read('owner');
     expect(result?.game.result).toEqual({ winner: 'b', reason: 'timeout' });
     const completed = saved();
     await match.alarm();
     await match.alarm();
     expect(saved()).toEqual(completed);
-    expect(ctx.storage.setAlarm).toHaveBeenCalled();
+    expect(ctx.storage.setAlarm).toHaveBeenCalledWith(306_000);
     expect(database.write).toHaveBeenCalledTimes(3);
   });
 
@@ -138,7 +141,7 @@ describe('durable finalisation', () => {
     expect(retry).toMatchObject({ error: 'invalid_action' });
     expect(saved()).toEqual(accepted);
     expect(accepted.moves).toEqual(['e4']);
-    expect(accepted.clocks.w).toBe(302000);
+    expect(accepted.clocks.w).toBe(302_000);
   });
 });
 
@@ -153,9 +156,9 @@ describe('account erasure in retained matches', () => {
     await match.anonymise('owner');
     expect(saved().owner).toBe('deleted');
     expect(saved().result?.reason).toBe('resignation');
-    expect(await match.read('owner')).toBeNull();
+    await expect(match.read('owner')).resolves.toBeNull();
     expect(socket.close).toHaveBeenCalledWith(1008, 'Account deleted');
-    expect(ctx.storage.deleteAlarm).toHaveBeenCalled();
+    expect(ctx.storage.deleteAlarm).toHaveBeenCalledWith();
   });
 });
 
@@ -168,6 +171,7 @@ describe('computer admission and deletion races', () => {
     );
     expect(database.write).not.toHaveBeenCalled();
   });
+
   it('uses current durable revision after asynchronous authorisation', async () => {
     const f = fixture();
     const action = { type: 'move', from: 'e2', to: 'e4', revision: 0 };
@@ -176,12 +180,13 @@ describe('computer admission and deletion races', () => {
     expect(f.saved().moves).toEqual(['e4']);
     expect(f.saved().revision).toBe(1);
   });
+
   it('revokes already admitted sockets when a tombstone appears', async () => {
     const f = fixture();
     const socket = { send: vi.fn(), close: vi.fn() };
     f.sockets.push(socket);
     f.setDeleted(true);
-    expect(await f.match.read('owner')).toBeNull();
+    await expect(f.match.read('owner')).resolves.toBeNull();
     expect(f.saved().owner).toBe('deleted');
     expect(socket.close).toHaveBeenCalledWith(1008, 'Account deleted');
   });

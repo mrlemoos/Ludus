@@ -1,4 +1,5 @@
-import { type Language, isLanguage } from './waitlist';
+import { isLanguage } from './waitlist';
+import type { Language } from './waitlist';
 import { Chess } from 'chess.js';
 
 export const teachingProfiles = ['beginner', 'developing', 'club', 'advanced'] as const;
@@ -10,16 +11,16 @@ export const profileInstructions: Record<TeachingProfile, string> = {
   club: 'Compare candidate moves and explain positional trade-offs with concrete variations.',
   advanced: 'Use concise variations, precise evaluation and deeper positional reasoning.',
 };
-export type SavedCoachMatch = {
+export interface SavedCoachMatch {
   id: string;
   moves: string[];
   result: unknown;
   colour: 'w' | 'b';
   kind?: 'computer' | 'human';
   completedAt?: number;
-};
+}
 /** Browser supplied and always untrusted, even after the server checks every move. */
-export type AnalysisLine = {
+export interface AnalysisLine {
   ply: number;
   fen: string;
   engineVersion: string | null;
@@ -30,7 +31,7 @@ export type AnalysisLine = {
   variations: string[][];
   depth: number | null;
   nodes: number | null;
-};
+}
 export const mistakeTags = [
   'hanging-piece',
   'missed-tactic',
@@ -39,12 +40,12 @@ export const mistakeTags = [
   'time-management',
 ] as const;
 export type MistakeTag = (typeof mistakeTags)[number];
-export type CoachDocument = {
+export interface CoachDocument {
   summary: string;
   variations: { ply: number; moves: string[]; explanation: string }[];
   mistakes: { ply: number; tag: MistakeTag; explanation: string }[];
-};
-export type SavedReview = {
+}
+export interface SavedReview {
   id: string;
   matchId: string;
   language: Language;
@@ -52,17 +53,20 @@ export type SavedReview = {
   document: CoachDocument;
   createdAt: number;
   historyGaps?: number;
-};
-export type SavedReply = {
+}
+export interface SavedReply {
   id: string;
   reviewId: string;
   language: Language;
   question: string;
   document: CoachDocument;
   createdAt: number;
-};
-export type CoachHistoryInput = { matchId: string; analysis: AnalysisLine[] | null };
-export type SavedCoachHistory = {
+}
+export interface CoachHistoryInput {
+  matchId: string;
+  analysis: AnalysisLine[] | null;
+}
+export interface SavedCoachHistory {
   matchId: string;
   moves: string[];
   colour: 'w' | 'b';
@@ -70,28 +74,34 @@ export type SavedCoachHistory = {
   kind: 'computer' | 'human';
   completedAt: number;
   analysis: AnalysisLine[] | null;
-};
+}
 export type SavedReviewWithAnalysis = SavedReview & {
   analysis: AnalysisLine[];
   history?: SavedCoachHistory[];
   historyGaps?: number;
 };
-export type CoachInput = {
+export interface CoachInput {
   key: string;
   matchId: string;
   language: Language;
   profile: TeachingProfile;
   analysis: AnalysisLine[];
   history: CoachHistoryInput[];
-};
-export function monthKey(now: number) { return new Date(now).toISOString().slice(0, 7); }
+}
+export function monthKey(now: number) {
+  return new Date(now).toISOString().slice(0, 7);
+}
 export function isTeachingProfile(value: unknown): value is TeachingProfile {
   return teachingProfiles.some((profile) => profile === value);
 }
 export function positionAt(moves: readonly string[], ply: number): Chess {
-  if (!Number.isInteger(ply) || ply < 0 || ply > moves.length) {throw new Error('invalid_ply');}
+  if (!Number.isInteger(ply) || ply < 0 || ply > moves.length) {
+    throw new Error('invalid_ply');
+  }
   const chess = new Chess();
-  for (const move of moves.slice(0, ply)) {chess.move(move);}
+  for (const move of moves.slice(0, ply)) {
+    chess.move(move);
+  }
   return chess;
 }
 export function legalVariation(
@@ -99,21 +109,29 @@ export function legalVariation(
   ply: number,
   variation: readonly string[],
 ): boolean {
-  if (variation.length === 0 || variation.length > 16) {return false;}
+  if (variation.length === 0 || variation.length > 16) {
+    return false;
+  }
   try {
     const chess = positionAt(moves, ply);
-    for (const move of variation) {chess.move(move);}
+    for (const move of variation) {
+      chess.move(move);
+    }
     return true;
   } catch {
     return false;
   }
 }
 export function validateAnalysis(match: SavedCoachMatch, input: unknown): AnalysisLine[] | null {
-  if (!match.result || !Array.isArray(input) || input.length < 1 || input.length > 300) {return null;}
+  if (!match.result || !Array.isArray(input) || input.length === 0 || input.length > 300) {
+    return null;
+  }
   const seen = new Set<number>();
   const output: AnalysisLine[] = [];
   for (const value of input) {
-    if (!value || typeof value !== 'object') {return null;}
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
     const { ply, fen, engineVersion, perspective, cp, mate, moves, variations, depth, nodes } =
       value;
     if (
@@ -134,7 +152,7 @@ export function validateAnalysis(match: SavedCoachMatch, input: unknown): Analys
       !moves.every((move) => typeof move === 'string' && move.length <= 12) ||
       !legalVariation(match.moves, ply, moves) ||
       !Array.isArray(variations) ||
-      variations.length < 1 ||
+      variations.length === 0 ||
       variations.length > 4 ||
       variations.some(
         (line) =>
@@ -143,15 +161,18 @@ export function validateAnalysis(match: SavedCoachMatch, input: unknown): Analys
           !legalVariation(match.moves, ply, line),
       ) ||
       variations[0].join(' ') !== moves.join(' ')
-    )
-      {return null;}
+    ) {
+      return null;
+    }
     let expectedFen: string;
     try {
       expectedFen = positionAt(match.moves, ply).fen();
     } catch {
       return null;
     }
-    if (fen !== expectedFen) {return null;}
+    if (fen !== expectedFen) {
+      return null;
+    }
     seen.add(ply);
     output.push({
       ply,
@@ -174,16 +195,23 @@ export function validateSavedAnalysis(
   input: unknown,
 ): AnalysisLine[] | null {
   const modern = validateAnalysis(match, input);
-  if (modern) {return modern;}
-  if (!match.result || !Array.isArray(input) || input.length < 1 || input.length > 300) {return null;}
+  if (modern) {
+    return modern;
+  }
+  if (!match.result || !Array.isArray(input) || input.length === 0 || input.length > 300) {
+    return null;
+  }
   const output: AnalysisLine[] = [];
   const seen = new Set<number>();
   for (const value of input) {
-    if (!value || typeof value !== 'object') {return null;}
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
     const row = value as Record<string, unknown>;
     // Only accept the exact old shape. Partial or malformed new records stay invalid.
-    if (['fen', 'engineVersion', 'perspective', 'variations', 'nodes'].some((key) => key in row))
-      {return null;}
+    if (['fen', 'engineVersion', 'perspective', 'variations', 'nodes'].some((key) => key in row)) {
+      return null;
+    }
     const { ply, cp, mate, moves, depth } = row;
     const validCp =
       cp === null || (typeof cp === 'number' && Number.isInteger(cp) && Math.abs(cp) <= 100_000);
@@ -201,8 +229,9 @@ export function validateSavedAnalysis(
       !Array.isArray(moves) ||
       !moves.every((move) => typeof move === 'string' && move.length <= 12) ||
       !legalVariation(match.moves, ply as number, moves)
-    )
-      {return null;}
+    ) {
+      return null;
+    }
     const validDepth =
       Number.isInteger(depth) && (depth as number) >= 1 && (depth as number) <= 80
         ? (depth as number)
@@ -234,17 +263,22 @@ export function validateDocument(
   value: unknown,
   analysis: readonly AnalysisLine[],
 ): CoachDocument | null {
-  if (!value || typeof value !== 'object') {return null;}
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
   const doc = value as CoachDocument;
-  function text(value: unknown, max: number): value is string  { return typeof value === 'string' && value.trim().length > 0 && value.length <= max; }
+  function text(value: unknown, max: number): value is string {
+    return typeof value === 'string' && value.trim().length > 0 && value.length <= max;
+  }
   if (
     !text(doc.summary, 8000) ||
     !Array.isArray(doc.variations) ||
     doc.variations.length > 12 ||
     !Array.isArray(doc.mistakes) ||
     doc.mistakes.length > 12
-  )
-    {return null;}
+  ) {
+    return null;
+  }
   for (const variation of doc.variations) {
     if (
       !variation ||
@@ -252,13 +286,15 @@ export function validateDocument(
       !variation.moves.every((move) => typeof move === 'string' && move.length <= 12) ||
       !text(variation.explanation, 2000) ||
       !legalVariation(match.moves, variation.ply, variation.moves)
-    )
-      {return null;}
+    ) {
+      return null;
+    }
     // Ground each cited branch in a supplied engine candidate, without claiming the browser evaluation is trusted.
     if (
       !analysis.some((line) => line.ply === variation.ply && line.moves[0] === variation.moves[0])
-    )
-      {return null;}
+    ) {
+      return null;
+    }
   }
   for (const mistake of doc.mistakes) {
     if (
@@ -270,8 +306,9 @@ export function validateDocument(
       mistake.tag === 'time-management' ||
       !text(mistake.explanation, 2000) ||
       !analysis.some((line) => line.ply === mistake.ply - 1)
-    )
-      {return null;}
+    ) {
+      return null;
+    }
   }
   return {
     summary: doc.summary,
@@ -284,7 +321,9 @@ export function validateDocument(
   };
 }
 export function parseCoachInput(value: unknown): CoachInput | null {
-  if (!value || typeof value !== 'object') {return null;}
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
   const input = value as CoachInput;
   if (
     typeof input.key !== 'string' ||
@@ -296,8 +335,9 @@ export function parseCoachInput(value: unknown): CoachInput | null {
     !Array.isArray(input.analysis) ||
     !Array.isArray(input.history) ||
     input.history.length > 3
-  )
-    {return null;}
+  ) {
+    return null;
+  }
   if (
     new Set(input.history.map((item) => item?.matchId)).size !== input.history.length ||
     input.history.some(
@@ -308,18 +348,20 @@ export function parseCoachInput(value: unknown): CoachInput | null {
         !(item.analysis === null || Array.isArray(item.analysis)) ||
         item.matchId === input.matchId,
     )
-  )
-    {return null;}
+  ) {
+    return null;
+  }
   return input;
 }
 export function recurringMistakes(reviews: readonly SavedReview[]) {
   const counts = new Map<MistakeTag, Set<string>>();
-  for (const review of reviews)
-    {for (const mistake of review.document.mistakes) {
+  for (const review of reviews) {
+    for (const mistake of review.document.mistakes) {
       const matches = counts.get(mistake.tag) ?? new Set<string>();
       matches.add(review.matchId);
       counts.set(mistake.tag, matches);
-    }}
+    }
+  }
   return [...counts]
     .filter(([, ids]) => ids.size >= 2)
     .map(([tag, ids]) => ({ tag, matches: ids.size }))

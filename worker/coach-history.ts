@@ -12,8 +12,10 @@ export async function loadCoachHistory(
   current: SavedCoachMatch,
   load: (owner: string, id: string) => Promise<SavedCoachMatch | null>,
 ): Promise<CoachHistory> {
-  const {completedAt} = current;
-  if (!completedAt || !Number.isFinite(completedAt)) {return { matches: [], gaps: 3 };}
+  const { completedAt } = current;
+  if (!completedAt || !Number.isFinite(completedAt)) {
+    return { matches: [], gaps: 3 };
+  }
   const [known, legacy] = await Promise.all([
     db
       .prepare(`SELECT id,finished_at FROM (
@@ -30,7 +32,9 @@ export async function loadCoachHistory(
       .bind(owner, current.id, completedAt)
       .all<{ id: string }>(),
   ]);
-  if (legacy.results.length > 32) {return { matches: [], gaps: 3 };}
+  if (legacy.results.length > 32) {
+    return { matches: [], gaps: 3 };
+  }
   let unavailable = 0;
   const candidates = await Promise.all(
     [...known.results, ...legacy.results].map(async (row) => {
@@ -40,7 +44,9 @@ export async function loadCoachHistory(
           unavailable++;
           return null;
         }
-        if (match.completedAt >= completedAt) {return null;}
+        if (match.completedAt >= completedAt) {
+          return null;
+        }
         return { match, completedAt: match.completedAt };
       } catch {
         unavailable++;
@@ -49,8 +55,9 @@ export async function loadCoachHistory(
     }),
   );
   // A missing snapshot could be more recent than any available match.
-  if (unavailable)
-    {return { matches: [], gaps: Math.min(3, known.results.length + legacy.results.length) };}
+  if (unavailable) {
+    return { matches: [], gaps: Math.min(3, known.results.length + legacy.results.length) };
+  }
   const matches = candidates
     .filter((row): row is NonNullable<typeof row> => row !== null)
     .sort((a, b) => b.completedAt - a.completedAt || b.match.id.localeCompare(a.match.id))

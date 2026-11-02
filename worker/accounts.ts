@@ -8,7 +8,9 @@ import { authFor } from './auth';
 import { cancelAccountBilling } from './billing';
 import { deleteCoachAccount } from './coach-store';
 
-function response(value: unknown, status = 200) { return Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } }); }
+function response(value: unknown, status = 200) {
+  return Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
+}
 interface ProfileRow {
   user_id: string;
   username: string;
@@ -36,7 +38,9 @@ export async function loadPlayerProfile(
     )
     .bind(owner, owner)
     .first<ProfileRow>();
-  if (!p) {return null;}
+  if (!p) {
+    return null;
+  }
   return profileFromRow(p, now);
 }
 function profileFromRow(p: ProfileRow, now: number): PlayerProfile {
@@ -61,13 +65,17 @@ export async function readPublicProfile(
   db: D1Database,
   username: string,
 ): Promise<PublicPlayerProfile | null> {
-  if (!validPublicUsername(username)) {return null;}
+  if (!validPublicUsername(username)) {
+    return null;
+  }
   const user = await db
     .prepare('SELECT user_id FROM player_profiles WHERE username = ? COLLATE NOCASE')
     .bind(username)
     .first<{ user_id: string }>();
   const profile = user ? await loadPlayerProfile(db, user.user_id) : null;
-  if (!profile) {return null;}
+  if (!profile) {
+    return null;
+  }
   const ratings = await db
     .prepare('SELECT control,rating,deviation,games FROM ratings WHERE user_id = ?')
     .bind(profile.userId)
@@ -99,7 +107,9 @@ export async function recordActivity(
     completedAt: number;
   },
 ) {
-  if (!earnsActivity(input.reason, input.moves)) {return;}
+  if (!earnsActivity(input.reason, input.moves)) {
+    return;
+  }
   for (const player of new Set(input.players)) {
     const zone = await db
       .prepare(
@@ -107,7 +117,9 @@ export async function recordActivity(
       )
       .bind(player, input.completedAt)
       .first<{ timezone: string }>();
-    if (!zone) {continue;}
+    if (!zone) {
+      continue;
+    }
     await db
       .prepare(
         'INSERT OR IGNORE INTO activity_events(user_id,game_id,completed_at,date,timezone) SELECT ?,?,?,?,? WHERE EXISTS (SELECT 1 FROM player_profiles WHERE user_id = ?) AND NOT EXISTS(SELECT 1 FROM account_deletions WHERE user_id=?)',
@@ -138,14 +150,20 @@ export async function readActivity(
   return { ...dailyActivity(rows.results, today), today };
 }
 export async function boundedBody(request: Request): Promise<Record<string, unknown> | null> {
-  if (request.headers.get('Content-Type')?.split(';')[0].trim() !== 'application/json') {return null;}
+  if (request.headers.get('Content-Type')?.split(';')[0].trim() !== 'application/json') {
+    return null;
+  }
   const reader = request.body?.getReader();
-  if (!reader) {return null;}
+  if (!reader) {
+    return null;
+  }
   let size = 0;
   const chunks: Uint8Array[] = [];
   while (true) {
     const { done, value } = await reader.read();
-    if (done) {break;}
+    if (done) {
+      break;
+    }
     size += value.byteLength;
     if (size > 8192) {
       await reader.cancel();
@@ -168,7 +186,9 @@ export async function boundedBody(request: Request): Promise<Record<string, unkn
 }
 async function saveProfile(db: D1Database, owner: string, body: unknown, now: number) {
   const input = parseProfile(body);
-  if (!input) {return response({ error: 'invalid_profile' }, 400);}
+  if (!input) {
+    return response({ error: 'invalid_profile' }, 400);
+  }
   const row = await db
     .prepare(
       'SELECT * FROM player_profiles WHERE user_id = ? AND NOT EXISTS(SELECT 1 FROM account_deletions WHERE user_id=?)',
@@ -205,14 +225,15 @@ async function saveProfile(db: D1Database, owner: string, body: unknown, now: nu
           row?.mutation_id ?? '',
         ),
     ];
-    if (!previous)
-      {statements.push(
+    if (!previous) {
+      statements.push(
         db
           .prepare(
             'INSERT OR IGNORE INTO timezone_history(user_id,effective_at,timezone) SELECT ?,?,? WHERE EXISTS (SELECT 1 FROM player_profiles WHERE user_id=? AND mutation_id=?)',
           )
           .bind(owner, now, input.timezone, owner, mutation),
-      );}
+      );
+    }
     statements.push(
       db
         .prepare(
@@ -220,19 +241,23 @@ async function saveProfile(db: D1Database, owner: string, body: unknown, now: nu
         )
         .bind(owner, now, owner, mutation),
     );
-    if (zone.pendingTimezone && zone.timezoneEffectiveAt !== null)
-      {statements.push(
+    if (zone.pendingTimezone && zone.timezoneEffectiveAt !== null) {
+      statements.push(
         db
           .prepare(
             'INSERT INTO timezone_history(user_id,effective_at,timezone) SELECT ?,?,? WHERE EXISTS (SELECT 1 FROM player_profiles WHERE user_id=? AND mutation_id=?) ON CONFLICT(user_id,effective_at) DO UPDATE SET timezone=excluded.timezone',
           )
           .bind(owner, zone.timezoneEffectiveAt, zone.pendingTimezone, owner, mutation),
-      );}
+      );
+    }
     const results = await db.batch(statements);
-    if (!results[0].meta.changes) {return response({ error: 'profile_changed_retry' }, 409);}
+    if (!results[0].meta.changes) {
+      return response({ error: 'profile_changed_retry' }, 409);
+    }
   } catch (error) {
-    if (String(error).includes('UNIQUE constraint failed: player_profiles.username'))
-      {return response({ error: 'username_taken' }, 409);}
+    if (String(error).includes('UNIQUE constraint failed: player_profiles.username')) {
+      return response({ error: 'username_taken' }, 409);
+    }
     throw error;
   }
   return response({ profile: await loadPlayerProfile(db, owner, now) });
@@ -247,17 +272,20 @@ export async function purgeExpiredPersonalData(db: D1Database, now = Date.now())
     db
       .prepare('DELETE FROM invitations WHERE redeemed_by IS NULL AND expires_at < ?')
       .bind(now - 30 * 86_400_000),
-    db.prepare('DELETE FROM invitation_deliveries WHERE created_at < ?').bind(now - 30 * 86_400_000),
+    db
+      .prepare('DELETE FROM invitation_deliveries WHERE created_at < ?')
+      .bind(now - 30 * 86_400_000),
     db.prepare('DELETE FROM invitation_batches WHERE created_at < ?').bind(now - 30 * 86_400_000),
   ]);
   const hasReports = await db
     .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='match_reports'")
     .first();
-  if (hasReports)
-    {await db
+  if (hasReports) {
+    await db
       .prepare('DELETE FROM match_reports WHERE created_at < ?')
-      .bind(now - 90 * 86400000)
-      .run();}
+      .bind(now - 90 * 86_400_000)
+      .run();
+  }
 }
 async function deleteAccount(env: Env, owner: string, email: string, now: number) {
   // The tombstone blocks play/purchases. Retain only deletion-status/retry access until billing is cancelled.
@@ -280,23 +308,30 @@ async function deleteAccount(env: Env, owner: string, email: string, now: number
     name: string;
   }>();
   const names = new Set(tables.results.map((row) => row.name));
-  if (names.has('complimentary_plus'))
-    {await env.DB.prepare('DELETE FROM complimentary_plus WHERE email=?')
+  if (names.has('complimentary_plus')) {
+    await env.DB.prepare('DELETE FROM complimentary_plus WHERE email=?')
       .bind(email.toLowerCase())
-      .run();}
+      .run();
+  }
   if (names.has('online_matches')) {
     const online = await env.DB.prepare(
       'SELECT id FROM online_matches WHERE white_id=? OR black_id=?',
     )
       .bind(owner, owner)
       .all<{ id: string }>();
-    for (const game of online.results) {await env.HUMAN_MATCHES.getByName(game.id).anonymise(owner);}
+    for (const game of online.results) {
+      await env.HUMAN_MATCHES.getByName(game.id).anonymise(owner);
+    }
   }
-  if (names.has('coach_requests')) {await deleteCoachAccount(env.DB, owner);}
+  if (names.has('coach_requests')) {
+    await deleteCoachAccount(env.DB, owner);
+  }
   const matchmaking = env as unknown as {
     MATCHMAKING?: { getByName(name: string): { removeUser(id: string): Promise<void> } };
   };
-  if (matchmaking.MATCHMAKING) {await matchmaking.MATCHMAKING.getByName('beta').removeUser(owner);}
+  if (matchmaking.MATCHMAKING) {
+    await matchmaking.MATCHMAKING.getByName('beta').removeUser(owner);
+  }
   const cleanup = [
     'player_profiles',
     'activity_events',
@@ -304,10 +339,11 @@ async function deleteAccount(env: Env, owner: string, email: string, now: number
     'account',
     'session',
   ].map((table) => env.DB.prepare(`DELETE FROM ${table} WHERE user_id = ?`).bind(owner));
-  if (names.has('ratings'))
-    {cleanup.push(env.DB.prepare('DELETE FROM ratings WHERE user_id = ?').bind(owner));}
-  if (names.has('match_reports'))
-    {cleanup.push(
+  if (names.has('ratings')) {
+    cleanup.push(env.DB.prepare('DELETE FROM ratings WHERE user_id = ?').bind(owner));
+  }
+  if (names.has('match_reports')) {
+    cleanup.push(
       env.DB.prepare(
         'UPDATE match_reports SET reporter_id=CASE WHEN reporter_id=? THEN ? ELSE reporter_id END,opponent_id=CASE WHEN opponent_id=? THEN ? ELSE opponent_id END,reviewed_by=CASE WHEN reviewed_by=? THEN ? ELSE reviewed_by END WHERE reporter_id=? OR opponent_id=? OR reviewed_by=?',
       ).bind(
@@ -321,14 +357,18 @@ async function deleteAccount(env: Env, owner: string, email: string, now: number
         owner,
         owner,
       ),
-    );}
+    );
+  }
   // Coach table names are fixed application contracts, never supplied by a request.
   for (const table of ['player_cosmetics']) {
-    if (!names.has(table)) {continue;}
+    if (!names.has(table)) {
+      continue;
+    }
     const columns = await env.DB.prepare(`PRAGMA table_info(${table})`).all<{ name: string }>();
     const column = columns.results.find((entry) => ['user_id', 'owner'].includes(entry.name))?.name;
-    if (column)
-      {cleanup.push(env.DB.prepare(`DELETE FROM ${table} WHERE ${column} = ?`).bind(owner));}
+    if (column) {
+      cleanup.push(env.DB.prepare(`DELETE FROM ${table} WHERE ${column} = ?`).bind(owner));
+    }
   }
   cleanup.push(
     env.DB.prepare('DELETE FROM invitations WHERE email = ?').bind(email.toLowerCase()),
@@ -368,7 +408,9 @@ export async function resumeAccountDeletions(env: Env) {
       failed = true;
     }
   }
-  if (failed) {throw new Error('account_deletions_pending');}
+  if (failed) {
+    throw new Error('account_deletions_pending');
+  }
 }
 interface Delivery {
   id: string;
@@ -402,17 +444,19 @@ async function invitationBatch(
   now: number,
 ) {
   const action = new URL(request.url).pathname.endsWith('/preview') ? 'preview' : 'send';
-  if (typeof body.batchId !== 'string' || !/^[0-9a-f-]{36}$/.test(body.batchId))
-    {return response({ error: 'invalid_batch' }, 400);}
-  const {batchId} = body;
+  if (typeof body.batchId !== 'string' || !/^[0-9a-f-]{36}$/.test(body.batchId)) {
+    return response({ error: 'invalid_batch' }, 400);
+  }
+  const { batchId } = body;
   if (action === 'preview') {
     if (
       !Array.isArray(body.emails) ||
       body.emails.length === 0 ||
       body.emails.length > 10 ||
       body.emails.some((email) => typeof email !== 'string')
-    )
-      {return response({ error: 'invalid_batch' }, 400);}
+    ) {
+      return response({ error: 'invalid_batch' }, 400);
+    }
     const emails = [
       ...new Set((body.emails as string[]).map((email) => email.trim().toLowerCase())),
     ];
@@ -431,8 +475,9 @@ async function invitationBatch(
           .sort()
           .join(',') !== emails.sort().join(',') ||
         !!batch?.reissue !== (body.reissue === true)
-      )
-        {return response({ error: 'batch_conflict' }, 409);}
+      ) {
+        return response({ error: 'batch_conflict' }, 409);
+      }
       return response({ batchId, invitations: existing.results });
     }
     const members = await env.DB.prepare(
@@ -440,8 +485,9 @@ async function invitationBatch(
     )
       .bind(...emails)
       .all<{ email: string; language: Language }>();
-    if (members.results.length !== emails.length)
-      {return response({ error: 'waitlist_member_missing' }, 400);}
+    if (members.results.length !== emails.length) {
+      return response({ error: 'waitlist_member_missing' }, 400);
+    }
     const fingerprint = JSON.stringify([...emails].sort());
     await env.DB.batch([
       env.DB.prepare(
@@ -470,8 +516,9 @@ async function invitationBatch(
     )
       .bind(batchId)
       .first<{ fingerprint: string; reissue: number }>();
-    if (batch?.fingerprint !== fingerprint || !!batch.reissue !== (body.reissue === true))
-      {return response({ error: 'batch_conflict' }, 409);}
+    if (batch?.fingerprint !== fingerprint || !!batch.reissue !== (body.reissue === true)) {
+      return response({ error: 'batch_conflict' }, 409);
+    }
     return response({
       batchId,
       invitations: (
@@ -483,10 +530,12 @@ async function invitationBatch(
       ).results,
     });
   }
-  if (body.capacityConfirmed !== true)
-    {return response({ error: 'capacity_confirmation_required' }, 400);}
-  if (!env.RESEND_API_KEY || !env.AUTH_EMAIL_FROM)
-    {return response({ error: 'email_unconfigured' }, 503);}
+  if (body.capacityConfirmed !== true) {
+    return response({ error: 'capacity_confirmation_required' }, 400);
+  }
+  if (!env.RESEND_API_KEY || !env.AUTH_EMAIL_FROM) {
+    return response({ error: 'email_unconfigured' }, 503);
+  }
   const rows = await env.DB.prepare(
     'SELECT * FROM invitation_deliveries WHERE batch_id = ? ORDER BY email',
   )
@@ -495,8 +544,9 @@ async function invitationBatch(
   const batch = await env.DB.prepare('SELECT reissue FROM invitation_batches WHERE id=?')
     .bind(batchId)
     .first<{ reissue: number }>();
-  if (rows.results.length === 0 || rows.results.length > 10)
-    {return response({ error: 'invalid_batch' }, 400);}
+  if (rows.results.length === 0 || rows.results.length > 10) {
+    return response({ error: 'invalid_batch' }, 400);
+  }
   let sent = 0;
   for (const delivery of rows.results) {
     if (delivery.sent_at !== null) {
@@ -507,12 +557,15 @@ async function invitationBatch(
     if (
       delivery.expires_at <= now ||
       (delivery.status === 'sending' && delivery.created_at + 23 * 3_600_000 <= now)
-    )
-      {return response({ error: 'batch_requires_reissue', sent }, 409);}
+    ) {
+      return response({ error: 'batch_requires_reissue', sent }, 409);
+    }
     const admitted = await env.DB.prepare('SELECT redeemed_by FROM invitations WHERE email = ?')
       .bind(delivery.email)
       .first<{ redeemed_by: string | null }>();
-    if (admitted?.redeemed_by) {return response({ error: 'already_admitted', sent }, 409);}
+    if (admitted?.redeemed_by) {
+      return response({ error: 'already_admitted', sent }, 409);
+    }
     const changes = await env.DB.batch([
       env.DB.prepare(
         'INSERT INTO invitations(email,expires_at,delivery_id) VALUES (?,?,?) ON CONFLICT(email) DO UPDATE SET expires_at=excluded.expires_at,delivery_id=excluded.delivery_id WHERE invitations.redeemed_by IS NULL AND (invitations.delivery_id=excluded.delivery_id OR invitations.expires_at<=? OR ?=1)',
@@ -521,8 +574,9 @@ async function invitationBatch(
         "UPDATE invitation_deliveries SET status='sending' WHERE id=? AND sent_at IS NULL",
       ).bind(delivery.id),
     ]);
-    if (!changes[0].meta.changes)
-      {return response({ error: 'explicit_reissue_required', sent }, 409);}
+    if (!changes[0].meta.changes) {
+      return response({ error: 'explicit_reissue_required', sent }, 409);
+    }
     const copy = invitationCopy[delivery.language];
     const sentResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -539,7 +593,9 @@ async function invitationBatch(
       }),
       signal: AbortSignal.timeout(10_000),
     });
-    if (!sentResponse.ok) {return response({ error: 'delivery_unavailable', sent }, 503);}
+    if (!sentResponse.ok) {
+      return response({ error: 'delivery_unavailable', sent }, 503);
+    }
     await env.DB.prepare("UPDATE invitation_deliveries SET sent_at=?,status='sent' WHERE id=?")
       .bind(now, delivery.id)
       .run();
@@ -553,14 +609,16 @@ export async function accountsApi(request: Request, env: Env): Promise<Response 
     path !== '/api/account' &&
     !path.startsWith('/api/profiles/') &&
     !path.startsWith('/api/operator/')
-  )
-    {return null;}
+  ) {
+    return null;
+  }
   if (
     request.method !== 'GET' &&
     (request.headers.get('Origin') !== new URL(request.url).origin ||
       request.headers.get('Sec-Fetch-Site') === 'cross-site')
-  )
-    {return response({ error: 'forbidden' }, 403);}
+  ) {
+    return response({ error: 'forbidden' }, 403);
+  }
   try {
     if (path.startsWith('/api/profiles/') && request.method === 'GET') {
       const username = decodeURIComponent(path.slice('/api/profiles/'.length));
@@ -568,7 +626,9 @@ export async function accountsApi(request: Request, env: Env): Promise<Response 
       return profile ? response(profile) : response({ error: 'not_found' }, 404);
     }
     const session = await authFor(request, env).api.getSession({ headers: request.headers });
-    if (!session) {return response({ error: 'unauthorised' }, 401);}
+    if (!session) {
+      return response({ error: 'unauthorised' }, 401);
+    }
     const deleting = await env.DB.prepare(
       'SELECT user_id,completed_at FROM account_deletions WHERE user_id = ?',
     )
@@ -579,13 +639,15 @@ export async function accountsApi(request: Request, env: Env): Promise<Response 
       path === '/api/account' &&
       deleting.completed_at === null &&
       request.method === 'GET'
-    )
-      {return response({ deletionPending: true }, 202);}
+    ) {
+      return response({ deletionPending: true }, 202);
+    }
     if (
       deleting &&
       !(path === '/api/account' && deleting.completed_at === null && request.method === 'DELETE')
-    )
-      {return response({ error: 'account_deleted' }, 403);}
+    ) {
+      return response({ error: 'account_deleted' }, 403);
+    }
     if (path === '/api/account') {
       if (request.method === 'GET') {
         const profile = await loadPlayerProfile(env.DB, session.user.id);
@@ -597,12 +659,14 @@ export async function accountsApi(request: Request, env: Env): Promise<Response 
             : {}),
         });
       }
-      if (request.method === 'POST')
-        {return await saveProfile(env.DB, session.user.id, await boundedBody(request), Date.now());}
+      if (request.method === 'POST') {
+        return await saveProfile(env.DB, session.user.id, await boundedBody(request), Date.now());
+      }
       if (request.method === 'DELETE') {
         const body = await boundedBody(request);
-        if (body?.confirmation !== 'DELETE')
-          {return response({ error: 'confirmation_required' }, 400);}
+        if (body?.confirmation !== 'DELETE') {
+          return response({ error: 'confirmation_required' }, 400);
+        }
         try {
           await deleteAccount(env, session.user.id, session.user.email, Date.now());
         } catch {
@@ -612,7 +676,9 @@ export async function accountsApi(request: Request, env: Env): Promise<Response 
       }
       return response({ error: 'method' }, 405);
     }
-    if (!isOperator(session.user, env.OPERATOR_IDS)) {return response({ error: 'forbidden' }, 403);}
+    if (!isOperator(session.user, env.OPERATOR_IDS)) {
+      return response({ error: 'forbidden' }, 403);
+    }
     if (path === '/api/operator/billing' && request.method === 'GET') {
       return response({
         cases: (
@@ -624,8 +690,9 @@ export async function accountsApi(request: Request, env: Env): Promise<Response 
     }
     if (path === '/api/operator/billing' && request.method === 'POST') {
       const body = await boundedBody(request);
-      if (!body || typeof body.caseId !== 'string' || body.caseId.length > 250)
-        {return response({ error: 'invalid' }, 400);}
+      if (!body || typeof body.caseId !== 'string' || body.caseId.length > 250) {
+        return response({ error: 'invalid' }, 400);
+      }
       const updated = await env.DB.prepare(
         'UPDATE billing_review_cases SET resolved_at=? WHERE id=? AND resolved_at IS NULL',
       )
@@ -665,8 +732,9 @@ export async function accountsApi(request: Request, env: Env): Promise<Response 
         !body ||
         typeof body.reportId !== 'string' ||
         !['reviewed', 'dismissed'].includes(String(body.status))
-      )
-        {return response({ error: 'invalid' }, 400);}
+      ) {
+        return response({ error: 'invalid' }, 400);
+      }
       const result = await env.DB.prepare(
         'UPDATE match_reports SET status=?,reviewed_by=?,reviewed_at=? WHERE id=?',
       )

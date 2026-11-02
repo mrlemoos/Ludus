@@ -12,13 +12,19 @@ test('online lobby exposes friend links and requires explicit acceptance to leav
   });
   await page.route('**/api/**', async (route) => {
     const request = route.request();
-      const path = new URL(request.url()).pathname;
-    if (request.method() !== 'GET') {writes.push(path);}
-    if (path === '/api/me')
-      {return route.fulfill({ json: { user: { id: 'one', name: 'Player one' } } });}
-    if (path === '/api/appearance')
-      {return route.fulfill({ json: { appearance: { board: 'wood', pieces: 'wood' } } });}
-    if (path.endsWith('/history')) {return route.fulfill({ json: [] });}
+    const path = new URL(request.url()).pathname;
+    if (request.method() !== 'GET') {
+      writes.push(path);
+    }
+    if (path === '/api/me') {
+      return route.fulfill({ json: { user: { id: 'one', name: 'Player one' } } });
+    }
+    if (path === '/api/appearance') {
+      return route.fulfill({ json: { appearance: { board: 'wood', pieces: 'wood' } } });
+    }
+    if (path.endsWith('/history')) {
+      return route.fulfill({ json: [] });
+    }
     if (path === '/api/online/invitations') {
       state = {
         status: 'invited',
@@ -27,20 +33,22 @@ test('online lobby exposes friend links and requires explicit acceptance to leav
       };
       return route.fulfill({ json: state });
     }
-    if (path.endsWith('/invitations/cancel') || path.endsWith('/queue/cancel'))
-      {state = { status: 'idle' };}
-    if (path.endsWith('/queue'))
-      {state = {
+    if (path.endsWith('/invitations/cancel') || path.endsWith('/queue/cancel')) {
+      state = { status: 'idle' };
+    }
+    if (path.endsWith('/queue')) {
+      state = {
         status: 'queued',
         entry: {
           user: 'one',
           control: '5+3',
           rated: false,
           rating: 1500,
-          joinedAt: Date.now() - 31000,
+          joinedAt: Date.now() - 31_000,
           token: 'queue-token',
         },
-      };}
+      };
+    }
     if (path.endsWith('/queue/ai')) {
       expect(request.postDataJSON()).toEqual({ token: 'queue-token' });
       state = { status: 'idle' };

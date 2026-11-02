@@ -39,7 +39,9 @@ if (mode === 'template' && file) {
   process.stdout.write(
     `${report.passed ? 'PASS' : 'FAIL'} ${report.observations}/480 observations. USD ${report.totalCostUsd.toFixed(4)}.\n`,
   );
-  if (!report.passed) {process.exitCode = 1;}
+  if (!report.passed) {
+    process.exitCode = 1;
+  }
 } else {
   throw new Error(
     'Usage: node scripts/evaluate-coach.ts template <matrix.json> [model] | report <completed-matrix.json> <model> <report.json>',

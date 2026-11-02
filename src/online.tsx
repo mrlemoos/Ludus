@@ -351,14 +351,16 @@ export function Online() {
       setPending(false);
     }
   }
-  async function act(action: Omit<HumanAction, 'revision'>) { return run(async () => {
+  async function act(action: Omit<HumanAction, 'revision'>) {
+    return run(async () => {
       if (!game) {
         return;
       }
       accept(await api(`games/${game.id}`, { ...action, revision: game.revision }));
       setSelected(null);
       setPromotion(null);
-    }); }
+    });
+  }
   function navigate(next: typeof replay) {
     setReplay(next);
     setSelected(null);
@@ -482,7 +484,9 @@ export function Online() {
       selected,
     },
   };
-  function clock(time: number) { return `${Math.floor(Math.ceil(time / 1000) / 60)}:${String(Math.ceil(time / 1000) % 60).padStart(2, '0')}`; }
+  function clock(time: number) {
+    return `${Math.floor(Math.ceil(time / 1000) / 60)}:${String(Math.ceil(time / 1000) % 60).padStart(2, '0')}`;
+  }
   const playing = Boolean(id && game);
   return (
     <div className={`site-shell game-shell${playing ? ' match-shell' : ''}`}>
@@ -505,9 +509,7 @@ export function Online() {
           <p>{boardCopy.loading}</p>
         ) : user ? (
           id ? (
-            !game ? (
-              <p>{boardCopy.loading}</p>
-            ) : (
+            game ? (
               <div className="match-layout">
                 <div className="match-heading">
                   <Link to="/online" className="eyebrow text-muted" aria-label={c.back}>
@@ -868,7 +870,9 @@ export function Online() {
                     <Dialog.Root
                       open
                       onOpenChange={(open) => {
-                        if (!open) {setPromotion(null);}
+                        if (!open) {
+                          setPromotion(null);
+                        }
                       }}
                     >
                       <Dialog.Portal>
@@ -899,6 +903,8 @@ export function Online() {
                   )}
                 </div>
               </div>
+            ) : (
+              <p>{boardCopy.loading}</p>
             )
           ) : (
             <div className="grid max-w-2xl gap-5">
@@ -929,13 +935,15 @@ export function Online() {
                             token: inviteToken,
                             colour,
                           });
-                          if (state.status === 'assigned') {setParams({ game: state.match.id });}
-                        } catch (caught) {
-                          if (caught instanceof Error && caught.message === 'not_found') {
+                          if (state.status === 'assigned') {
+                            setParams({ game: state.match.id });
+                          }
+                        } catch (error_) {
+                          if (error_ instanceof Error && error_.message === 'not_found') {
                             setMissingInvite(true);
                             return;
                           }
-                          throw caught;
+                          throw error_;
                         }
                       })
                     }
@@ -988,7 +996,9 @@ export function Online() {
                           void run(async () => {
                             const state = await api<QueueState>('queue', { control, rated: false });
                             setQueue(state);
-                            if (state.status === 'assigned') {setParams({ game: state.match.id });}
+                            if (state.status === 'assigned') {
+                              setParams({ game: state.match.id });
+                            }
                           })
                         }
                       >
@@ -1049,9 +1059,11 @@ export function Online() {
                                   'queue/ai',
                                   { token: queue.entry.token },
                                 );
-                                if (state.status === 'assigned')
-                                  {setParams({ game: state.match.id });}
-                                else if (state.aiAccepted) {location.assign('/play');}
+                                if (state.status === 'assigned') {
+                                  setParams({ game: state.match.id });
+                                } else if (state.aiAccepted) {
+                                  location.assign('/play');
+                                }
                               })
                             }
                           >

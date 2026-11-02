@@ -48,7 +48,7 @@ describe('game API identity boundary', () => {
     );
     expect(result.status).toBe(404);
     expect(stub.read).toHaveBeenCalledWith('signed-in-owner');
-    expect(await result.json()).toEqual({ error: 'not_found' });
+    await expect(result.json()).resolves.toEqual({ error: 'not_found' });
   });
 
   it('passes action authorisation to the match with authenticated identity', async () => {
@@ -131,7 +131,7 @@ describe('game API identity boundary', () => {
         env,
       );
       expect(response.status).toBe(503);
-      expect(await response.json()).toEqual({ error: 'unavailable' });
+      await expect(response.json()).resolves.toEqual({ error: 'unavailable' });
     } finally {
       log.mockRestore();
     }

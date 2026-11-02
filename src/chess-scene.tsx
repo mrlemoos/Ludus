@@ -49,10 +49,14 @@ export function ChessScene() {
       <div className="chessboard">
         {Array.from({ length: 64 }, (_, i) => {
           const row = Math.floor(i / 8);
-            const col = i % 8;
-          let kind = row === 0 || row === 7 ? backRank[col] : (row === 1 || row === 6 ? 'pawn' : '');
-          if ((row === 6 && col === 4) || (row === 1 && col === 4)) {kind = '';}
-          if ((row === 4 && col === 4) || (row === 3 && col === 4)) {kind = 'pawn';}
+          const col = i % 8;
+          let kind = row === 0 || row === 7 ? backRank[col] : row === 1 || row === 6 ? 'pawn' : '';
+          if ((row === 6 && col === 4) || (row === 1 && col === 4)) {
+            kind = '';
+          }
+          if ((row === 4 && col === 4) || (row === 3 && col === 4)) {
+            kind = 'pawn';
+          }
           return (
             <div
               key={i}

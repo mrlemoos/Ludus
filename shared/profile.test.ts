@@ -1,5 +1,6 @@
 import { invitationEligible, isOperator, parseProfile, validTimezone } from './profile';
 import { describe, expect, it } from 'vitest';
+
 const valid = {
   username: 'Chess_Player',
   language: 'fr-FR',
@@ -10,11 +11,13 @@ const valid = {
   adult: true,
 };
 describe('profile validation', () => {
-  it('keeps teaching and computer skill independent', () =>
+  it('keeps teaching and computer skill independent', () => {
     expect(parseProfile(valid)).toMatchObject({
       chessLevel: 'casual',
       teachingProfile: 'developing',
-    }));
+    });
+  });
+
   it.each([
     { adult: false },
     { username: 'ab' },
@@ -24,12 +27,14 @@ describe('profile validation', () => {
     { activityPublic: 'false' },
     { teachingProfile: 'expert' },
     { chessLevel: null },
-  ])('rejects invalid fields %j', (patch) =>
-    expect(parseProfile({ ...valid, ...patch })).toBeNull(),
-  );
-  it.each(['UTC', 'Europe/Madrid', 'America/Sao_Paulo'])('accepts IANA timezone %s', (zone) =>
-    expect(validTimezone(zone)).toBe(true),
-  );
+  ])('rejects invalid fields %j', (patch) => {
+    expect(parseProfile({ ...valid, ...patch })).toBeNull();
+  });
+
+  it.each(['UTC', 'Europe/Madrid', 'America/Sao_Paulo'])('accepts IANA timezone %s', (zone) => {
+    expect(validTimezone(zone)).toBe(true);
+  });
+
   it('requires explicit verified-ID operator access', () => {
     expect(isOperator({ id: 'owner', emailVerified: true }, 'other, owner')).toBe(true);
     expect(isOperator({ id: 'owner', emailVerified: false }, 'owner')).toBe(false);

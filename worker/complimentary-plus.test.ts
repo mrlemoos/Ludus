@@ -7,8 +7,9 @@ function fixture() {
   const sql = new DatabaseSync(':memory:');
   for (const file of readdirSync('drizzle')
     .filter((name) => name.endsWith('.sql'))
-    .sort())
-    {sql.exec(readFileSync(`drizzle/${file}`, 'utf8'));}
+    .sort()) {
+    sql.exec(readFileSync(`drizzle/${file}`, 'utf8'));
+  }
   const db = {
     prepare: (query: string) => ({
       bind: (...args: string[]) => ({ first: async () => sql.prepare(query).get(...args) ?? null }),

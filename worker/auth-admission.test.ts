@@ -10,8 +10,9 @@ function fixture() {
     '0001_pale_microchip.sql',
     '0003_accounts.sql',
     '0011_nifty_redwing.sql',
-  ])
-    {sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));}
+  ]) {
+    sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));
+  }
   sqlite
     .prepare(
       'INSERT INTO user(id,name,email,email_verified,created_at,updated_at) VALUES (?,?,?,?,?,?)',

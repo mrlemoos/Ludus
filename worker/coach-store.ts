@@ -1,6 +1,13 @@
 import { monthKey } from '../shared/coaching';
-import type { AnalysisLine, CoachDocument, SavedCoachHistory, SavedReply, SavedReview, SavedReviewWithAnalysis } from '../shared/coaching';
-import type { TeachingProfile } from '../shared/coaching';
+import type {
+  AnalysisLine,
+  CoachDocument,
+  SavedCoachHistory,
+  SavedReply,
+  SavedReview,
+  SavedReviewWithAnalysis,
+  TeachingProfile,
+} from '../shared/coaching';
 import type { Language } from '../shared/waitlist';
 
 export interface Reservation {

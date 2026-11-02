@@ -25,7 +25,9 @@ export async function admitSession(db: D1Database, userId: string, now: number):
 export function authFor(request: Request, env: Env, capture?: (url: string) => void) {
   const local = localDevelopment(request, env);
   const secret = env.BETTER_AUTH_SECRET;
-  if (!secret) {throw new Error('Authentication is not configured');}
+  if (!secret) {
+    throw new Error('Authentication is not configured');
+  }
   const db = drizzle(env.DB, { schema });
   async function eligible(email: string, id: string | null) {
     if (
@@ -33,8 +35,9 @@ export function authFor(request: Request, env: Env, capture?: (url: string) => v
       (await env.DB.prepare('SELECT user_id FROM account_deletions WHERE user_id = ?')
         .bind(id)
         .first())
-    )
-      {return false;}
+    ) {
+      return false;
+    }
     const invited = await db
       .select()
       .from(schema.invitations)
@@ -55,9 +58,7 @@ export function authFor(request: Request, env: Env, capture?: (url: string) => v
     databaseHooks: {
       user: {
         create: {
-          before: async (user) => 
-            (await eligible(user.email, null)) ? { data: user } : false
-          ,
+          before: async (user) => ((await eligible(user.email, null)) ? { data: user } : false),
         },
       },
       session: {
@@ -88,13 +89,16 @@ export function authFor(request: Request, env: Env, capture?: (url: string) => v
             .from(schema.user)
             .where(eq(schema.user.email, email.toLowerCase()))
             .get();
-          if (!(await eligible(email, user?.id ?? null))) {return;}
+          if (!(await eligible(email, user?.id ?? null))) {
+            return;
+          }
           if (local && capture) {
             capture(url);
             return;
           }
-          if (!env.RESEND_API_KEY || !env.AUTH_EMAIL_FROM)
-            {throw new Error('Email delivery is not configured');}
+          if (!env.RESEND_API_KEY || !env.AUTH_EMAIL_FROM) {
+            throw new Error('Email delivery is not configured');
+          }
           const response = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: {
@@ -109,7 +113,9 @@ export function authFor(request: Request, env: Env, capture?: (url: string) => v
             }),
             signal: AbortSignal.timeout(10_000),
           });
-          if (!response.ok) {throw new Error('Email delivery failed');}
+          if (!response.ok) {
+            throw new Error('Email delivery failed');
+          }
         },
       }),
     ],

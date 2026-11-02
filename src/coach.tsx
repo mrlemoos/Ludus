@@ -218,17 +218,15 @@ export function Coach() {
         }
         let missing = context.gaps;
         setHistoryMatches(
-          context.matches
-            .slice(1, 4)
-            .map((previous) => ({
-              analysis: null,
-              colour: previous.colour,
-              completedAt: previous.completedAt ?? 0,
-              kind: previous.kind ?? 'computer',
-              matchId: previous.id,
-              moves: previous.moves,
-              result: previous.result,
-            })),
+          context.matches.slice(1, 4).map((previous) => ({
+            analysis: null,
+            colour: previous.colour,
+            completedAt: previous.completedAt ?? 0,
+            kind: previous.kind ?? 'computer',
+            matchId: previous.id,
+            moves: previous.moves,
+            result: previous.result,
+          })),
         );
         const total = 1 + context.matches.length - 1 + context.gaps;
         const analysis =
@@ -261,17 +259,15 @@ export function Coach() {
           }
         }
         setHistoryMatches(
-          context.matches
-            .slice(1, 4)
-            .map((previous, index) => ({
-              analysis: earlierAnalyses[index],
-              colour: previous.colour,
-              completedAt: previous.completedAt ?? 0,
-              kind: previous.kind ?? 'computer',
-              matchId: previous.id,
-              moves: previous.moves,
-              result: previous.result,
-            })),
+          context.matches.slice(1, 4).map((previous, index) => ({
+            analysis: earlierAnalyses[index],
+            colour: previous.colour,
+            completedAt: previous.completedAt ?? 0,
+            kind: previous.kind ?? 'computer',
+            matchId: previous.id,
+            moves: previous.moves,
+            result: previous.result,
+          })),
         );
         setHistoryGaps(missing);
         reviewRequest.current = {
@@ -381,7 +377,9 @@ export function Coach() {
     }
   }
   function Notice({ savedLanguage }: NoticeProps) {
-    if (savedLanguage === language) {return null;}
+    if (savedLanguage === language) {
+      return null;
+    }
     return (
       <p role="note" className="game-notice my-3">
         {c.language} {languageName(savedLanguage, language)}. {c.preserved}
@@ -505,9 +503,9 @@ export function Coach() {
               >
                 {pending === 'analysis'
                   ? `${c.analysing} ${progress}`
-                  : (pending === 'generation'
+                  : pending === 'generation'
                     ? c.generating
-                    : c.generate)}
+                    : c.generate}
               </Button>
             )}
             {!review && status.reviewCredits.available < 1 && (

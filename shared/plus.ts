@@ -7,7 +7,9 @@ export interface PlusAccess {
 }
 
 export function hasPlusAccess(access: PlusAccess, now: number): boolean {
-  function active(until: number | null | undefined) { return typeof until === 'number' && Number.isFinite(until) && until > now; }
+  function active(until: number | null | undefined) {
+    return typeof until === 'number' && Number.isFinite(until) && until > now;
+  }
   return (
     access.complimentaryPlus === true ||
     active(access.trialExpiresAt) ||

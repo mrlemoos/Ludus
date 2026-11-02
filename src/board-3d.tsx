@@ -14,10 +14,20 @@ import { Chess } from 'chess.js';
 import type { PieceSymbol, Square } from 'chess.js';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
-import { DataTexture, PerspectiveCamera, RGBAFormat, RepeatWrapping, SRGBColorSpace, Vector3 } from 'three';
+import {
+  DataTexture,
+  PerspectiveCamera,
+  RGBAFormat,
+  RepeatWrapping,
+  SRGBColorSpace,
+  Vector3,
+} from 'three';
 import type { BufferGeometry, Texture } from 'three';
 
-interface TableProps { captured: CapturedPiece[]; tableClock: TableClockProps }
+interface TableProps {
+  captured: CapturedPiece[];
+  tableClock: TableClockProps;
+}
 
 interface PieceProps {
   type: PieceSymbol;
@@ -100,13 +110,17 @@ function Scene({ board: boardProps, table, looking, lowQuality }: SceneProps) {
   }, [fen]);
   const geometries = useMemo(createPieceGeometries, []);
   useEffect(
-    () => () =>{  Object.values(geometries).forEach((geometry) => geometry.dispose()); },
+    () => () => {
+      Object.values(geometries).forEach((geometry) => {
+        geometry.dispose();
+      });
+    },
     [geometries],
   );
   const wood = useMemo(() => {
     const data = new Uint8Array(256 * 256 * 4);
-    for (let y = 0; y < 256; y++)
-      {for (let x = 0; x < 256; x++) {
+    for (let y = 0; y < 256; y++) {
+      for (let x = 0; x < 256; x++) {
         const grain =
           245 +
           Math.sin(x * 0.39 + Math.sin(y * 0.025) * 4 + Math.sin(y * 0.007) * 8) * 3 +
@@ -116,14 +130,20 @@ function Scene({ board: boardProps, table, looking, lowQuality }: SceneProps) {
         data[i + 1] = grain;
         data[i + 2] = grain;
         data[i + 3] = 255;
-      }}
+      }
+    }
     const texture = new DataTexture(data, 256, 256, RGBAFormat);
     texture.colorSpace = SRGBColorSpace;
     texture.wrapS = texture.wrapT = RepeatWrapping;
     texture.needsUpdate = true;
     return texture;
   }, []);
-  useEffect(() => () =>{  wood.dispose(); }, [wood]);
+  useEffect(
+    () => () => {
+      wood.dispose();
+    },
+    [wood],
+  );
   return (
     <group>
       {/* Shortcut: ambient fill approximates indirect light; bake architectural lighting before beta. */}
@@ -166,7 +186,9 @@ function Scene({ board: boardProps, table, looking, lowQuality }: SceneProps) {
               position={[file - 3.5, 0.02, rank - 3.5]}
               onClick={(e) => {
                 e.stopPropagation();
-                if (!looking && e.delta < 5) {onSquare(square);}
+                if (!looking && e.delta < 5) {
+                  onSquare(square);
+                }
               }}
             >
               <mesh receiveShadow position={[0, -0.02, 0]}>
@@ -204,7 +226,9 @@ function Scene({ board: boardProps, table, looking, lowQuality }: SceneProps) {
               <group
                 key={`${colour}-${i}`}
                 name={`captured-${colour}-${piece.type}`}
-                onClick={(event) =>{  event.stopPropagation(); }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                }}
                 position={[
                   side * (5.2 + (i % 2) * 0.85),
                   -0.42,
@@ -254,7 +278,9 @@ function Camera({ flipped, looking, resetKey, presentation = false }: CameraProp
   const previousSize = useRef(size);
   useEffect(() => {
     const orbit = controls.current;
-    if (!orbit || !(camera instanceof PerspectiveCamera) || !size.width || !size.height) {return;}
+    if (!orbit || !(camera instanceof PerspectiveCamera) || !size.width || !size.height) {
+      return;
+    }
     const resized =
       previousSize.current.width !== size.width || previousSize.current.height !== size.height;
     previousSize.current = size;
@@ -269,7 +295,9 @@ function Camera({ flipped, looking, resetKey, presentation = false }: CameraProp
     const position = looking
       ? new Vector3(0, 8.6, side * 22)
       : new Vector3(0, Math.sin(elevation) * distance, side * Math.cos(elevation) * distance);
-    if (presentation && !looking) {position.applyAxisAngle(new Vector3(0, 1, 0), -0.32);}
+    if (presentation && !looking) {
+      position.applyAxisAngle(new Vector3(0, 1, 0), -0.32);
+    }
     const target = looking ? new Vector3(flipped ? 10 : 35, 10, side * -52) : new Vector3(0, 0, 0);
     const azimuth = looking
       ? Math.atan2(position.x - target.x, position.z - target.z)
@@ -278,21 +306,27 @@ function Camera({ flipped, looking, resetKey, presentation = false }: CameraProp
       minDistance: looking ? 60 : distance,
       maxDistance: looking ? 88 : distance + 7,
       minPolarAngle: looking ? 1.48 : 0.25,
-      maxPolarAngle: looking ? 1.63 : (presentation ? 1.05 : 0.84),
+      maxPolarAngle: looking ? 1.63 : presentation ? 1.05 : 0.84,
       minAzimuthAngle: azimuth - (looking ? 0.3 : 0.4),
       maxAzimuthAngle: azimuth + (looking ? 0.3 : 0.4),
     };
     function finish() {
-      if (!orbit) {return;}
+      if (!orbit) {
+        return;
+      }
       camera.position.copy(position);
       orbit.target.copy(target);
       Object.assign(orbit, limits);
       orbit.update();
       motion.current = null;
     }
-    if (initial.current || resized || window.matchMedia('(prefers-reduced-motion: reduce)').matches)
-      {finish();}
-    else {
+    if (
+      initial.current ||
+      resized ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      finish();
+    } else {
       // Destination constraints would clamp intermediate frames into a jump.
       Object.assign(orbit, {
         minDistance: 0,
@@ -308,13 +342,17 @@ function Camera({ flipped, looking, resetKey, presentation = false }: CameraProp
   }, [camera, size.width, size.height, flipped, looking, resetKey, presentation]);
   useFrame((_, delta) => {
     const move = motion.current;
-      const orbit = controls.current;
-    if (!move || !orbit) {return;}
+    const orbit = controls.current;
+    if (!move || !orbit) {
+      return;
+    }
     move.elapsed += delta;
     const amount = 1 - Math.exp(-delta * 16);
     camera.position.lerp(move.position, amount);
     orbit.target.lerp(move.target, amount);
-    if (move.elapsed >= 0.35) {move.finish();}
+    if (move.elapsed >= 0.35) {
+      move.finish();
+    }
     orbit.update();
   }, -2);
   return (
@@ -354,7 +392,12 @@ export default function Board3D({
           gl.setClearColor('#c5baa2');
         }}
       >
-        <PerformanceMonitor bounds={() => [30, 45]} onDecline={() =>{  setLowQuality(true); }} />
+        <PerformanceMonitor
+          bounds={() => [30, 45]}
+          onDecline={() => {
+            setLowQuality(true);
+          }}
+        />
         <Suspense fallback={null}>
           <Scene board={board} table={table} looking={looking} lowQuality={lowQuality} />
           <Camera

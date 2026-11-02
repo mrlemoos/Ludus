@@ -7,12 +7,14 @@ function game(
   winner: 'w' | 'b' | null,
   completedAt: number,
   difficulty: Difficulty = 2,
-): ComputerHistory  { return ({
-  difficulty,
-  colour: 'w',
-  result: { winner, reason: 'checkmate' },
-  completedAt,
-}); }
+): ComputerHistory {
+  return {
+    difficulty,
+    colour: 'w',
+    result: { winner, reason: 'checkmate' },
+    completedAt,
+  };
+}
 
 describe('computer strength suggestions', () => {
   it('shares a named opponent and coach identity without an Elo claim', () => {

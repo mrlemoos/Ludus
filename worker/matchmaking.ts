@@ -57,7 +57,9 @@ export class Matchmaking extends DurableObject<Env> {
   }
   async status(user: string) {
     const state = this.state(user);
-    if (state.status === 'assigned') {return this.ensure(state.match);}
+    if (state.status === 'assigned') {
+      return this.ensure(state.match);
+    }
     if (
       state.status === 'invited' &&
       (state.expiresAt <= Date.now() || !this.inviteRow(state.token))
@@ -74,15 +76,20 @@ export class Matchmaking extends DurableObject<Env> {
         state.entry.rated,
         state.entry.rating,
       );
-      if (next.status === 'assigned') {this.pushAssigned(next);}
+      if (next.status === 'assigned') {
+        this.pushAssigned(next);
+      }
       return next;
     }
     return state;
   }
   async join(user: string, control: Control, rated: boolean, rating: number) {
     const next = await this.place(user, control, rated, rating);
-    if (next.status === 'assigned') {this.pushAssigned(next);}
-    else {this.push(user, next);}
+    if (next.status === 'assigned') {
+      this.pushAssigned(next);
+    } else {
+      this.push(user, next);
+    }
     return next;
   }
   private async place(
@@ -95,14 +102,23 @@ export class Matchmaking extends DurableObject<Env> {
       !['5+3', '10+5'].includes(control) ||
       typeof rated !== 'boolean' ||
       !Number.isFinite(rating)
-    )
-      {throw new Error('invalid_queue');}
-    if (rated && !RATED_ENABLED) {throw new Error('rated_unavailable');}
+    ) {
+      throw new Error('invalid_queue');
+    }
+    if (rated && !RATED_ENABLED) {
+      throw new Error('rated_unavailable');
+    }
     const state = this.state(user);
-      const now = Date.now();
-    if (state.status === 'assigned') {return this.ensure(state.match);}
-    if (state.status === 'computer') {throw new Error('computer_active');}
-    if (state.status === 'invited' && state.expiresAt > now) {throw new Error('invite_active');}
+    const now = Date.now();
+    if (state.status === 'assigned') {
+      return this.ensure(state.match);
+    }
+    if (state.status === 'computer') {
+      throw new Error('computer_active');
+    }
+    if (state.status === 'invited' && state.expiresAt > now) {
+      throw new Error('invite_active');
+    }
     const entry: QueueEntry =
       state.status === 'queued'
         ? state.entry
@@ -138,25 +154,32 @@ export class Matchmaking extends DurableObject<Env> {
       this.pushAssigned(ready);
       return ready;
     }
-    if (state.status !== 'queued' || state.entry.token !== token) {throw new Error('stale_queue');}
-    if (ai && !canAcceptAI(state.entry, token, Date.now())) {throw new Error('too_early');}
+    if (state.status !== 'queued' || state.entry.token !== token) {
+      throw new Error('stale_queue');
+    }
+    if (ai && !canAcceptAI(state.entry, token, Date.now())) {
+      throw new Error('too_early');
+    }
     const idle = { status: 'idle' as const };
     this.save(user, idle);
     this.push(user, idle);
     return { ...idle, aiAccepted: ai };
   }
   async createInvite(user: string, control: Control) {
-    if (!['5+3', '10+5'].includes(control)) {throw new Error('invalid_invite');}
+    if (!['5+3', '10+5'].includes(control)) {
+      throw new Error('invalid_invite');
+    }
     const state = this.state(user);
-    if (state.status === 'assigned' || state.status === 'queued' || state.status === 'computer')
-      {throw new Error('busy');}
+    if (state.status === 'assigned' || state.status === 'queued' || state.status === 'computer') {
+      throw new Error('busy');
+    }
     if (state.status === 'invited' && state.expiresAt > Date.now() && this.inviteRow(state.token)) {
       this.push(user, state);
       return { token: state.token, expiresAt: state.expiresAt };
     }
     const token = crypto.randomUUID();
-      const expiresAt = Date.now() + 86_400_000;
-      const invite: Invite = { owner: user, control, expiresAt };
+    const expiresAt = Date.now() + 86_400_000;
+    const invite: Invite = { owner: user, control, expiresAt };
     this.ctx.storage.sql.exec('INSERT INTO invites VALUES (?,?)', token, JSON.stringify(invite));
     const next = { status: 'invited' as const, token, expiresAt };
     this.save(user, next);
@@ -165,7 +188,9 @@ export class Matchmaking extends DurableObject<Env> {
   }
   async revokeInvite(user: string, token: string) {
     const state = this.state(user);
-    if (state.status !== 'invited' || state.token !== token) {throw new Error('stale_invite');}
+    if (state.status !== 'invited' || state.token !== token) {
+      throw new Error('stale_invite');
+    }
     this.ctx.storage.sql.exec('DELETE FROM invites WHERE token=?', token);
     const idle = { status: 'idle' as const };
     this.save(user, idle);
@@ -176,10 +201,14 @@ export class Matchmaking extends DurableObject<Env> {
     const row = this.ctx.storage.sql
       .exec<{ data: string }>('SELECT data FROM invites WHERE token=?', token)
       .toArray()[0];
-    if (!row) {throw new Error('not_found');}
+    if (!row) {
+      throw new Error('not_found');
+    }
     const invite: Invite = JSON.parse(row.data);
     if (invite.match) {
-      if (![invite.owner, invite.redeemedBy].includes(user)) {throw new Error('redeemed');}
+      if (![invite.owner, invite.redeemedBy].includes(user)) {
+        throw new Error('redeemed');
+      }
       const ready = await this.ensure(invite.match);
       this.pushAssigned(ready);
       return ready;
@@ -188,10 +217,11 @@ export class Matchmaking extends DurableObject<Env> {
       !['w', 'b', 'random'].includes(colour) ||
       invite.expiresAt <= Date.now() ||
       invite.owner === user
-    )
-      {throw new Error('invalid_invite');}
+    ) {
+      throw new Error('invalid_invite');
+    }
     const ownerState = this.state(invite.owner);
-      const joinerState = this.state(user);
+    const joinerState = this.state(user);
     if (
       ownerState.status !== 'invited' ||
       ownerState.token !== token ||
@@ -199,8 +229,9 @@ export class Matchmaking extends DurableObject<Env> {
       joinerState.status === 'assigned' ||
       joinerState.status === 'queued' ||
       joinerState.status === 'invited'
-    )
-      {throw new Error('busy');}
+    ) {
+      throw new Error('busy');
+    }
     const guestWhite =
       colour === 'w' || (colour === 'random' && crypto.getRandomValues(new Uint8Array(1))[0] < 128);
     const match: Assignment = {
@@ -240,8 +271,9 @@ export class Matchmaking extends DurableObject<Env> {
       this.push(user, state);
       return { reserved: true };
     }
-    if (state.status !== 'idle' && !(state.status === 'invited' && state.expiresAt <= Date.now()))
-      {throw new Error('busy');}
+    if (state.status !== 'idle' && !(state.status === 'invited' && state.expiresAt <= Date.now())) {
+      throw new Error('busy');
+    }
     const next = { status: 'computer' as const, id };
     this.save(user, next);
     this.push(user, next);
@@ -257,25 +289,30 @@ export class Matchmaking extends DurableObject<Env> {
   }
   async removeUser(user: string) {
     const current = this.state(user);
-    if (current.status === 'assigned')
-      {await this.release(current.match.id, Object.values(current.match.players));}
+    if (current.status === 'assigned') {
+      await this.release(current.match.id, Object.values(current.match.players));
+    }
     this.ctx.storage.sql.exec('DELETE FROM players WHERE user_id=?', user);
     const rows = this.ctx.storage.sql
       .exec<{ token: string; data: string }>('SELECT token,data FROM invites')
       .toArray();
     for (const row of rows) {
       const invite: Invite = JSON.parse(row.data);
-      if (invite.owner === user || invite.redeemedBy === user)
-        {this.ctx.storage.sql.exec('DELETE FROM invites WHERE token=?', row.token);}
+      if (invite.owner === user || invite.redeemedBy === user) {
+        this.ctx.storage.sql.exec('DELETE FROM invites WHERE token=?', row.token);
+      }
     }
   }
   async webSocketClose() {}
   async webSocketError() {}
   async fetch(request: Request) {
     const user = request.headers.get('X-Player');
-    if (!user) {return new Response(null, { status: 404 });}
-    if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket')
-      {return new Response(null, { status: 426 });}
+    if (!user) {
+      return new Response(null, { status: 404 });
+    }
+    if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
+      return new Response(null, { status: 426 });
+    }
     const state = await this.status(user);
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1], [user]);

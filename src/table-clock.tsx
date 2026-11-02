@@ -3,7 +3,10 @@ import type { Color } from 'chess.js';
 import { useEffect, useMemo } from 'react';
 import { CanvasTexture, SRGBColorSpace } from 'three';
 
-export interface TableClockProps { times: Record<Color, string>; active: Color | null }
+export interface TableClockProps {
+  times: Record<Color, string>;
+  active: Color | null;
+}
 interface DisplayProps {
   times: Record<Color, string>;
   active: Color | null;
@@ -18,7 +21,12 @@ function Display({ times, active, reversed }: DisplayProps) {
     map.colorSpace = SRGBColorSpace;
     return map;
   }, []);
-  useEffect(() => () =>{  texture.dispose(); }, [texture]);
+  useEffect(
+    () => () => {
+      texture.dispose();
+    },
+    [texture],
+  );
   useEffect(() => {
     const c = texture.image.getContext('2d')!;
     c.fillStyle = '#bac4a2';
@@ -58,7 +66,9 @@ export function TableClock({ times, active }: TableClockProps) {
     <group
       position={[0, 0.4, -6.2]}
       name="table-clock"
-      onClick={(event) =>{  event.stopPropagation(); }}
+      onClick={(event) => {
+        event.stopPropagation();
+      }}
     >
       <RoundedBox args={[3.9, 1.6, 1.34]} radius={0.12} smoothness={2} castShadow receiveShadow>
         <meshStandardMaterial color="#493024" roughness={0.42} />

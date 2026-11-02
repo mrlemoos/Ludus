@@ -21,36 +21,55 @@ export async function featuresApi(original: Request, env: Env): Promise<Response
     path !== '/api/appearance' &&
     !path.startsWith('/api/online/') &&
     !path.startsWith('/api/coach/')
-  )
-    {return null;}
+  ) {
+    return null;
+  }
   const request = await boundedRequest(original, path.startsWith('/api/coach/') ? 200_000 : 65_536);
-  if (request instanceof Response) {return request;}
+  if (request instanceof Response) {
+    return request;
+  }
   try {
-    if (accountRoute) {return await accountsApi(request, env);}
+    if (accountRoute) {
+      return await accountsApi(request, env);
+    }
     const session = await authFor(request, env).api.getSession({ headers: request.headers });
-    if (!session) {return apiJson({ error: 'unauthorised' }, 401);}
+    if (!session) {
+      return apiJson({ error: 'unauthorised' }, 401);
+    }
     const owner = session.user.id;
     if (
       await env.DB.prepare('SELECT user_id FROM account_deletions WHERE user_id=?')
         .bind(owner)
         .first()
-    )
-      {return apiJson({ error: 'account_deleted' }, 403);}
+    ) {
+      return apiJson({ error: 'account_deleted' }, 403);
+    }
     const profile = await loadPlayerProfile(env.DB, owner);
-    if (!profile) {return apiJson({ error: 'onboarding_required' }, 403);}
-    if (billingRoute) {return await billingApi(request, env, owner, profile);}
-    if (path.startsWith('/api/online/')) {return await onlineApi(request, env, owner);}
-    if (path === '/api/appearance') {return await cosmeticsApi(request, env, owner);}
-    async function loadMatch(player: string, id: string): Promise<SavedCoachMatch | null>  {
+    if (!profile) {
+      return apiJson({ error: 'onboarding_required' }, 403);
+    }
+    if (billingRoute) {
+      return await billingApi(request, env, owner, profile);
+    }
+    if (path.startsWith('/api/online/')) {
+      return await onlineApi(request, env, owner);
+    }
+    if (path === '/api/appearance') {
+      return await cosmeticsApi(request, env, owner);
+    }
+    async function loadMatch(player: string, id: string): Promise<SavedCoachMatch | null> {
       const computer = await env.MATCHES.getByName(id).read(player);
-      if (computer)
-        {return {
+      if (computer) {
+        return {
           ...computer.game,
           kind: 'computer',
           completedAt: computer.game.result ? computer.game.updatedAt : undefined,
-        };}
+        };
+      }
       const human = await env.HUMAN_MATCHES.getByName(id).read(player);
-      if (!human) {return null;}
+      if (!human) {
+        return null;
+      }
       return {
         kind: 'human',
         id: human.game.id,

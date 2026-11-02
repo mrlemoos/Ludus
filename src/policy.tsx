@@ -5,7 +5,10 @@ import { Header } from './app';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router';
 
-interface Section { title: string; paragraphs: string[] }
+interface Section {
+  title: string;
+  paragraphs: string[];
+}
 const policies: Record<
   Language,
   Record<'terms' | 'privacy', { title: string; sections: Section[] }>
@@ -248,16 +251,16 @@ export function Policy() {
   const updated =
     language === 'es-ES'
       ? `Última actualización: ${date}`
-      : (language === 'fr-FR'
+      : language === 'fr-FR'
         ? `Dernière mise à jour : ${date}`
-        : `Last updated: ${date}`);
+        : `Last updated: ${date}`;
   return (
     <div className="site-shell profile-page">
       <Header />
       <main className="profile-main policy-page">
         <nav className="profile-navigation">
           <Link to="/account">
-            {language === 'es-ES' ? 'Cuenta' : (language === 'fr-FR' ? 'Compte' : 'Account')}
+            {language === 'es-ES' ? 'Cuenta' : language === 'fr-FR' ? 'Compte' : 'Account'}
           </Link>
           <Link to={pathname === '/privacy' ? '/terms' : '/privacy'}>
             {pathname === '/privacy'

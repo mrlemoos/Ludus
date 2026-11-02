@@ -1,6 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-
 import { cosmeticsApi } from './cosmetics';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('appearance API', () => {
   function environment(expires: number | null) {
@@ -30,7 +29,7 @@ describe('appearance API', () => {
       'owner',
     );
     expect(response.status).toBe(200);
-    expect(run).toHaveBeenCalledTimes(1);
+    expect(run).toHaveBeenCalledOnce();
   });
 
   it('accepts trusted paid access after beta without changing the beta grant', async () => {
@@ -45,7 +44,7 @@ describe('appearance API', () => {
       Date.now() + 86_400_000,
     );
     expect(response.status).toBe(200);
-    expect(run).toHaveBeenCalledTimes(1);
+    expect(run).toHaveBeenCalledOnce();
   });
 
   it('loads saved materials after beta expiry', async () => {
@@ -71,7 +70,9 @@ describe('appearance API', () => {
         env,
         'owner',
       );
-      await expect(response.json()).resolves.toEqual({ appearance: { board: 'marble', pieces: 'ebony' } });
+      await expect(response.json()).resolves.toEqual({
+        appearance: { board: 'marble', pieces: 'ebony' },
+      });
       expect(run).not.toHaveBeenCalled();
     } finally {
       clock.mockRestore();
@@ -89,7 +90,7 @@ describe('appearance API', () => {
       'owner',
     );
     expect(response.status).toBe(200);
-    expect(run).toHaveBeenCalledTimes(1);
+    expect(run).toHaveBeenCalledOnce();
     expect(bind).toHaveBeenLastCalledWith('owner', 'marble', 'ebony');
   });
 });

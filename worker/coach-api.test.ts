@@ -1,17 +1,20 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it, vi } from 'vitest';
+
 vi.mock('./auth', () => ({
   authFor: () => ({ api: { getSession: async () => null } }),
 }));
-import { type AnalysisLine, type SavedCoachMatch, positionAt } from '../shared/coaching';
-import { type CoachDependencies, coachApi } from './coach';
+import { positionAt } from '../shared/coaching';
+import type { AnalysisLine, SavedCoachMatch } from '../shared/coaching';
+import { coachApi } from './coach';
+import type { CoachDependencies } from './coach';
 import type { CoachEnvironment } from './coach-provider';
 import { CoachStore } from './coach-store';
 import { reserveCoachReviewCredit, reviewCreditStatus } from './review-credits';
 
 const now = Date.parse('2026-10-30T12:00:00Z');
-function lineFor(match: SavedCoachMatch): AnalysisLine  {
+function lineFor(match: SavedCoachMatch): AnalysisLine {
   const move = positionAt(match.moves, 0).move(match.moves[0]);
   const uci = `${move.from}${move.to}${move.promotion ?? ''}`;
   return {
@@ -32,8 +35,9 @@ function fixture() {
   sqlite.exec('PRAGMA foreign_keys=ON');
   for (const file of readdirSync('drizzle')
     .filter((name) => /^\d{4}_.+\.sql$/.test(name))
-    .sort())
-    {sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));}
+    .sort()) {
+    sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));
+  }
   for (const id of ['owner', 'other']) {
     sqlite
       .prepare(
@@ -48,9 +52,11 @@ function fixture() {
   }
   function statement(query: string, parameters: unknown[] = []) {
     const bindings = parameters as (string | number | null)[];
-    function execute() { return ({
-      meta: { changes: Number(sqlite.prepare(query).run(...bindings).changes) },
-    }); }
+    function execute() {
+      return {
+        meta: { changes: Number(sqlite.prepare(query).run(...bindings).changes) },
+      };
+    }
     return {
       bind: (...values: unknown[]) => statement(query, values),
       first: async <T>() => (sqlite.prepare(query).get(...bindings) as T) ?? null,
@@ -117,8 +123,8 @@ function fixture() {
     mistakes: [],
   };
   const generate = vi.fn().mockResolvedValue({ document: generated, costMicros: 100 });
-  let owner = 'owner',
-    expiry = 0,
+  let expiry = 0,
+    owner = 'owner',
     selected = 'beginner' as const,
     clock = now;
   let history: { matches: { match: SavedCoachMatch; completedAt: number }[]; gaps: number } = {
@@ -172,21 +178,23 @@ function input(
   key = 'idempotency-key-0001',
   matchId = 'match-1',
   history: { matchId: string; analysis: AnalysisLine[] | null }[] = [],
-) { return ({
-  key,
-  matchId,
-  language: 'en-GB',
-  profile: 'beginner',
-  analysis: [
-    lineFor({
-      id: matchId,
-      moves: ['e4', 'e5', 'Nf3'],
-      result: { reason: 'resignation' },
-      colour: 'w',
-    }),
-  ],
-  history,
-}); }
+) {
+  return {
+    key,
+    matchId,
+    language: 'en-GB',
+    profile: 'beginner',
+    analysis: [
+      lineFor({
+        id: matchId,
+        moves: ['e4', 'e5', 'Nf3'],
+        result: { reason: 'resignation' },
+        colour: 'w',
+      }),
+    ],
+    history,
+  };
+}
 function request(
   path = '/api/coach/reviews',
   body?: unknown,
@@ -211,7 +219,7 @@ describe('private engine-grounded coach API', () => {
   it('exposes credit counts, unlimited local-analysis entitlement and five replies per review', async () => {
     const f = fixture();
     const response = await coachApi(request('/api/coach/status'), f.env, f.dependencies);
-    expect(await response.json()).toMatchObject({
+    await expect(response.json()).resolves.toMatchObject({
       replyLimit: 5,
       reviewCredits: {
         available: 1,
@@ -304,7 +312,7 @@ describe('private engine-grounded coach API', () => {
     expect(
       ((await response.json()) as { review: { id: string; language: string } }).review,
     ).toMatchObject({ id: saved.id, language: 'en-GB' });
-    expect(f.generate).toHaveBeenCalledOnce();
+    expect(f.generate).toHaveBeenCalledTimes(1);
     expect(
       f.sqlite
         .prepare("SELECT COUNT(*) AS count FROM review_credit_reservations WHERE state='committed'")
@@ -325,14 +333,16 @@ describe('private engine-grounded coach API', () => {
         }),
     );
     const first = coachApi(request('/api/coach/reviews', input()), f.env, f.dependencies);
-    await vi.waitFor(() => expect(f.generate).toHaveBeenCalledOnce());
+    await vi.waitFor(() => {
+      expect(f.generate).toHaveBeenCalledTimes(1);
+    });
     const second = await coachApi(
       request('/api/coach/reviews', input('different-idempotency-key-02')),
       f.env,
       f.dependencies,
     );
     expect(second.status).toBe(409);
-    expect(await second.json()).toMatchObject({ error: 'review_pending' });
+    await expect(second.json()).resolves.toMatchObject({ error: 'review_pending' });
     finish({ document: f.generated, costMicros: 100 });
     expect((await first).status).toBe(200);
     expect(
@@ -363,7 +373,9 @@ describe('private engine-grounded coach API', () => {
 
   it('releases an orphaned credit reservation after a crash before request reservation', async () => {
     const f = fixture();
-    expect(await reserveCoachReviewCredit(f.db, 'owner', 'match-1', 'orphan', now)).toMatchObject({
+    await expect(
+      reserveCoachReviewCredit(f.db, 'owner', 'match-1', 'orphan', now),
+    ).resolves.toMatchObject({
       source: 'intro',
     });
     expect((await reviewCreditStatus(f.db, 'owner', now)).introAvailable).toBe(false);
@@ -409,12 +421,12 @@ describe('private engine-grounded coach API', () => {
     expect(
       (await coachApi(request('/api/coach/reviews', input()), f.env, f.dependencies)).status,
     ).toBe(503);
-    expect(await new CoachStore(f.db).reviews('owner')).toEqual([]);
+    await expect(new CoachStore(f.db).reviews('owner')).resolves.toEqual([]);
   });
 
   it('allows five successful replies per review for non-Plus accounts and does not count failures', async () => {
-    const f = fixture(),
-      saved = await generateReview(f);
+    const f = fixture();
+    const saved = await generateReview(f);
     f.generate.mockRejectedValueOnce(new Error('temporary outage'));
     const path = `/api/coach/reviews/${saved.id}/replies`;
     const first = await coachApi(
@@ -441,12 +453,12 @@ describe('private engine-grounded coach API', () => {
       f.dependencies,
     );
     expect(extra.status).toBe(429);
-    expect(await extra.json()).toMatchObject({ error: 'reply_limit' });
+    await expect(extra.json()).resolves.toMatchObject({ error: 'reply_limit' });
   });
 
   it('keeps legacy saved reviews conversational without inventing missing engine metadata', async () => {
-    const f = fixture(),
-      reviewId = 'legacy-review';
+    const f = fixture();
+    const reviewId = 'legacy-review';
     const legacyLine = { ply: 0, cp: 20, mate: null, moves: ['e2e4'], depth: 12 };
     await f.db
       .prepare(
@@ -487,9 +499,9 @@ describe('private engine-grounded coach API', () => {
   it('requires only the lifetime intro credit when no trial or purchased pack exists', async () => {
     const f = fixture();
     await generateReview(f);
-    expect(
-      await (await coachApi(request('/api/coach/status'), f.env, f.dependencies)).json(),
-    ).toMatchObject({ reviewCredits: { available: 0, introAvailable: false } });
+    await expect(
+      (await coachApi(request('/api/coach/status'), f.env, f.dependencies)).json(),
+    ).resolves.toMatchObject({ reviewCredits: { available: 0, introAvailable: false } });
     f.matches.set('match-2', { ...f.current, id: 'match-2' });
     const exhausted = await coachApi(
       request('/api/coach/reviews', input('another-match-key-0001', 'match-2')),
@@ -508,7 +520,7 @@ describe('private engine-grounded coach API', () => {
       f.dependencies,
     );
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
+    await expect(response.json()).resolves.toMatchObject({
       gaps: 2,
       matches: [{ id: 'match-1' }, { id: 'earlier-1', completedAt: now - 10_000 }],
     });
@@ -523,11 +535,13 @@ describe('private engine-grounded coach API', () => {
     f.dependencies.loadHistory = undefined;
     const candidates: SavedCoachMatch[] = [
       { ...f.previous, id: 'older-computer', kind: 'computer', completedAt: now - 20_000 },
-      { ...f.older2, id: 'newest-human', kind: 'human', completedAt: now - 2_000 },
-      { ...f.older3, id: 'middle-computer', kind: 'computer', completedAt: now - 5_000 },
+      { ...f.older2, id: 'newest-human', kind: 'human', completedAt: now - 2000 },
+      { ...f.older3, id: 'middle-computer', kind: 'computer', completedAt: now - 5000 },
       { ...f.previous, id: 'oldest-human', kind: 'human', completedAt: now - 30_000 },
     ];
-    for (const game of candidates) {f.matches.set(game.id, game);}
+    for (const game of candidates) {
+      f.matches.set(game.id, game);
+    }
     for (const game of candidates.filter((item) => item.kind === 'computer')) {
       await f.db
         .prepare(

@@ -455,7 +455,9 @@ export function Play() {
     ? shown.moves({ square: selected, verbose: true }).map((move) => move.to)
     : [];
   const clocks = game ? remaining(game, now) : { b: 0, w: 0 };
-  function clock(time: number) { return `${Math.floor(Math.ceil(time / 1000) / 60)}:${String(Math.ceil(time / 1000) % 60).padStart(2, '0')}`; }
+  function clock(time: number) {
+    return `${Math.floor(Math.ceil(time / 1000) / 60)}:${String(Math.ceil(time / 1000) % 60).padStart(2, '0')}`;
+  }
   const topColour = flipped ? 'w' : 'b';
   const topIsYou = topColour === game?.colour;
   const boardProps = {
@@ -553,7 +555,378 @@ export function Play() {
                   }
                 </Link>
               </section>
-            ) : !gameId ? (
+            ) : gameId ? (
+              !game ? (
+                <p>{c.loading}</p>
+              ) : (
+                <div className="match-layout">
+                  <div className="match-heading">
+                    <div>
+                      <Link to="/play?tab=history" className="eyebrow text-muted">
+                        ← {c.history}
+                      </Link>
+                      <h1 className="match-title font-display">{c.opponent}</h1>
+                    </div>
+                    <span className="match-badge">
+                      <span aria-hidden="true">◷</span>
+                      {game.control} · {c.levels[game.difficulty - 1]}
+                    </span>
+                  </div>
+                  <div className="match-grid">
+                    <section className="match-stage">
+                      <div className="match-players">
+                        <div className="player-bar">
+                          <div>
+                            <span className="player-avatar">L</span>
+                            <span>
+                              {topIsYou ? c.you : coachIdentity.name}
+                              <small>{topIsYou ? identity.user.name : c.computer}</small>
+                            </span>
+                          </div>
+                          <span
+                            className={`clock ${boardChess.turn() === topColour && !game.result ? 'clock-active' : ''}`}
+                          >
+                            {clock(clocks[flipped ? 'w' : 'b'])}
+                          </span>
+                        </div>
+                        <div className="player-bar">
+                          <div>
+                            <span className="player-avatar player-avatar-you">
+                              {topIsYou ? 'L' : identity.user.name[0]}
+                            </span>
+                            <span>
+                              {topIsYou ? coachIdentity.name : c.you}
+                              <small>{topIsYou ? c.computer : identity.user.name}</small>
+                            </span>
+                          </div>
+                          <span
+                            className={`clock ${boardChess.turn() === (flipped ? 'b' : 'w') && !game.result ? 'clock-active' : ''}`}
+                          >
+                            {clock(clocks[flipped ? 'b' : 'w'])}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="board-frame">
+                        {view === '3d' ? (
+                          <GraphicsBoundary
+                            key={resetKey}
+                            fallback={
+                              <div className="board-fallback">
+                                <p role="status" className="p-3 text-sm">
+                                  {c.unavailable3d}
+                                </p>
+                                <Board {...boardProps} />
+                              </div>
+                            }
+                          >
+                            <Suspense
+                              fallback={
+                                <div className="grid aspect-square place-items-center">
+                                  {c.loading}
+                                </div>
+                              }
+                            >
+                              <Board3D
+                                board={boardProps}
+                                resetKey={resetKey}
+                                looking={looking}
+                                table={{
+                                  captured,
+                                  tableClock: {
+                                    times: { w: clock(clocks.w), b: clock(clocks.b) },
+                                    active: game.result || pause > 0 ? null : boardChess.turn(),
+                                  },
+                                }}
+                              />
+                            </Suspense>
+                            {!looking && <Board {...boardProps} concealed />}
+                          </GraphicsBoundary>
+                        ) : (
+                          <Board {...boardProps} />
+                        )}
+                      </div>
+                      <div className="board-tools" role="group" aria-label={c.board}>
+                        <Button
+                          className="game-secondary"
+                          onClick={() => {
+                            const next = view === '3d' ? '2d' : '3d';
+                            setView(next);
+                            setLooking(false);
+                            try {
+                              localStorage.setItem('ludus-board', next);
+                            } catch {
+                              /* Preference is optional. */
+                            }
+                          }}
+                        >
+                          <ControlIcon name="board" />
+                          {view === '3d' ? c.view2d : c.view3d}
+                        </Button>
+                        <Button
+                          className="game-secondary"
+                          onClick={() => {
+                            setFlipped(!flipped);
+                          }}
+                        >
+                          <ControlIcon name="flip" />
+                          {c.flip}
+                        </Button>
+                        {view === '3d' && (
+                          <>
+                            <Button
+                              className="game-secondary"
+                              aria-pressed={looking}
+                              onClick={() => {
+                                setSelected(null);
+                                setLooking(!looking);
+                              }}
+                            >
+                              <ControlIcon name="look" />
+                              {looking ? c.returnToBoard : c.lookAround}
+                            </Button>
+                            <Button
+                              className="game-secondary"
+                              onClick={() => {
+                                setResetKey(resetKey + 1);
+                              }}
+                            >
+                              <ControlIcon name="reset" />
+                              {c.reset}
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </section>
+                    <aside className="match-sidebar">
+                      <p className="eyebrow mb-3 text-muted">{c.casual}</p>
+                      <div role="status" className="match-status">
+                        <h2 className="font-display text-3xl">{status}</h2>
+                        {!game.result && boardChess.isCheck() && (
+                          <p className="mt-2 text-sm">{c.check}</p>
+                        )}
+                      </div>
+                      {!connected && !game.result && (
+                        <p className="game-notice text-xs">{c.reconnecting}</p>
+                      )}
+                      {pause > 0 && !game.result && (
+                        <p role="status" className="game-notice text-xs">
+                          {c.paused} · {pause} {c.allowance}
+                        </p>
+                      )}
+                      {engineError && (
+                        <div role="alert" className="game-notice text-sm">
+                          {c.engineError}
+                          <Button
+                            className="mt-3 block underline"
+                            onClick={() => {
+                              setEngineRetry(engineRetry + 1);
+                            }}
+                          >
+                            {c.retry}
+                          </Button>
+                        </div>
+                      )}
+                      {!game.result &&
+                        boardChess.turn() === game.colour &&
+                        (boardChess.isThreefoldRepetition() || boardChess.isDrawByFiftyMoves()) && (
+                          <Button
+                            className="game-secondary"
+                            disabled={pending || !connected}
+                            onClick={() =>
+                              void send({ type: 'claimDraw', revision: game.revision })
+                            }
+                          >
+                            {c.claimDraw}
+                          </Button>
+                        )}
+                      <section className="moves-panel" aria-label={c.moveList}>
+                        <h3 className="eyebrow mb-4">{c.moveList}</h3>
+                        {!game.moves.length ? (
+                          <p className="text-sm text-muted">{c.noMoves}</p>
+                        ) : (
+                          <ol>
+                            {Array.from({ length: Math.ceil(game.moves.length / 2) }, (_, i) => (
+                              <li key={i} className="move-row">
+                                <span>{i + 1}.</span>
+                                {game.moves.slice(i * 2, i * 2 + 2).map((move, j) => (
+                                  <Button
+                                    key={j}
+                                    disabled={!game.result}
+                                    aria-pressed={
+                                      replay?.branchAt === null && replay.ply === i * 2 + j + 1
+                                    }
+                                    onClick={() => {
+                                      navigateReplay(savedReplay(game, i * 2 + j + 1));
+                                    }}
+                                    className="move-notation"
+                                  >
+                                    {move}
+                                  </Button>
+                                ))}
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+                      </section>
+                      {game.result ? (
+                        <div className="mt-5 grid gap-3">
+                          <div className="replay-controls">
+                            <Button
+                              aria-label={c.beginning}
+                              onClick={() => {
+                                navigateReplay(
+                                  replay ? { ...replay, ply: 0 } : savedReplay(game, 0),
+                                );
+                              }}
+                            >
+                              │‹
+                            </Button>
+                            <Button
+                              aria-label={c.previous}
+                              onClick={() => {
+                                navigateReplay(stepReplay(replay ?? savedReplay(game), -1));
+                              }}
+                            >
+                              ‹
+                            </Button>
+                            <Button
+                              aria-label={c.next}
+                              onClick={() => {
+                                navigateReplay(stepReplay(replay ?? savedReplay(game), 1));
+                              }}
+                            >
+                              ›
+                            </Button>
+                            <Button
+                              aria-label={c.latest}
+                              onClick={() => {
+                                navigateReplay(null);
+                              }}
+                            >
+                              ›│
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted">{rc.hint}</p>
+                          {replay?.branchAt !== null && replay?.branchAt !== undefined && (
+                            <section aria-label={rc.variation}>
+                              <p role="status" className="text-sm">
+                                {rc.variation}:{' '}
+                                {replay.moves.slice(replay.branchAt, replay.ply).join(' ')}
+                              </p>
+                              <Button
+                                className="game-secondary mt-3"
+                                onClick={() => {
+                                  navigateReplay(savedReplay(game, replay.branchAt!));
+                                }}
+                              >
+                                {rc.saved}
+                              </Button>
+                            </section>
+                          )}
+                          <Button className="game-secondary" onClick={download}>
+                            {c.download}
+                          </Button>
+                          <Link className="game-secondary" to={`/coach/${game.id}`}>
+                            {
+                              {
+                                'en-GB': 'Review with Lucía',
+                                'es-ES': 'Analizar con Lucía',
+                                'fr-FR': 'Analyser avec Lucía',
+                              }[isLanguage(i18n.language) ? i18n.language : 'en-GB']
+                            }
+                          </Link>
+                          <Link to="/play" className="game-primary text-center">
+                            {c.newGame}
+                          </Link>
+                        </div>
+                      ) : confirmResign ? (
+                        <div className="mt-5">
+                          <p className="mb-3 text-sm">{c.confirmResign}</p>
+                          <div className="flex gap-3">
+                            <Button
+                              className="game-secondary"
+                              onClick={() => {
+                                setConfirmResign(false);
+                              }}
+                            >
+                              {c.cancel}
+                            </Button>
+                            <Button
+                              className="game-primary"
+                              disabled={pending || !connected}
+                              onClick={() => {
+                                setConfirmResign(false);
+                                void send({ type: 'resign', revision: game.revision });
+                              }}
+                            >
+                              {c.resign}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button
+                          className="game-secondary mt-5"
+                          disabled={!connected || pending}
+                          onClick={() => {
+                            setConfirmResign(true);
+                          }}
+                        >
+                          {c.resign}
+                        </Button>
+                      )}
+                    </aside>
+                  </div>
+                  {promotion && (
+                    <Dialog.Root
+                      open
+                      onOpenChange={(open) => {
+                        if (!open) {
+                          setPromotion(null);
+                        }
+                      }}
+                    >
+                      <Dialog.Portal>
+                        <Dialog.Backdrop className="fixed inset-0 z-50 bg-ink/50" />
+                        <Dialog.Popup className="promotion-panel fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2">
+                          <Dialog.Title className="mb-5 font-display text-3xl">
+                            {c.promotion}
+                          </Dialog.Title>
+                          <div className="grid grid-cols-2 gap-3">
+                            {(['q', 'r', 'b', 'n'] as const).map((piece, i) => (
+                              <Button
+                                autoFocus={i === 0}
+                                key={piece}
+                                className="game-secondary"
+                                onClick={() => {
+                                  game.result
+                                    ? playVariation({ ...promotion, promotion: piece })
+                                    : void send({
+                                        type: 'move',
+                                        ...promotion,
+                                        promotion: piece,
+                                        revision: game.revision,
+                                      });
+                                }}
+                              >
+                                {{ q: c.queen, r: c.rook, b: c.bishop, n: c.knight }[piece]}
+                              </Button>
+                            ))}
+                          </div>
+                          <Button
+                            className="mt-4 text-sm underline"
+                            onClick={() => {
+                              setPromotion(null);
+                            }}
+                          >
+                            {rc.cancelPromotion}
+                          </Button>
+                        </Dialog.Popup>
+                      </Dialog.Portal>
+                    </Dialog.Root>
+                  )}
+                </div>
+              )
+            ) : (
               <>
                 <div className="lobby-heading">
                   <div>
@@ -726,369 +1099,6 @@ export function Play() {
                   </div>
                 </div>
               </>
-            ) : !game ? (
-              <p>{c.loading}</p>
-            ) : (
-              <div className="match-layout">
-                <div className="match-heading">
-                  <div>
-                    <Link to="/play?tab=history" className="eyebrow text-muted">
-                      ← {c.history}
-                    </Link>
-                    <h1 className="match-title font-display">{c.opponent}</h1>
-                  </div>
-                  <span className="match-badge">
-                    <span aria-hidden="true">◷</span>
-                    {game.control} · {c.levels[game.difficulty - 1]}
-                  </span>
-                </div>
-                <div className="match-grid">
-                  <section className="match-stage">
-                    <div className="match-players">
-                      <div className="player-bar">
-                        <div>
-                          <span className="player-avatar">L</span>
-                          <span>
-                            {topIsYou ? c.you : coachIdentity.name}
-                            <small>{topIsYou ? identity.user.name : c.computer}</small>
-                          </span>
-                        </div>
-                        <span
-                          className={`clock ${boardChess.turn() === topColour && !game.result ? 'clock-active' : ''}`}
-                        >
-                          {clock(clocks[flipped ? 'w' : 'b'])}
-                        </span>
-                      </div>
-                      <div className="player-bar">
-                        <div>
-                          <span className="player-avatar player-avatar-you">
-                            {topIsYou ? 'L' : identity.user.name[0]}
-                          </span>
-                          <span>
-                            {topIsYou ? coachIdentity.name : c.you}
-                            <small>{topIsYou ? c.computer : identity.user.name}</small>
-                          </span>
-                        </div>
-                        <span
-                          className={`clock ${boardChess.turn() === (flipped ? 'b' : 'w') && !game.result ? 'clock-active' : ''}`}
-                        >
-                          {clock(clocks[flipped ? 'b' : 'w'])}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="board-frame">
-                      {view === '3d' ? (
-                        <GraphicsBoundary
-                          key={resetKey}
-                          fallback={
-                            <div className="board-fallback">
-                              <p role="status" className="p-3 text-sm">
-                                {c.unavailable3d}
-                              </p>
-                              <Board {...boardProps} />
-                            </div>
-                          }
-                        >
-                          <Suspense
-                            fallback={
-                              <div className="grid aspect-square place-items-center">
-                                {c.loading}
-                              </div>
-                            }
-                          >
-                            <Board3D
-                              board={boardProps}
-                              resetKey={resetKey}
-                              looking={looking}
-                              table={{
-                                captured,
-                                tableClock: {
-                                  times: { w: clock(clocks.w), b: clock(clocks.b) },
-                                  active: game.result || pause > 0 ? null : boardChess.turn(),
-                                },
-                              }}
-                            />
-                          </Suspense>
-                          {!looking && <Board {...boardProps} concealed />}
-                        </GraphicsBoundary>
-                      ) : (
-                        <Board {...boardProps} />
-                      )}
-                    </div>
-                    <div className="board-tools" role="group" aria-label={c.board}>
-                      <Button
-                        className="game-secondary"
-                        onClick={() => {
-                          const next = view === '3d' ? '2d' : '3d';
-                          setView(next);
-                          setLooking(false);
-                          try {
-                            localStorage.setItem('ludus-board', next);
-                          } catch {
-                            /* Preference is optional. */
-                          }
-                        }}
-                      >
-                        <ControlIcon name="board" />
-                        {view === '3d' ? c.view2d : c.view3d}
-                      </Button>
-                      <Button
-                        className="game-secondary"
-                        onClick={() => {
-                          setFlipped(!flipped);
-                        }}
-                      >
-                        <ControlIcon name="flip" />
-                        {c.flip}
-                      </Button>
-                      {view === '3d' && (
-                        <>
-                          <Button
-                            className="game-secondary"
-                            aria-pressed={looking}
-                            onClick={() => {
-                              setSelected(null);
-                              setLooking(!looking);
-                            }}
-                          >
-                            <ControlIcon name="look" />
-                            {looking ? c.returnToBoard : c.lookAround}
-                          </Button>
-                          <Button
-                            className="game-secondary"
-                            onClick={() => {
-                              setResetKey(resetKey + 1);
-                            }}
-                          >
-                            <ControlIcon name="reset" />
-                            {c.reset}
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </section>
-                  <aside className="match-sidebar">
-                    <p className="eyebrow mb-3 text-muted">{c.casual}</p>
-                    <div role="status" className="match-status">
-                      <h2 className="font-display text-3xl">{status}</h2>
-                      {!game.result && boardChess.isCheck() && (
-                        <p className="mt-2 text-sm">{c.check}</p>
-                      )}
-                    </div>
-                    {!connected && !game.result && (
-                      <p className="game-notice text-xs">{c.reconnecting}</p>
-                    )}
-                    {pause > 0 && !game.result && (
-                      <p role="status" className="game-notice text-xs">
-                        {c.paused} · {pause} {c.allowance}
-                      </p>
-                    )}
-                    {engineError && (
-                      <div role="alert" className="game-notice text-sm">
-                        {c.engineError}
-                        <Button
-                          className="mt-3 block underline"
-                          onClick={() => {
-                            setEngineRetry(engineRetry + 1);
-                          }}
-                        >
-                          {c.retry}
-                        </Button>
-                      </div>
-                    )}
-                    {!game.result &&
-                      boardChess.turn() === game.colour &&
-                      (boardChess.isThreefoldRepetition() || boardChess.isDrawByFiftyMoves()) && (
-                        <Button
-                          className="game-secondary"
-                          disabled={pending || !connected}
-                          onClick={() => void send({ type: 'claimDraw', revision: game.revision })}
-                        >
-                          {c.claimDraw}
-                        </Button>
-                      )}
-                    <section className="moves-panel" aria-label={c.moveList}>
-                      <h3 className="eyebrow mb-4">{c.moveList}</h3>
-                      {!game.moves.length ? (
-                        <p className="text-sm text-muted">{c.noMoves}</p>
-                      ) : (
-                        <ol>
-                          {Array.from({ length: Math.ceil(game.moves.length / 2) }, (_, i) => (
-                            <li key={i} className="move-row">
-                              <span>{i + 1}.</span>
-                              {game.moves.slice(i * 2, i * 2 + 2).map((move, j) => (
-                                <Button
-                                  key={j}
-                                  disabled={!game.result}
-                                  aria-pressed={
-                                    replay?.branchAt === null && replay.ply === i * 2 + j + 1
-                                  }
-                                  onClick={() => {
-                                    navigateReplay(savedReplay(game, i * 2 + j + 1));
-                                  }}
-                                  className="move-notation"
-                                >
-                                  {move}
-                                </Button>
-                              ))}
-                            </li>
-                          ))}
-                        </ol>
-                      )}
-                    </section>
-                    {game.result ? (
-                      <div className="mt-5 grid gap-3">
-                        <div className="replay-controls">
-                          <Button
-                            aria-label={c.beginning}
-                            onClick={() => {
-                              navigateReplay(replay ? { ...replay, ply: 0 } : savedReplay(game, 0));
-                            }}
-                          >
-                            │‹
-                          </Button>
-                          <Button
-                            aria-label={c.previous}
-                            onClick={() => {
-                              navigateReplay(stepReplay(replay ?? savedReplay(game), -1));
-                            }}
-                          >
-                            ‹
-                          </Button>
-                          <Button
-                            aria-label={c.next}
-                            onClick={() => {
-                              navigateReplay(stepReplay(replay ?? savedReplay(game), 1));
-                            }}
-                          >
-                            ›
-                          </Button>
-                          <Button
-                            aria-label={c.latest}
-                            onClick={() => {
-                              navigateReplay(null);
-                            }}
-                          >
-                            ›│
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted">{rc.hint}</p>
-                        {replay?.branchAt !== null && replay?.branchAt !== undefined && (
-                          <section aria-label={rc.variation}>
-                            <p role="status" className="text-sm">
-                              {rc.variation}:{' '}
-                              {replay.moves.slice(replay.branchAt, replay.ply).join(' ')}
-                            </p>
-                            <Button
-                              className="game-secondary mt-3"
-                              onClick={() => {
-                                navigateReplay(savedReplay(game, replay.branchAt!));
-                              }}
-                            >
-                              {rc.saved}
-                            </Button>
-                          </section>
-                        )}
-                        <Button className="game-secondary" onClick={download}>
-                          {c.download}
-                        </Button>
-                        <Link className="game-secondary" to={`/coach/${game.id}`}>
-                          {
-                            {
-                              'en-GB': 'Review with Lucía',
-                              'es-ES': 'Analizar con Lucía',
-                              'fr-FR': 'Analyser avec Lucía',
-                            }[isLanguage(i18n.language) ? i18n.language : 'en-GB']
-                          }
-                        </Link>
-                        <Link to="/play" className="game-primary text-center">
-                          {c.newGame}
-                        </Link>
-                      </div>
-                    ) : confirmResign ? (
-                      <div className="mt-5">
-                        <p className="mb-3 text-sm">{c.confirmResign}</p>
-                        <div className="flex gap-3">
-                          <Button
-                            className="game-secondary"
-                            onClick={() => {
-                              setConfirmResign(false);
-                            }}
-                          >
-                            {c.cancel}
-                          </Button>
-                          <Button
-                            className="game-primary"
-                            disabled={pending || !connected}
-                            onClick={() => {
-                              setConfirmResign(false);
-                              void send({ type: 'resign', revision: game.revision });
-                            }}
-                          >
-                            {c.resign}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <Button
-                        className="game-secondary mt-5"
-                        disabled={!connected || pending}
-                        onClick={() => {
-                          setConfirmResign(true);
-                        }}
-                      >
-                        {c.resign}
-                      </Button>
-                    )}
-                  </aside>
-                </div>
-                {promotion && (
-                  <Dialog.Root
-                    open
-                    onOpenChange={(open) => {
-                      if (!open) {setPromotion(null);}
-                    }}
-                  >
-                    <Dialog.Portal>
-                      <Dialog.Backdrop className="fixed inset-0 z-50 bg-ink/50" />
-                      <Dialog.Popup className="promotion-panel fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2">
-                        <Dialog.Title className="mb-5 font-display text-3xl">
-                          {c.promotion}
-                        </Dialog.Title>
-                        <div className="grid grid-cols-2 gap-3">
-                          {(['q', 'r', 'b', 'n'] as const).map((piece, i) => (
-                            <Button
-                              autoFocus={i === 0}
-                              key={piece}
-                              className="game-secondary"
-                              onClick={() => {
-                                game.result
-                                  ? playVariation({ ...promotion, promotion: piece })
-                                  : void send({
-                                      type: 'move',
-                                      ...promotion,
-                                      promotion: piece,
-                                      revision: game.revision,
-                                    });
-                              }}
-                            >
-                              {{ q: c.queen, r: c.rook, b: c.bishop, n: c.knight }[piece]}
-                            </Button>
-                          ))}
-                        </div>
-                        <Button
-                          className="mt-4 text-sm underline"
-                          onClick={() => {
-                            setPromotion(null);
-                          }}
-                        >
-                          {rc.cancelPromotion}
-                        </Button>
-                      </Dialog.Popup>
-                    </Dialog.Portal>
-                  </Dialog.Root>
-                )}
-              </div>
             )
           ) : (
             <div className="entry-layout">
@@ -1100,7 +1110,9 @@ export function Play() {
                   className="mt-8 grid gap-5"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (adult) {void signIn(false);}
+                    if (adult) {
+                      void signIn(false);
+                    }
                   }}
                 >
                   <label className="grid gap-2 text-sm">

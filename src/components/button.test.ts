@@ -29,22 +29,33 @@ function ruleBody(css: string, selector: string) {
 
 it('keeps button hover and press feedback on the shared button class', () => {
   const css = readFileSync('src/styles.css', 'utf8');
-  expect(css).toMatch(/@custom-variant fine-hover\s*\{[^}]*@media \(hover: hover\) and \(pointer: fine\)/);
-  const targets = /\.(header-play|language-trigger|game-primary|game-secondary|move-notation)|replay-controls button|feature-page button|board-tools \.game-secondary/;
+  expect(css).toMatch(
+    /@custom-variant fine-hover\s*\{[^}]*@media \(hover: hover\) and \(pointer: fine\)/,
+  );
+  const targets =
+    /\.(header-play|language-trigger|game-primary|game-secondary|move-notation)|replay-controls button|feature-page button|board-tools \.game-secondary/;
   let header = '';
   const applies: string[] = [];
   for (const line of css.split('\n')) {
     if (line.includes('@apply')) {
-      if (targets.test(header)) {applies.push(line);}
-    } else if (line.includes('{')) {header = line;}
+      if (targets.test(header)) {
+        applies.push(line);
+      }
+    } else if (line.includes('{')) {
+      header = line;
+    }
   }
   expect(applies.length).toBeGreaterThan(0);
-  for (const line of applies) {expect(line).not.toMatch(/(?<![\w-])hover:/);}
+  for (const line of applies) {
+    expect(line).not.toMatch(/(?<![\w-])hover:/);
+  }
   const button = ruleBody(css, '.ui-button {');
   expect(button).toMatch(/-webkit-tap-highlight-color:\s*transparent/);
   expect(button).toMatch(/touch-action:\s*manipulation/);
   expect(button).toMatch(/user-select:\s*none/);
-  expect(ruleBody(css, ".ui-button[data-pressed='true']:not(:disabled):not([aria-disabled='true'])")).toMatch(/opacity:\s*0?\.72/);
+  expect(
+    ruleBody(css, ".ui-button[data-pressed='true']:not(:disabled):not([aria-disabled='true'])"),
+  ).toMatch(/opacity:\s*0?\.72/);
 });
 
 it('routes every button through the shared component', () => {

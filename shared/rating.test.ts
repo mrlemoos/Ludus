@@ -15,7 +15,7 @@ describe('glicko-2 periods', () => {
 
   it('updates both opponents from pre-match ratings, independently per period', () => {
     const initial = initialRating();
-      const after = rateMatch(initial, initial, 'w');
+    const after = rateMatch(initial, initial, 'w');
     expect(after.w.rating).toBeGreaterThan(1500);
     expect(after.b.rating).toBeLessThan(1500);
     expect(after.w.rating - 1500).toBeCloseTo(1500 - after.b.rating, 8);

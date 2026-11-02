@@ -4,7 +4,9 @@ import { expect, test } from '@playwright/test';
 test('edits profile without restarting beta trial and enforces hidden activity in public responses', async ({
   page,
 }) => {
-  await page.addInitScript(() =>{  localStorage.setItem('ludus-language', 'en-GB'); });
+  await page.addInitScript(() => {
+    localStorage.setItem('ludus-language', 'en-GB');
+  });
   await page.goto('/play');
   await page.getByRole('button', { name: 'Sign in as dev' }).click();
   await expect(page.getByRole('heading', { name: 'Take a seat.' })).toBeVisible();
@@ -51,9 +53,11 @@ test('edits profile without restarting beta trial and enforces hidden activity i
     await page.goto(`/players/${initial.profile.username}`);
     await expect(page.getByText('Activity is private.')).toBeVisible();
     await page.goto('/operator');
-    if (initial.operator)
-      {await expect(page.getByRole('heading', { name: 'Beta invitations' })).toBeVisible();}
-    else {await expect(page.getByRole('status')).toContainText('Operator access required');}
+    if (initial.operator) {
+      await expect(page.getByRole('heading', { name: 'Beta invitations' })).toBeVisible();
+    } else {
+      await expect(page.getByRole('status')).toContainText('Operator access required');
+    }
   } finally {
     const restored = await page.request.post('/api/account', {
       headers: { Origin: 'http://127.0.0.1:4173' },

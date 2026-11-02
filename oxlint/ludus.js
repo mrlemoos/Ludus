@@ -200,11 +200,11 @@ const noForwardRef = {
         const name =
           callee.type === 'Identifier'
             ? callee.name
-            : (callee.type === 'MemberExpression' &&
+            : callee.type === 'MemberExpression' &&
                 !callee.computed &&
                 callee.property.type === 'Identifier'
               ? callee.property.name
-              : null);
+              : null;
         if (name === 'forwardRef') {
           context.report({ node, message: 'forwardRef is deprecated. Take ref as a prop.' });
         }

@@ -75,8 +75,9 @@ export async function evaluateCoach(
       typeof row.rubricPass !== 'boolean' ||
       typeof row.criticalError !== 'boolean' ||
       !Array.isArray(row.variations)
-    )
-      {throw new Error('invalid_evaluation_observation');}
+    ) {
+      throw new Error('invalid_evaluation_observation');
+    }
     seen.add(key);
     for (const line of row.variations) {
       if (!Array.isArray(line) || line.length === 0 || line.length > 16) {
@@ -85,7 +86,9 @@ export async function evaluateCoach(
       }
       try {
         const chess = new Chess(fixture.fen);
-        for (const move of line) {chess.move(move);}
+        for (const move of line) {
+          chess.move(move);
+        }
       } catch {
         allLegal = false;
       }
@@ -123,18 +126,18 @@ export async function modelApproved(
   model: string | undefined,
   json: string | undefined,
 ): Promise<boolean> {
-  if (!model || !json) {return false;}
+  if (!model || !json) {
+    return false;
+  }
   try {
     const report = JSON.parse(json) as EvaluationReport;
     return (
       report.version === 1 &&
       report.model === model &&
       report.corpusHash === (await corpusHash()) &&
-      
       report.passed &&
       report.positions >= 40 &&
       report.observations >= 480 &&
-      
       report.allLegal &&
       report.criticalErrors === 0 &&
       report.totalCostUsd <= 10 &&

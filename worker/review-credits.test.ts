@@ -17,8 +17,9 @@ function fixture() {
   sqlite.exec('PRAGMA foreign_keys=ON');
   for (const file of readdirSync('drizzle')
     .filter((name) => name.endsWith('.sql'))
-    .sort())
-    {sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));}
+    .sort()) {
+    sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));
+  }
   for (const id of ['owner', 'other']) {
     sqlite
       .prepare(
@@ -66,7 +67,9 @@ describe('review credit accounting', () => {
       now + 2,
     );
     expect(retried?.source).toBe('intro');
-    await expect(commitCoachReviewCredit(f.db, retried!.reservationId, now + 3)).resolves.toBe(true);
+    await expect(commitCoachReviewCredit(f.db, retried!.reservationId, now + 3)).resolves.toBe(
+      true,
+    );
     expect(
       (await reserveCoachReviewCredit(f.db, 'owner', 'match-beta', 'beta-reservation', now + 4))
         ?.source,
@@ -103,7 +106,9 @@ describe('review credit accounting', () => {
         ?.source,
     ).toBe('complimentary');
     expect((await reviewCreditStatus(f.db, 'owner', now)).monthlyFreeRemaining).toBe(0);
-    await expect(reserveCoachReviewCredit(f.db, 'owner', 'match-extra', 'no-credit', now)).resolves.toBeNull();
+    await expect(
+      reserveCoachReviewCredit(f.db, 'owner', 'match-extra', 'no-credit', now),
+    ).resolves.toBeNull();
   });
 
   it('grants each verified pack once, isolates owners, and freezes only credits tied to a disputed pack', async () => {
@@ -168,7 +173,9 @@ describe('review credit accounting', () => {
       frozen: true,
       now: now + 1,
     });
-    await expect(commitCoachReviewCredit(f.db, reservation!.reservationId, now + 2)).resolves.toBe(false);
+    await expect(commitCoachReviewCredit(f.db, reservation!.reservationId, now + 2)).resolves.toBe(
+      false,
+    );
     expect((await reviewCreditStatus(f.db, 'owner', now + 2)).paidRemaining).toBe(10);
     await restoreCoachReviewCredit(f.db, reservation!.reservationId, now + 2);
     await applyReviewPackRisk(f.db, {
@@ -204,7 +211,9 @@ describe('review credit accounting', () => {
     );
     expect(abandoned?.source).toBe('intro');
     expect((await reviewCreditStatus(f.db, 'owner', now + 90_000)).introAvailable).toBe(true);
-    await expect(commitCoachReviewCredit(f.db, abandoned!.reservationId, now + 90_000)).resolves.toBe(false);
+    await expect(
+      commitCoachReviewCredit(f.db, abandoned!.reservationId, now + 90_000),
+    ).resolves.toBe(false);
     expect(
       (
         await reserveCoachReviewCredit(

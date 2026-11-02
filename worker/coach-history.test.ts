@@ -4,13 +4,15 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it, vi } from 'vitest';
 
-function match(id: string, completedAt: number): SavedCoachMatch  { return ({
-  id,
-  completedAt,
-  moves: ['e4'],
-  colour: 'w',
-  result: { reason: 'resignation' },
-}); }
+function match(id: string, completedAt: number): SavedCoachMatch {
+  return {
+    id,
+    completedAt,
+    moves: ['e4'],
+    colour: 'w',
+    result: { reason: 'resignation' },
+  };
+}
 function database(known: { id: string; finished_at: number }[], legacy: { id: string }[] = []) {
   return {
     prepare: vi.fn((sql: string) => ({
@@ -26,14 +28,16 @@ describe('coach history', () => {
     const sqlite = new DatabaseSync(':memory:');
     for (const file of readdirSync('drizzle')
       .filter((name) => name.endsWith('.sql'))
-      .sort())
-      {sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));}
-    for (const id of ['owner', 'other'])
-      {sqlite
+      .sort()) {
+      sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));
+    }
+    for (const id of ['owner', 'other']) {
+      sqlite
         .prepare(
           'INSERT INTO user(id,name,email,email_verified,created_at,updated_at) VALUES(?,?,?,1,0,0)',
         )
-        .run(id, id, `${id}@example.test`);}
+        .run(id, id, `${id}@example.test`);
+    }
     for (const [id, owner, finished] of [
       ['old', 'owner', 300],
       ['later', 'owner', 600],

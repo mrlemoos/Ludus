@@ -1,6 +1,5 @@
 import type { PieceSymbol } from 'chess.js';
-import type {
-  BufferGeometry} from 'three';
+import type { BufferGeometry } from 'three';
 import {
   BoxGeometry,
   CatmullRomCurve3,
@@ -17,17 +16,24 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Shared geometry keeps a full set at one wooden mesh per piece.
 export function createPieceGeometries(): Record<PieceSymbol, BufferGeometry> {
-  function lathe(points: number[][]) { return new LatheGeometry(
+  function lathe(points: number[][]) {
+    return new LatheGeometry(
       points.map(([x, y]) => new Vector2(x, y)),
       48,
-    ); }
-  function sphere(radius: number, y: number, x = 0, z = 0) { return new SphereGeometry(radius, radius < 0.075 ? 12 : 24, radius < 0.075 ? 8 : 16).translate(
+    );
+  }
+  function sphere(radius: number, y: number, x = 0, z = 0) {
+    return new SphereGeometry(radius, radius < 0.075 ? 12 : 24, radius < 0.075 ? 8 : 16).translate(
       x,
       y,
       z,
-    ); }
-  function collar(radius: number, y: number, thickness = 0.018) { return new TorusGeometry(radius, thickness, 8, 48).rotateX(Math.PI / 2).translate(0, y, 0); }
-  function base(radius: number) { return lathe([
+    );
+  }
+  function collar(radius: number, y: number, thickness = 0.018) {
+    return new TorusGeometry(radius, thickness, 8, 48).rotateX(Math.PI / 2).translate(0, y, 0);
+  }
+  function base(radius: number) {
+    return lathe([
       [0, 0],
       [radius * 0.88, 0],
       [radius, 0.025],
@@ -40,7 +46,8 @@ export function createPieceGeometries(): Record<PieceSymbol, BufferGeometry> {
       [radius * 0.76, 0.195],
       [radius * 0.73, 0.22],
       [0, 0.22],
-    ]); }
+    ]);
+  }
   function stem(height: number, width: number) {
     const curve = new CatmullRomCurve3([
       new Vector3(width, 0.2),
@@ -51,13 +58,15 @@ export function createPieceGeometries(): Record<PieceSymbol, BufferGeometry> {
     ]);
     return lathe([[0, 0.2], ...curve.getPoints(20).map((p) => [p.x, p.y]), [0, height]]);
   }
-  function scroll(points: number[][], thickness = 0.014) { return new TubeGeometry(
+  function scroll(points: number[][], thickness = 0.014) {
+    return new TubeGeometry(
       new CatmullRomCurve3(points.map(([x, y, z = 0]) => new Vector3(x, y, z))),
       20,
       thickness,
       6,
       false,
-    ); }
+    );
+  }
   function leaves(radius: number, y: number, count = 8) {
     const leaf = new Shape();
     leaf.moveTo(0, 0);
@@ -78,35 +87,44 @@ export function createPieceGeometries(): Record<PieceSymbol, BufferGeometry> {
         .rotateY((i * Math.PI * 2) / count),
     );
   }
-  function pearls(radius: number, y: number, count = 12) { return Array.from({ length: count }, (_, i) =>
+  function pearls(radius: number, y: number, count = 12) {
+    return Array.from({ length: count }, (_, i) =>
       sphere(
         0.02,
         y,
         Math.cos((i * Math.PI * 2) / count) * radius,
         Math.sin((i * Math.PI * 2) / count) * radius,
       ),
-    ); }
-  function twistedStem(height: number, width: number) { return [
-    stem(height, width),
-    ...Array.from({ length: 6 }, (_, rib) => {
-      const points = Array.from({ length: 17 }, (_, i) => {
-        const t = i / 16;
-        const radius = width * (0.91 - 0.45 * Math.sin((t * Math.PI) / 2));
-        const angle = (rib * Math.PI) / 3 + t * Math.PI * 0.8;
-        return [Math.cos(angle) * radius, 0.28 + t * (height - 0.29), Math.sin(angle) * radius];
-      });
-      return scroll(points, 0.012);
-    }),
-  ]; }
+    );
+  }
+  function twistedStem(height: number, width: number) {
+    return [
+      stem(height, width),
+      ...Array.from({ length: 6 }, (_, rib) => {
+        const points = Array.from({ length: 17 }, (_, i) => {
+          const t = i / 16;
+          const radius = width * (0.91 - 0.45 * Math.sin((t * Math.PI) / 2));
+          const angle = (rib * Math.PI) / 3 + t * Math.PI * 0.8;
+          return [Math.cos(angle) * radius, 0.28 + t * (height - 0.29), Math.sin(angle) * radius];
+        });
+        return scroll(points, 0.012);
+      }),
+    ];
+  }
   function join(parts: BufferGeometry[]) {
     const surfaces = parts.map((part) => (part.index ? part.toNonIndexed() : part));
     const geometry = mergeGeometries(surfaces);
-    new Set([...parts, ...surfaces]).forEach((part) =>{  part.dispose(); });
-    if (!geometry) {throw new Error('Cannot assemble chess piece');}
+    new Set([...parts, ...surfaces]).forEach((part) => {
+      part.dispose();
+    });
+    if (!geometry) {
+      throw new Error('Cannot assemble chess piece');
+    }
     geometry.computeBoundingBox();
     return geometry;
   }
-  function carve(shape: Shape, depth: number) { return new ExtrudeGeometry(shape, {
+  function carve(shape: Shape, depth: number) {
+    return new ExtrudeGeometry(shape, {
       depth,
       bevelEnabled: true,
       bevelSegments: 3,
@@ -114,7 +132,8 @@ export function createPieceGeometries(): Record<PieceSymbol, BufferGeometry> {
       bevelSize: 0.025,
       bevelThickness: 0.025,
       curveSegments: 16,
-    }).translate(0, 0, -depth / 2); }
+    }).translate(0, 0, -depth / 2);
+  }
   const knight = new Shape();
   knight.moveTo(-0.19, 0.33);
   knight.bezierCurveTo(-0.24, 0.53, -0.28, 0.79, -0.17, 1.02);

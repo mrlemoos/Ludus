@@ -29,8 +29,9 @@ export function validTimezone(value: unknown): value is string {
     typeof value !== 'string' ||
     value.length > 100 ||
     !/^[A-Za-z_]+(?:\/[A-Za-z0-9_+.-]+)*$/.test(value)
-  )
-    {return false;}
+  ) {
+    return false;
+  }
   try {
     new Intl.DateTimeFormat('en-GB', { timeZone: value }).format();
     return true;
@@ -39,7 +40,9 @@ export function validTimezone(value: unknown): value is string {
   }
 }
 export function parseProfile(input: unknown): ProfileInput | null {
-  if (!input || typeof input !== 'object') {return null;}
+  if (!input || typeof input !== 'object') {
+    return null;
+  }
   const value = input as Record<string, unknown>;
   if (
     value.adult !== true ||
@@ -50,8 +53,9 @@ export function parseProfile(input: unknown): ProfileInput | null {
     !['beginner', 'casual', 'intermediate', 'advanced'].includes(String(value.chessLevel)) ||
     !teachingProfiles.includes(value.teachingProfile as TeachingProfile) ||
     typeof value.activityPublic !== 'boolean'
-  )
-    {return null;}
+  ) {
+    return null;
+  }
   return {
     username: value.username,
     language: value.language,

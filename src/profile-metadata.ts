@@ -5,7 +5,9 @@ import { useEffect } from 'react';
 
 export function readInitialPublicProfile(username: string): InitialPublicProfile | null {
   const text = document.getElementById('public-profile-data')?.textContent;
-  if (!text) {return null;}
+  if (!text) {
+    return null;
+  }
   try {
     const data = JSON.parse(text) as InitialPublicProfile;
     return typeof data.username === 'string' &&
@@ -55,14 +57,19 @@ export function usePublicProfileMetadata(username: string, language: Language, m
     structured.id = 'profile-structured-data';
     structured.setAttribute('type', 'application/ld+json');
     structured.textContent = JSON.stringify(profileStructuredData(username));
-    if (missing) {structured.remove();} else {
+    if (missing) {
+      structured.remove();
+    } else {
       document.head.appendChild(structured);
       managed.push(structured);
     }
     return () => {
-      for (const element of managed) {element.remove();}
-      if (previousDescription !== null && previousDescription !== undefined)
-        {description?.setAttribute('content', previousDescription);}
+      for (const element of managed) {
+        element.remove();
+      }
+      if (previousDescription !== null && previousDescription !== undefined) {
+        description?.setAttribute('content', previousDescription);
+      }
       document.getElementById('profile-structured-data')?.remove();
     };
   }, [username, language, missing]);

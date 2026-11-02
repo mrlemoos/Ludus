@@ -10,17 +10,23 @@ class AnalysisWorker {
   fen = new Chess().fen();
   terminate = vi.fn();
   postMessage = vi.fn((message: string) => {
-    if (message === 'uci') {queueMicrotask(() => this.onmessage?.({ data: 'uciok' }));}
-    if (message === 'isready' && !AnalysisWorker.stall)
-      {queueMicrotask(() => this.onmessage?.({ data: 'readyok' }));}
-    if (message.startsWith('position fen ')) {this.fen = message.slice(13);}
-    if (message.startsWith('go '))
-      {queueMicrotask(() => {
+    if (message === 'uci') {
+      queueMicrotask(() => this.onmessage?.({ data: 'uciok' }));
+    }
+    if (message === 'isready' && !AnalysisWorker.stall) {
+      queueMicrotask(() => this.onmessage?.({ data: 'readyok' }));
+    }
+    if (message.startsWith('position fen ')) {
+      this.fen = message.slice(13);
+    }
+    if (message.startsWith('go ')) {
+      queueMicrotask(() => {
         const move = new Chess(this.fen).moves({ verbose: true })[0];
         const uci = move.from + move.to + (move.promotion ?? '');
         this.onmessage?.({ data: `info depth 12 score cp 10 nodes 1000 pv ${uci}` });
         this.onmessage?.({ data: `bestmove ${uci}` });
-      });}
+      });
+    }
   });
   constructor() {
     AnalysisWorker.instances.push(this);
@@ -45,7 +51,7 @@ describe('post-game analysis worker lifecycle', () => {
     const lines = await analyseMatch(match, new AbortController().signal, progress);
     expect(lines.map((line) => line.ply)).toEqual([0, 1, 2]);
     expect(progress).toHaveBeenLastCalledWith(3, 3);
-    expect(AnalysisWorker.instances[0].terminate).toHaveBeenCalledTimes(1);
+    expect(AnalysisWorker.instances[0].terminate).toHaveBeenCalledOnce();
     expect(match.moves).toEqual(['e4', 'e5', 'Nf3']);
   });
 
@@ -65,7 +71,7 @@ describe('post-game analysis worker lifecycle', () => {
     vi.stubGlobal('Worker', AnalysisWorker);
     AnalysisWorker.stall = true;
     const abort = new AbortController();
-      const pending = analyseMatch(match, abort.signal);
+    const pending = analyseMatch(match, abort.signal);
     abort.abort();
     await expect(pending).rejects.toThrow('analysis_cancelled');
     expect(AnalysisWorker.instances[0].terminate).toHaveBeenCalledWith();

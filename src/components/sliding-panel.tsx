@@ -22,11 +22,7 @@ interface SlidingPanelProps {
   children: ReactNode;
 }
 
-export function SlidingPanel({
-  activeKey,
-  direction,
-  children,
-}: SlidingPanelProps) {
+export function SlidingPanel({ activeKey, direction, children }: SlidingPanelProps) {
   const reduceMotion = useReducedMotion();
   const keyboard = useRef(false);
   useEffect(() => {
@@ -65,7 +61,7 @@ export function SlidingPanel({
             }),
           }}
           transition={{
-            duration: keyboard.current ? 0 : (reduceMotion ? 0.12 : 0.18),
+            duration: keyboard.current ? 0 : reduceMotion ? 0.12 : 0.18,
             ease: [0.23, 1, 0.32, 1],
           }}
         >

@@ -1,8 +1,18 @@
-import { applyAction, chessFrom, connection, createGame, parseAction, remaining, settle } from './game';
+import {
+  applyAction,
+  chessFrom,
+  connection,
+  createGame,
+  parseAction,
+  remaining,
+  settle,
+} from './game';
 import type { Game } from './game';
 import { describe, expect, it } from 'vitest';
 
-function start() { return connection(createGame('id', 'leo', '5+3', 1, 'w', 0), true, 0); }
+function start() {
+  return connection(createGame('id', 'leo', '5+3', 1, 'w', 0), true, 0);
+}
 function move(game: Game, uci: string, now = game.updatedAt + 1000) {
   return applyAction(
     game,
@@ -119,7 +129,9 @@ describe('authoritative computer matches', () => {
     { type: 'move', from: 'a7', to: 'a8', promotion: 'k', revision: 0 },
     { type: 'resign', revision: -1 },
     { type: 'resign', revision: 0.5 },
-  ])('rejects malformed actions %j', (input) =>{  expect(parseAction(input)).toBeNull(); });
+  ])('rejects malformed actions %j', (input) => {
+    expect(parseAction(input)).toBeNull();
+  });
 });
 
 describe('approved computer draw policy', () => {
