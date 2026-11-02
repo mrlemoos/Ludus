@@ -118,6 +118,10 @@
     "unicorn/prefer-dom-node-append": "off",
     "vitest/no-importing-vitest-globals": "off",
     "vitest/prefer-importing-vitest-globals": "off",
+    "vitest/prefer-import-in-mock": "off",
+    "vitest/consistent-test-it": ["error", { "fn": "it", "withinDescribe": "it" }],
+    "eslint/no-undefined": "off",
+    "typescript/no-unnecessary-type-assertion": "off",
     "typescript/consistent-type-assertions": [
       "error",
       { "assertionStyle": "as", "objectLiteralTypeAssertions": "allow" }

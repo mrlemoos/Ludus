@@ -1,4 +1,5 @@
-import { type Language, isLanguage } from '../shared/waitlist';
+import { isLanguage } from '../shared/waitlist';
+import type { Language } from '../shared/waitlist';
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
@@ -158,13 +159,13 @@ export const languageNames: Record<Language, string> = {
 function initialLanguage(): Language {
   try {
     const saved = localStorage.getItem('ludus-language');
-    if (isLanguage(saved)) return saved;
+    if (isLanguage(saved)) {return saved;}
   } catch {
     /* Browser storage may be unavailable. */
   }
   const preferred = navigator.languages?.[0] ?? navigator.language;
-  if (preferred?.startsWith('es')) return 'es-ES';
-  if (preferred?.startsWith('fr')) return 'fr-FR';
+  if (preferred?.startsWith('es')) {return 'es-ES';}
+  if (preferred?.startsWith('fr')) {return 'fr-FR';}
   return 'en-GB';
 }
 

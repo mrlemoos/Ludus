@@ -4,14 +4,14 @@ export const MONTHLY_FREE_REVIEW_CREDITS = 30;
 export const REVIEW_CREDIT_RESERVATION_TIMEOUT_MS = 90_000;
 
 export type ReviewCreditSource = 'intro' | 'beta' | 'complimentary' | 'paid';
-export type ReviewCreditReservation = {
+export interface ReviewCreditReservation {
   reservationId: string;
   source: ReviewCreditSource;
   packId: string | null;
-};
-export type ReviewCreditStatus = {
+}
+export interface ReviewCreditStatus {
   available: number;
   monthlyFreeRemaining: number;
   introAvailable: boolean;
   paidRemaining: number;
-};
+}

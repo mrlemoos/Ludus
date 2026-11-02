@@ -5,21 +5,24 @@ import { useId } from 'react';
 import type { ReactNode } from 'react';
 
 // Adapted from Skecher UI Apple Mail Tabs; source and changes in docs/skecher-ui.md.
+interface AppleMailTabsProps<T extends string> {
+  value: T;
+  onValueChange: (value: T) => void;
+  children: ReactNode;
+  menu: {
+    label: string;
+    minimal?: boolean;
+    tabs: readonly { value: T; label: string; icon: ReactNode }[];
+  };
+}
+
 export function AppleMailTabs<T extends string>({
   value,
   onValueChange,
-  tabs,
-  label,
   children,
-  minimal = false,
-}: {
-  minimal?: boolean;
-  value: T;
-  onValueChange: (value: T) => void;
-  tabs: readonly { value: T; label: string; icon: ReactNode }[];
-  label: string;
-  children: ReactNode;
-}) {
+  menu,
+}: AppleMailTabsProps<T>) {
+  const { label, tabs, minimal = false } = menu;
   const reduceMotion = useReducedMotion();
   const id = useId();
   return (

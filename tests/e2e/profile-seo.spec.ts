@@ -45,7 +45,7 @@ test('serves public profile content and SEO metadata without JavaScript', async 
 test('keeps metadata after client rendering and restores the home title when leaving', async ({
   page,
 }) => {
-  await page.addInitScript(() => localStorage.setItem('ludus-language', 'en-GB'));
+  await page.addInitScript(() =>{  localStorage.setItem('ludus-language', 'en-GB'); });
   await page.goto('/@leo');
   await expect(page.getByRole('button', { name: 'Share profile' })).toBeVisible();
   await expect(page).toHaveTitle('@Leo · Chess profile | Ludus');
@@ -90,7 +90,7 @@ test('publishes crawl rules and canonical profile sitemap entries', async ({ req
 });
 
 test('retains server-rendered content when the background API refresh fails', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('ludus-language', 'en-GB'));
+  await page.addInitScript(() =>{  localStorage.setItem('ludus-language', 'en-GB'); });
   await page.route('**/api/profiles/leo', (route) =>
     route.fulfill({ status: 503, json: { error: 'unavailable' } }),
   );

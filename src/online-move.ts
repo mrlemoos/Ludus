@@ -7,7 +7,7 @@ export function predictMove(
   to: string,
   promotion?: string,
 ): HumanGame | null {
-  if (game.result) return null;
+  if (game.result) {return null;}
   try {
     const chess = new Chess(game.fen);
     const move = chess.move({ from, to, promotion });
@@ -27,13 +27,13 @@ export function shouldApplySnapshot(
     incoming.revision === prediction.baseRevision &&
     incoming.moves.length < prediction.moves
   )
-    return false;
+    {return false;}
   if (
     latest &&
     latest.id === incoming.id &&
     (latest.revision > incoming.revision ||
       (latest.revision === incoming.revision && latest.updatedAt > incoming.updatedAt))
   )
-    return false;
+    {return false;}
   return true;
 }

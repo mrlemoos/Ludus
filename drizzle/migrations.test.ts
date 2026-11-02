@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
+
 const migrations = readdirSync('drizzle')
   .filter((file) => file.endsWith('.sql'))
   .sort();

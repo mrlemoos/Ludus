@@ -21,9 +21,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 
 const Board3D = lazy(() => import('./board-3d'));
-function Glyph({
-  name,
-}: {
+interface GlyphProps {
   name:
     | 'flag'
     | 'close'
@@ -37,7 +35,8 @@ function Glyph({
     | 'medal'
     | 'thanks'
     | 'hands';
-}) {
+}
+function Glyph({ name }: GlyphProps) {
   const path = {
     bell: 'M6 16h12l-1.4-2V10a4.6 4.6 0 0 0-9.2 0v4zM10 18a2 2 0 0 0 4 0',
     close: 'M6 6l12 12M18 6L6 18',
@@ -146,7 +145,7 @@ export function Online() {
   const latest = useRef<HumanGame | null>(null);
   const lock = useRef(false);
   const predicted = useRef<{ baseRevision: number; moves: number } | null>(null);
-  const accept = (snapshot: { game: HumanGame; serverNow: number }) => {
+  function accept(snapshot: { game: HumanGame; serverNow: number }) {
     if (!shouldApplySnapshot(latest.current, snapshot.game, predicted.current)) {
       return;
     }
@@ -156,7 +155,7 @@ export function Online() {
     offset.current = snapshot.serverNow - Date.now();
     setGame(snapshot.game);
     setNow(snapshot.serverNow);
-  };
+  }
   useEffect(() => {
     void fetch('/api/me')
       .then((response) => response.json() as Promise<{ user: { id: string } | null }>)
@@ -180,7 +179,7 @@ export function Online() {
       return;
     }
     let cancelled = false;
-    const poll = () => {
+    function poll() {
       void api<QueueState>('status')
         .then((state) => {
           if (cancelled) {
@@ -198,7 +197,7 @@ export function Online() {
             setError(true);
           }
         });
-    };
+    }
     poll();
     const timer = setInterval(poll, 2000);
     void api<typeof history>('history')
@@ -218,7 +217,7 @@ export function Online() {
     let disposed = false;
     let socket: WebSocket;
     let timer: ReturnType<typeof setTimeout>;
-    const connect = () => {
+    function connect() {
       try {
         socket = new WebSocket(
           `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/api/online/socket`,
@@ -250,7 +249,7 @@ export function Online() {
       socket.onerror = () => {
         socket.close();
       };
-    };
+    }
     connect();
     return () => {
       disposed = true;
@@ -294,7 +293,7 @@ export function Online() {
           setError(true);
         }
       });
-    const connect = () => {
+    function connect() {
       socket = new WebSocket(
         `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/api/online/games/${id}/socket`,
       );
@@ -327,7 +326,7 @@ export function Online() {
       socket.onerror = () => {
         socket.close();
       };
-    };
+    }
     connect();
     return () => {
       disposed = true;
@@ -352,20 +351,19 @@ export function Online() {
       setPending(false);
     }
   }
-  const act = async (action: Omit<HumanAction, 'revision'>) =>
-    run(async () => {
+  async function act(action: Omit<HumanAction, 'revision'>) { return run(async () => {
       if (!game) {
         return;
       }
       accept(await api(`games/${game.id}`, { ...action, revision: game.revision }));
       setSelected(null);
       setPromotion(null);
-    });
-  const navigate = (next: typeof replay) => {
+    }); }
+  function navigate(next: typeof replay) {
     setReplay(next);
     setSelected(null);
     setPromotion(null);
-  };
+  }
   const shown = useMemo(() => {
     const chess = new Chess();
     const moves = replay ? replay.moves.slice(0, replay.ply) : (prediction?.moves ?? game?.moves);
@@ -405,7 +403,7 @@ export function Online() {
       setSelected(null);
       setPromotion(null);
       void run(async () => {
-        const sync = async (conflict: boolean) => {
+        async function sync(conflict: boolean) {
           if (conflict) {
             predicted.current = null;
             setPrediction(null);
@@ -418,7 +416,7 @@ export function Online() {
           } catch {
             throw new Error('request_failed');
           }
-        };
+        }
         try {
           const response = await fetch(`/api/online/games/${gameId}`, {
             body: JSON.stringify({ type: 'move', from, to, promotion: promoted, revision }),
@@ -473,17 +471,18 @@ export function Online() {
   const props = {
     appearance: appearance.appearance,
     copy: boardCopy,
-    destinations: selected
-      ? shown.moves({ square: selected, verbose: true }).map((move) => move.to)
-      : [],
-    fen: shown.fen(),
-    flipped,
-    lastMove: last ? [last.from, last.to] : [],
     onSquare: square,
-    selected,
+    position: {
+      destinations: selected
+        ? shown.moves({ square: selected, verbose: true }).map((move) => move.to)
+        : [],
+      fen: shown.fen(),
+      flipped,
+      lastMove: last ? [last.from, last.to] : [],
+      selected,
+    },
   };
-  const clock = (time: number) =>
-    `${Math.floor(Math.ceil(time / 1000) / 60)}:${String(Math.ceil(time / 1000) % 60).padStart(2, '0')}`;
+  function clock(time: number) { return `${Math.floor(Math.ceil(time / 1000) / 60)}:${String(Math.ceil(time / 1000) % 60).padStart(2, '0')}`; }
   const playing = Boolean(id && game);
   return (
     <div className={`site-shell game-shell${playing ? ' match-shell' : ''}`}>
@@ -544,16 +543,18 @@ export function Online() {
                         <OnlineGraphics fallback={<Board {...props} />}>
                           <Suspense fallback={<p>{boardCopy.loading}</p>}>
                             <Board3D
-                              {...props}
+                              board={props}
                               resetKey={resetKey}
                               looking={false}
-                              captured={captured}
-                              tableClock={{
-                                times: { w: clock(timing!.clocks.w), b: clock(timing!.clocks.b) },
-                                active:
-                                  game.result || timing!.pauseRemaining > 0
-                                    ? null
-                                    : (game.fen.split(' ')[1] as 'w' | 'b'),
+                              table={{
+                                captured,
+                                tableClock: {
+                                  times: { w: clock(timing!.clocks.w), b: clock(timing!.clocks.b) },
+                                  active:
+                                    game.result || timing!.pauseRemaining > 0
+                                      ? null
+                                      : (game.fen.split(' ')[1] as 'w' | 'b'),
+                                },
                               }}
                             />
                           </Suspense>
@@ -867,7 +868,7 @@ export function Online() {
                     <Dialog.Root
                       open
                       onOpenChange={(open) => {
-                        if (!open) setPromotion(null);
+                        if (!open) {setPromotion(null);}
                       }}
                     >
                       <Dialog.Portal>
@@ -928,7 +929,7 @@ export function Online() {
                             token: inviteToken,
                             colour,
                           });
-                          if (state.status === 'assigned') setParams({ game: state.match.id });
+                          if (state.status === 'assigned') {setParams({ game: state.match.id });}
                         } catch (caught) {
                           if (caught instanceof Error && caught.message === 'not_found') {
                             setMissingInvite(true);
@@ -987,7 +988,7 @@ export function Online() {
                           void run(async () => {
                             const state = await api<QueueState>('queue', { control, rated: false });
                             setQueue(state);
-                            if (state.status === 'assigned') setParams({ game: state.match.id });
+                            if (state.status === 'assigned') {setParams({ game: state.match.id });}
                           })
                         }
                       >
@@ -1049,8 +1050,8 @@ export function Online() {
                                   { token: queue.entry.token },
                                 );
                                 if (state.status === 'assigned')
-                                  setParams({ game: state.match.id });
-                                else if (state.aiAccepted) location.assign('/play');
+                                  {setParams({ game: state.match.id });}
+                                else if (state.aiAccepted) {location.assign('/play');}
                               })
                             }
                           >

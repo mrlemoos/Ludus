@@ -1,4 +1,5 @@
 import type { Language } from '../shared/waitlist';
+
 const en = {
   coach: 'Review with Lucía',
   agreement: 'Draw by agreement',

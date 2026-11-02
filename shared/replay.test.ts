@@ -2,10 +2,11 @@ import type { Game } from './game';
 import { replayMove, replayPosition, savedReplay, stepReplay } from './replay';
 import { Chess } from 'chess.js';
 import { describe, expect, it } from 'vitest';
-const finished = (moves = ['e4', 'e5', 'Nf3', 'Nc6']): Pick<Game, 'moves' | 'result'> => ({
+
+function finished(moves = ['e4', 'e5', 'Nf3', 'Nc6']): Pick<Game, 'moves' | 'result'>  { return ({
   moves,
   result: { winner: 'b', reason: 'resignation' },
-});
+}); }
 
 describe('private replay variations', () => {
   it('branches from a saved position without mutating recorded moves or results', () => {
@@ -21,6 +22,7 @@ describe('private replay variations', () => {
       replayPosition(game, saved).fen(),
     );
   });
+
   it('plays both sides and truncates only the explored continuation after stepping back', () => {
     const game = finished();
     let branch = replayMove(game, savedReplay(game, 0), { from: 'd2', to: 'd4' });
@@ -31,6 +33,7 @@ describe('private replay variations', () => {
     expect(replacement.branchAt).toBe(0);
     expect(branch.moves).toEqual(['d4', 'd5', 'c4']);
   });
+
   it('keeps saved and variation navigation inside each line', () => {
     const game = finished();
     const branch = replayMove(game, savedReplay(game, 1), { from: 'c7', to: 'c5' });
@@ -39,6 +42,7 @@ describe('private replay variations', () => {
     expect(stepReplay(stepReplay(branch, -1), 1)).toEqual(branch);
     expect(savedReplay(game).moves).toEqual(game.moves);
   });
+
   it('rejects illegal moves and leaves the explored position unchanged', () => {
     const game = finished();
     const replay = savedReplay(game, 0);
@@ -46,6 +50,7 @@ describe('private replay variations', () => {
     expect(() => replayMove(game, replay, { from: 'e2', to: 'e5' })).toThrow();
     expect(replay).toEqual(before);
   });
+
   it('preserves legal underpromotion and en passant in variations', () => {
     const moves = ['a4', 'h5', 'a5', 'h4', 'a6', 'h3', 'axb7', 'hxg2'];
     const game = finished(moves);
@@ -55,6 +60,7 @@ describe('private replay variations', () => {
     const captured = replayMove(passant, savedReplay(passant), { from: 'e5', to: 'd6' });
     expect(replayPosition(passant, captured).get('d5')).toBeUndefined();
   });
+
   it('retains castling history and rejects moves beyond checkmate', () => {
     const castle = finished(['e4', 'e5', 'Nf3', 'Nc6', 'Bc4', 'Nf6']);
     const branch = replayMove(castle, savedReplay(castle), { from: 'e1', to: 'g1' });
@@ -63,6 +69,7 @@ describe('private replay variations', () => {
     expect(() => replayMove(mate, savedReplay(mate), { from: 'a2', to: 'a3' })).toThrow();
     expect(replayPosition(mate, savedReplay(mate, 0)).fen()).toBe(new Chess().fen());
   });
+
   it('never exposes replay helpers for a live game', () => {
     const live = { moves: ['e4'], result: null };
     expect(() => savedReplay(live)).toThrow('unfinished');
@@ -71,7 +78,8 @@ describe('private replay variations', () => {
       replayMove(live, { moves: [], ply: 0, branchAt: null }, { from: 'd2', to: 'd4' }),
     ).toThrow('unfinished');
   });
-  it.each([-1, 5, 0.5, NaN])('rejects invalid saved cursor %s', (ply) => {
+
+  it.each([-1, 5, 0.5, Number.NaN])('rejects invalid saved cursor %s', (ply) => {
     expect(() => savedReplay(finished(), ply)).toThrow('invalid_ply');
   });
 });

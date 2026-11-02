@@ -5,6 +5,7 @@ import {
   permittedAppearance,
 } from './cosmetics';
 import { describe, expect, it } from 'vitest';
+
 describe('free cosmetics', () => {
   it('keeps every saved material available regardless of legacy Plus input', () => {
     const selected = { board: 'marble', pieces: 'ebony' } as const;
@@ -12,13 +13,15 @@ describe('free cosmetics', () => {
     expect(permittedAppearance(selected, true)).toEqual(selected);
     expect(selected).toEqual({ board: 'marble', pieces: 'ebony' });
   });
+
   it.each([
     null,
     {},
     { board: 'marble' },
     { board: 'external-url', pieces: 'wood' },
     { board: 'wood', pieces: 'unknown' },
-  ])('rejects unsupported appearance %j', (value) => expect(parseAppearance(value)).toBeNull());
+  ])('rejects unsupported appearance %j', (value) =>{  expect(parseAppearance(value)).toBeNull(); });
+
   it('accepts only catalogue entries with complete material definitions', () => {
     expect(parseAppearance({ board: 'walnut', pieces: 'ebony', owner: 'forged' })).toEqual({
       board: 'walnut',

@@ -2,11 +2,11 @@ export const materials = ['wood', 'walnut', 'marble'] as const;
 export const finishes = ['wood', 'ebony'] as const;
 export type BoardMaterial = (typeof materials)[number];
 export type PieceFinish = (typeof finishes)[number];
-export type Appearance = { board: BoardMaterial; pieces: PieceFinish };
+export interface Appearance { board: BoardMaterial; pieces: PieceFinish }
 export const defaultAppearance: Appearance = { board: 'wood', pieces: 'wood' };
 export function parseAppearance(value: unknown): Appearance | null {
   if (!value || typeof value !== 'object' || !('board' in value) || !('pieces' in value))
-    return null;
+    {return null;}
   return materials.includes(value.board as BoardMaterial) &&
     finishes.includes(value.pieces as PieceFinish)
     ? { board: value.board as BoardMaterial, pieces: value.pieces as PieceFinish }

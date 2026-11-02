@@ -27,7 +27,11 @@ function Arrow() {
   );
 }
 
-export function Header({ compact = false }: { compact?: boolean }) {
+interface HeaderProps {
+  compact?: boolean;
+}
+
+export function Header({ compact = false }: HeaderProps) {
   const { t, i18n } = useTranslation();
   const { pathname } = useLocation();
   useEffect(() => {
@@ -130,7 +134,7 @@ export function App() {
       });
       if (!response.ok) {
         setError(
-          response.status === 429 ? 'limited' : response.status === 400 ? 'invalid' : 'unavailable',
+          response.status === 429 ? 'limited' : (response.status === 400 ? 'invalid' : 'unavailable'),
         );
         setState('idle');
         return;

@@ -11,6 +11,7 @@ import { Play } from './play';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Route, Routes, useParams } from 'react-router';
+
 const Account = React.lazy(() =>
   import('./account').then((module) => ({ default: module.Account })),
 );

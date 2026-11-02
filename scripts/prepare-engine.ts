@@ -1,11 +1,12 @@
 import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
+
 const require = createRequire(import.meta.url);
 const root = dirname(require.resolve('stockfish/package.json'));
 mkdirSync('public/engine', { recursive: true });
 for (const file of ['stockfish-19-lite-single.js', 'stockfish-19-lite-single.wasm'])
-  copyFileSync(join(root, 'bin', file), join('public/engine', file));
+  {copyFileSync(join(root, 'bin', file), join('public/engine', file));}
 copyFileSync(join(root, 'Copying.txt'), 'public/engine/Copying.txt');
 
 writeFileSync(

@@ -1,7 +1,7 @@
 import { createPieceGeometries } from './piece-geometry';
-import { expect, test } from 'vitest';
+import { expect, it } from 'vitest';
 
-test('Baroque pieces fit their squares and keep mesh data finite and bounded', () => {
+it('baroque pieces fit their squares and keep mesh data finite and bounded', () => {
   const pieces = createPieceGeometries();
   for (const geometry of Object.values(pieces)) {
     const box = geometry.boundingBox!;
@@ -12,7 +12,7 @@ test('Baroque pieces fit their squares and keep mesh data finite and bounded', (
       Math.max(Math.abs(box.min.x), Math.abs(box.max.x), Math.abs(box.min.z), Math.abs(box.max.z)),
     ).toBeLessThan(0.4);
     for (const attribute of Object.values(geometry.attributes)) {
-      expect(Array.from(attribute.array).every(Number.isFinite)).toBe(true);
+      expect([...attribute.array].every(Number.isFinite)).toBe(true);
     }
     geometry.dispose();
   }

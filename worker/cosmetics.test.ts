@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { cosmeticsApi } from './cosmetics';
+
 describe('appearance API', () => {
   function environment(expires: number | null) {
     const run = vi.fn();
@@ -10,12 +11,14 @@ describe('appearance API', () => {
     }));
     return { env: { DB: { prepare: () => ({ bind }) } } as unknown as Env, bind, run };
   }
+
   it('requires onboarding', async () => {
     const { env } = environment(null);
     expect(
       (await cosmeticsApi(new Request('https://ludus.test/api/appearance'), env, 'owner')).status,
     ).toBe(403);
   });
+
   it('allows every catalogue material after beta expiry', async () => {
     const { env, run } = environment(Date.now() - 1);
     const response = await cosmeticsApi(
@@ -27,8 +30,9 @@ describe('appearance API', () => {
       'owner',
     );
     expect(response.status).toBe(200);
-    expect(run).toHaveBeenCalledOnce();
+    expect(run).toHaveBeenCalledTimes(1);
   });
+
   it('accepts trusted paid access after beta without changing the beta grant', async () => {
     const { env, run } = environment(Date.now() - 1);
     const response = await cosmeticsApi(
@@ -38,11 +42,12 @@ describe('appearance API', () => {
       }),
       env,
       'owner',
-      Date.now() + 86400_000,
+      Date.now() + 86_400_000,
     );
     expect(response.status).toBe(200);
-    expect(run).toHaveBeenCalledOnce();
+    expect(run).toHaveBeenCalledTimes(1);
   });
+
   it('loads saved materials after beta expiry', async () => {
     const now = Date.now();
     const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
@@ -66,12 +71,13 @@ describe('appearance API', () => {
         env,
         'owner',
       );
-      expect(await response.json()).toEqual({ appearance: { board: 'marble', pieces: 'ebony' } });
+      await expect(response.json()).resolves.toEqual({ appearance: { board: 'marble', pieces: 'ebony' } });
       expect(run).not.toHaveBeenCalled();
     } finally {
       clock.mockRestore();
     }
   });
+
   it('writes only authenticated owner and validated catalogue IDs', async () => {
     const { env, bind, run } = environment(Date.now() + 1000);
     const response = await cosmeticsApi(
@@ -83,7 +89,7 @@ describe('appearance API', () => {
       'owner',
     );
     expect(response.status).toBe(200);
-    expect(run).toHaveBeenCalledOnce();
+    expect(run).toHaveBeenCalledTimes(1);
     expect(bind).toHaveBeenLastCalledWith('owner', 'marble', 'ebony');
   });
 });

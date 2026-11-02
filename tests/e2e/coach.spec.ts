@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+
 const id = '11111111-1111-4111-8111-111111111111';
 const review = {
   id: 'saved-review',
@@ -25,22 +26,22 @@ const status = {
 test('saved review survives model outage, preserves language and replays legal variations', async ({
   page,
 }) => {
-  const writes: string[] = [],
-    errors: string[] = [];
+  const writes: string[] = [];
+    const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.addInitScript(() => localStorage.setItem('ludus-language', 'en-GB'));
+  await page.addInitScript(() =>{  localStorage.setItem('ludus-language', 'en-GB'); });
   await page.route('**/api/coach/**', async (route) => {
-    if (route.request().method() !== 'GET') writes.push(route.request().url());
+    if (route.request().method() !== 'GET') {writes.push(route.request().url());}
     const path = new URL(route.request().url()).pathname;
-    if (path.endsWith('/status')) return route.fulfill({ json: status });
+    if (path.endsWith('/status')) {return route.fulfill({ json: status });}
     if (path.endsWith(`/matches/${id}/review`))
-      return route.fulfill({ json: { review, replies: [] } });
+      {return route.fulfill({ json: { review, replies: [] } });}
     if (path.endsWith(`/matches/${id}`))
-      return route.fulfill({
+      {return route.fulfill({
         json: {
           match: { id, moves: ['e4', 'e5', 'Nf3'], colour: 'w', result: { reason: 'resignation' } },
         },
-      });
+      });}
     return route.fulfill({ json: { review, replies: [] } });
   });
   await page.goto(`/coach/${id}`);
@@ -68,14 +69,14 @@ test('saved review survives model outage, preserves language and replays legal v
 test('conversation outage retries manually with one stable request key', async ({ page }) => {
   const requests: { key: string; language: string }[] = [];
   const replies: unknown[] = [];
-  await page.addInitScript(() => localStorage.setItem('ludus-language', 'en-GB'));
+  await page.addInitScript(() =>{  localStorage.setItem('ludus-language', 'en-GB'); });
   await page.route('**/api/coach/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (route.request().method() === 'POST') {
       const body = route.request().postDataJSON();
       requests.push(body);
       if (requests.length === 1)
-        return route.fulfill({ status: 503, json: { error: 'coach_unavailable' } });
+        {return route.fulfill({ status: 503, json: { error: 'coach_unavailable' } });}
       const reply = {
         id: 'reply-1',
         reviewId: review.id,
@@ -91,14 +92,14 @@ test('conversation outage retries manually with one stable request key', async (
       replies.push(reply);
       return route.fulfill({ json: { reply } });
     }
-    if (path.endsWith('/status')) return route.fulfill({ json: { ...status, available: true } });
-    if (path.endsWith(`/matches/${id}/review`)) return route.fulfill({ json: { review, replies } });
+    if (path.endsWith('/status')) {return route.fulfill({ json: { ...status, available: true } });}
+    if (path.endsWith(`/matches/${id}/review`)) {return route.fulfill({ json: { review, replies } });}
     if (path.endsWith(`/matches/${id}`))
-      return route.fulfill({
+      {return route.fulfill({
         json: {
           match: { id, moves: ['e4', 'e5'], colour: 'w', result: { reason: 'resignation' } },
         },
-      });
+      });}
     return route.fulfill({ json: { review, replies } });
   });
   await page.goto(`/coach/${id}`);
@@ -118,7 +119,7 @@ test('real unconfigured coach returns unavailable without consuming quota', asyn
   page,
   baseURL,
 }) => {
-  const origin = new URL(baseURL!).origin;
+  const {origin} = new URL(baseURL!);
   const signIn = await page.request.post('/api/dev/sign-in', {
     headers: { Origin: origin },
     data: {},
@@ -163,7 +164,7 @@ test('local engine analysis remains available during model outage without review
   const entries = await page.request.get('/api/games').then((r) => r.json());
   let matchId: string | undefined;
   for (const entry of entries) {
-    if (!entry.result) continue;
+    if (!entry.result) {continue;}
     const { game } = await page.request.get(`/api/games/${entry.id}`).then((r) => r.json());
     if (game.moves.length > 0 && game.moves.length <= 12) {
       matchId = game.id;
@@ -183,7 +184,7 @@ test('local engine analysis remains available during model outage without review
   const writes: string[] = [];
   page.on('request', (request) => {
     if (request.method() === 'POST' && request.url().includes('/api/coach/'))
-      writes.push(request.url());
+      {writes.push(request.url());}
   });
   await page.goto(`/coach/${matchId}`);
   await expect(

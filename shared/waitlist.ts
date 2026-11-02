@@ -7,8 +7,8 @@ export function isLanguage(value: unknown): value is Language {
 
 export function parseWaitlist(value: unknown): { email: string; language: Language } | null {
   if (typeof value !== 'object' || value === null || !('email' in value) || !('language' in value))
-    return null;
-  if (typeof value.email !== 'string' || !isLanguage(value.language)) return null;
+    {return null;}
+  if (typeof value.email !== 'string' || !isLanguage(value.language)) {return null;}
   const email = value.email.trim().toLowerCase();
   if (
     email.length > 254 ||
@@ -16,7 +16,7 @@ export function parseWaitlist(value: unknown): { email: string; language: Langua
       email,
     )
   )
-    return null;
+    {return null;}
   const [local, domain] = email.split('@');
   if (
     local.length > 64 ||
@@ -25,6 +25,6 @@ export function parseWaitlist(value: unknown): { email: string; language: Langua
     local.includes('..') ||
     domain.split('.').some((label) => label.length > 63)
   )
-    return null;
+    {return null;}
   return { email, language: value.language };
 }

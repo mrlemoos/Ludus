@@ -38,12 +38,12 @@ export function suggestDifficulty(
       (game) => game.result!.winner !== null && game.result!.winner !== game.colour,
     ).length;
     if (wins >= 4 && selected < 4)
-      return { difficulty: (selected + 1) as Difficulty, reason: 'recentWins' };
+      {return { difficulty: (selected + 1) as Difficulty, reason: 'recentWins' };}
     if (losses >= 4 && selected > 1)
-      return { difficulty: (selected - 1) as Difficulty, reason: 'recentLosses' };
+      {return { difficulty: (selected - 1) as Difficulty, reason: 'recentLosses' };}
     return null;
   }
-  if (history.some((game) => game.result)) return null;
+  if (history.some((game) => game.result)) {return null;}
   const difficulty = { beginner: 1, casual: 2, intermediate: 3, advanced: 4 }[level] as Difficulty;
   return difficulty === selected ? null : { difficulty, reason: 'onboarding' };
 }

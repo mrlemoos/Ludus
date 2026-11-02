@@ -2,7 +2,11 @@ import { Wordmark } from './components/wordmark';
 
 const backRank = ['rook', 'knight', 'bishop', 'queen', 'king', 'bishop', 'knight', 'rook'];
 
-function Piece({ kind }: { kind: string }) {
+interface PieceProps {
+  kind: string;
+}
+
+function Piece({ kind }: PieceProps) {
   return (
     <svg viewBox="0 0 40 64" className="piece" aria-hidden="true">
       <path d="M7 57h26l-2-5H9zM10 49h20l-3-5H13z" />
@@ -44,11 +48,11 @@ export function ChessScene() {
       <div className="table-rim" />
       <div className="chessboard">
         {Array.from({ length: 64 }, (_, i) => {
-          const row = Math.floor(i / 8),
-            col = i % 8;
-          let kind = row === 0 || row === 7 ? backRank[col] : row === 1 || row === 6 ? 'pawn' : '';
-          if ((row === 6 && col === 4) || (row === 1 && col === 4)) kind = '';
-          if ((row === 4 && col === 4) || (row === 3 && col === 4)) kind = 'pawn';
+          const row = Math.floor(i / 8);
+            const col = i % 8;
+          let kind = row === 0 || row === 7 ? backRank[col] : (row === 1 || row === 6 ? 'pawn' : '');
+          if ((row === 6 && col === 4) || (row === 1 && col === 4)) {kind = '';}
+          if ((row === 4 && col === 4) || (row === 3 && col === 4)) {kind = 'pawn';}
           return (
             <div
               key={i}

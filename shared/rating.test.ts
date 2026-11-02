@@ -1,6 +1,7 @@
 import { initialRating, provisional, rate, rateMatch } from './rating';
 import { describe, expect, it } from 'vitest';
-describe('Glicko-2 periods', () => {
+
+describe('glicko-2 periods', () => {
   it('matches Glickman’s published numerical example', () => {
     const result = rate({ rating: 1500, deviation: 200, volatility: 0.06, games: 0 }, [
       { rating: { ...initialRating(), rating: 1400, deviation: 30 }, score: 1 },
@@ -11,9 +12,10 @@ describe('Glicko-2 periods', () => {
     expect(result.deviation).toBeCloseTo(151.52, 2);
     expect(result.volatility).toBeCloseTo(0.059996, 6);
   });
+
   it('updates both opponents from pre-match ratings, independently per period', () => {
-    const initial = initialRating(),
-      after = rateMatch(initial, initial, 'w');
+    const initial = initialRating();
+      const after = rateMatch(initial, initial, 'w');
     expect(after.w.rating).toBeGreaterThan(1500);
     expect(after.b.rating).toBeLessThan(1500);
     expect(after.w.rating - 1500).toBeCloseTo(1500 - after.b.rating, 8);
@@ -21,6 +23,7 @@ describe('Glicko-2 periods', () => {
     expect(after.w.games).toBe(1);
     expect(rateMatch(initial, initial, null).w.rating).toBe(1500);
   });
+
   it('shows provisional status only before ten games and handles inactivity', () => {
     expect(provisional({ ...initialRating(), games: 9 })).toBe(true);
     expect(provisional({ ...initialRating(), games: 10 })).toBe(false);

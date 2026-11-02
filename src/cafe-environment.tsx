@@ -1,20 +1,9 @@
-import { type CafeMaterial, createCafeModels } from './cafe-models';
+import { createCafeModels } from './cafe-models';
+import type { CafeMaterial } from './cafe-models';
 import { ContactShadows, CubeCamera, RoundedBox } from '@react-three/drei';
 import { createContext, memo, useContext, useEffect, useMemo } from 'react';
-import {
-  BoxGeometry,
-  CanvasTexture,
-  CubicBezierCurve3,
-  DoubleSide,
-  ExtrudeGeometry,
-  MeshStandardMaterial,
-  RepeatWrapping,
-  SRGBColorSpace,
-  Shape,
-  type Texture,
-  Vector2,
-  Vector3,
-} from 'three';
+import { BoxGeometry, CanvasTexture, CubicBezierCurve3, DoubleSide, ExtrudeGeometry, MeshStandardMaterial, RepeatWrapping, SRGBColorSpace, Shape, Vector2, Vector3 } from 'three';
+import type { Texture } from 'three';
 
 type Point = [number, number, number];
 const CafeResources = createContext<{
@@ -24,7 +13,11 @@ const CafeResources = createContext<{
   finishes: Record<CafeMaterial, MeshStandardMaterial>;
 } | null>(null);
 
-function Model({ name }: { name: keyof ReturnType<typeof createCafeModels> }) {
+interface ModelProps {
+  name: keyof ReturnType<typeof createCafeModels>;
+}
+
+function Model({ name }: ModelProps) {
   const resources = useContext(CafeResources)!;
   return (
     <group>
@@ -41,19 +34,15 @@ function Model({ name }: { name: keyof ReturnType<typeof createCafeModels> }) {
     </group>
   );
 }
-function Block({
-  at,
-  size,
-  colour,
-  map,
-  metal = false,
-}: {
+interface BlockProps {
   at: Point;
   size: Point;
   colour: string;
   map?: Texture;
   metal?: boolean;
-}) {
+}
+
+function Block({ at, size, colour, map, metal = false }: BlockProps) {
   const resources = useContext(CafeResources)!;
   const key = `${colour}-${map?.uuid ?? ''}-${metal}`;
   let material = resources.materials.get(key);
@@ -80,21 +69,17 @@ function Block({
     />
   );
 }
-function Ring({
-  at,
-  radius,
-  tube,
-  colour,
-  arc = Math.PI * 2,
-  rotation = [0, 0, 0],
-}: {
+interface RingProps {
   at: Point;
   radius: number;
   tube: number;
   colour: string;
-  arc?: number;
-  rotation?: Point;
-}) {
+  curve?: { arc?: number; rotation?: Point };
+}
+
+function Ring({ at, radius, tube, colour, curve }: RingProps) {
+  const arc = curve?.arc ?? Math.PI * 2;
+  const rotation = curve?.rotation ?? ([0, 0, 0] as Point);
   return (
     <mesh position={at} rotation={rotation} castShadow>
       <torusGeometry args={[radius, tube, 6, 32, arc]} />
@@ -102,10 +87,10 @@ function Ring({
     </mesh>
   );
 }
-const walnut = '#493024',
-  plaster = '#d8c9ad',
+const brass = '#987447',
   carving = '#e5d8bd',
-  brass = '#987447';
+  plaster = '#d8c9ad',
+  walnut = '#493024';
 
 function surface(
   kind: 'wood' | 'stone' | 'plaster' | 'floor' | 'ceiling' | 'paper' | 'leather' | 'newsprint',
@@ -114,15 +99,15 @@ function surface(
   canvas.width = canvas.height = 256;
   const c = canvas.getContext('2d')!;
   let seed = 17;
-  const random = () => {
-    seed = (seed * 16807) % 2147483647;
-    return seed / 2147483647;
-  };
-  c.fillStyle = kind === 'floor' ? '#b9ad95' : kind === 'ceiling' ? '#b8a17b' : '#eee8dc';
+  function random() {
+    seed = (seed * 16_807) % 2_147_483_647;
+    return seed / 2_147_483_647;
+  }
+  c.fillStyle = kind === 'floor' ? '#b9ad95' : (kind === 'ceiling' ? '#b8a17b' : '#eee8dc');
   c.fillRect(0, 0, 256, 256);
   for (let i = 0; i < 1800; i++) {
-    const x = random() * 256,
-      y = random() * 256;
+    const x = random() * 256;
+      const y = random() * 256;
     c.strokeStyle = `rgba(70,48,30,${random() * (kind === 'wood' ? 0.13 : 0.035)})`;
     if (kind === 'wood') {
       c.beginPath();
@@ -139,8 +124,8 @@ function surface(
     c.fillRect(0, 0, 256, 256);
     for (let i = 0; i < 3500; i++) {
       c.strokeStyle = `rgba(125,112,91,${0.025 + random() * 0.06})`;
-      const x = random() * 256,
-        y = random() * 256;
+      const x = random() * 256;
+        const y = random() * 256;
       c.beginPath();
       c.moveTo(x, y);
       c.lineTo(x + random() * 5, y + random() * 2);
@@ -148,14 +133,14 @@ function surface(
     }
     c.strokeStyle = '#b9ab9120';
     for (let y = 8; y < 256; y += 16)
-      for (let x = 8; x < 256; x += 16) {
+      {for (let x = 8; x < 256; x += 16) {
         c.beginPath();
         c.arc(x, y, 2, 0, Math.PI * 2);
         c.stroke();
-      }
+      }}
   }
   if (kind === 'stone')
-    for (let i = 0; i < 14; i++) {
+    {for (let i = 0; i < 14; i++) {
       const x = random() * 256,
         drift = random() * 60 - 30;
       c.strokeStyle = '#887c6a18';
@@ -164,7 +149,7 @@ function surface(
       c.moveTo(x, 0);
       c.bezierCurveTo(x + drift, 80, x - drift, 175, x, 256);
       c.stroke();
-    }
+    }}
   c.lineWidth = 1;
   if (kind === 'wood') {
     for (let x = 0; x < 256; x++) {
@@ -178,7 +163,7 @@ function surface(
   }
   if (kind === 'floor') {
     for (let y = 0; y < 2; y++)
-      for (let x = 0; x < 2; x++) {
+      {for (let x = 0; x < 2; x++) {
         c.fillStyle = ['#bdb29c', '#c9bda7', '#c5baa3', '#b9af99'][y * 2 + x];
         c.fillRect(x * 128, y * 128, 128, 128);
         const patina = c.createRadialGradient(
@@ -197,9 +182,9 @@ function surface(
         c.strokeRect(x * 128 + 0.5, y * 128 + 0.5, 127, 127);
         c.strokeStyle = '#e5d9bf';
         c.strokeRect(x * 128 + 1.5, y * 128 + 1.5, 125, 125);
-      }
+      }}
     for (let y = 0; y <= 256; y += 128)
-      for (let x = 0; x <= 256; x += 128) {
+      {for (let x = 0; x <= 256; x += 128) {
         c.fillStyle = '#55594c';
         c.beginPath();
         c.moveTo(x, y - 12);
@@ -208,7 +193,7 @@ function surface(
         c.lineTo(x - 12, y);
         c.closePath();
         c.fill();
-      }
+      }}
   }
   if (kind === 'leather') {
     for (let i = 0; i < 5000; i++) {
@@ -235,10 +220,10 @@ function surface(
     c.fillRect(14, 46, 228, 2);
     c.fillRect(14, 52, 228, 1);
     for (let column = 0; column < 3; column++)
-      for (let line = 0; line < 36; line++) {
+      {for (let line = 0; line < 36; line++) {
         c.fillStyle = line < 3 ? '#675e49' : '#8a806a';
         c.fillRect(14 + column * 79, 64 + line * 5, 48 + random() * 22, line < 3 ? 2 : 1);
-      }
+      }}
     c.fillStyle = '#8c7e65';
     c.fillRect(94, 85, 69, 54);
     c.fillStyle = '#b8aa8c';
@@ -258,8 +243,8 @@ function surface(
   if (kind === 'plaster') {
     // Keep wall texture subtle beside carved plaster.
     for (let i = 0; i < 60; i++) {
-      const x = random() * 256,
-        y = random() * 256;
+      const x = random() * 256;
+        const y = random() * 256;
       const wash = c.createRadialGradient(x, y, 0, x, y, 40);
       wash.addColorStop(0, '#806c4c08');
       wash.addColorStop(1, '#806c4c00');
@@ -270,7 +255,7 @@ function surface(
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = SRGBColorSpace;
   texture.wrapS = texture.wrapT = RepeatWrapping;
-  if (kind === 'floor') texture.repeat.set(7, 10.3 / 0.9);
+  if (kind === 'floor') {texture.repeat.set(7, 10.3 / 0.9);}
   return texture;
 }
 function Sconce() {
@@ -285,8 +270,7 @@ function Sconce() {
         radius={0.13}
         tube={0.018}
         colour={brass}
-        arc={Math.PI}
-        rotation={[0, Math.PI / 2, Math.PI]}
+        curve={{ arc: Math.PI, rotation: [0, Math.PI / 2, Math.PI] }}
       />
       <mesh position={[0, 0.19, 0.2]}>
         <cylinderGeometry args={[0.1, 0.19, 0.23, 24, 1, true]} />
@@ -309,7 +293,7 @@ function Sconce() {
           radius={i ? 0.1 : 0.19}
           tube={0.009}
           colour={brass}
-          rotation={[Math.PI / 2, 0, 0]}
+          curve={{ rotation: [Math.PI / 2, 0, 0] }}
         />
       ))}
       <pointLight
@@ -322,14 +306,23 @@ function Sconce() {
     </group>
   );
 }
-function Chair({ at, angle = 0 }: { at: Point; angle?: number }) {
+interface ChairProps {
+  at: Point;
+  angle?: number;
+}
+
+function Chair({ at, angle = 0 }: ChairProps) {
   return (
     <group position={at} rotation-y={angle}>
       <Model name="chair" />
     </group>
   );
 }
-function Cup({ at }: { at: Point }) {
+interface CupProps {
+  at: Point;
+}
+
+function Cup({ at }: CupProps) {
   const profile = useMemo(
     () =>
       [
@@ -400,7 +393,11 @@ function Cup({ at }: { at: Point }) {
     </group>
   );
 }
-function Doorway({ front = false }: { front?: boolean }) {
+interface DoorwayProps {
+  front?: boolean;
+}
+
+function Doorway({ front = false }: DoorwayProps) {
   const spandrel = useMemo(() => {
     const shape = new Shape();
     shape.moveTo(-0.75, 2.05);
@@ -410,7 +407,7 @@ function Doorway({ front = false }: { front?: boolean }) {
     shape.closePath();
     return new ExtrudeGeometry(shape, { depth: 0.3, bevelEnabled: false, curveSegments: 20 });
   }, []);
-  useEffect(() => () => spandrel.dispose(), [spandrel]);
+  useEffect(() => () =>{  spandrel.dispose(); }, [spandrel]);
   return (
     <group position={[0.4, 0, front ? 3.5 : -6.5]} scale-z={front ? -1 : 1}>
       <Block at={[-1.325, 2.1, 0]} size={[1.15, 4.2, 0.3]} colour={plaster} />
@@ -430,12 +427,12 @@ function Doorway({ front = false }: { front?: boolean }) {
             radius={0.15}
             tube={0.055}
             colour={carving}
-            arc={Math.PI * 1.7}
+            curve={{ arc: Math.PI * 1.7 }}
           />
         </group>
       ))}
       {[0.76, 0.85, 0.95].map((r) => (
-        <Ring key={r} at={[0, 2.05, 0.16]} radius={r} tube={0.055} colour={carving} arc={Math.PI} />
+        <Ring key={r} at={[0, 2.05, 0.16]} radius={r} tube={0.055} colour={carving} curve={{ arc: Math.PI }} />
       ))}
       <Block at={[0, 3.02, 0.15]} size={[2.25, 0.12, 0.48]} colour={carving} />
       <Model name="portal" />
@@ -449,11 +446,13 @@ function Doorway({ front = false }: { front?: boolean }) {
   );
 }
 
-export const CafeEnvironment = memo(function CafeEnvironment({
-  lowQuality,
-}: {
+interface CafeSceneProps {
   lowQuality: boolean;
-}) {
+}
+
+function CafeScene({
+  lowQuality,
+}: CafeSceneProps) {
   const maps = useMemo(
     () => ({
       wood: surface('wood'),
@@ -498,15 +497,15 @@ export const CafeEnvironment = memo(function CafeEnvironment({
   useEffect(
     () => () => {
       resources.box.dispose();
-      resources.materials.forEach((material) => material.dispose());
-      Object.values(resources.finishes).forEach((material) => material.dispose());
+      resources.materials.forEach((material) =>{  material.dispose(); });
+      Object.values(resources.finishes).forEach((material) =>{  material.dispose(); });
       Object.values(resources.models)
         .flat()
-        .forEach(({ geometry }) => geometry.dispose());
+        .forEach(({ geometry }) =>{  geometry.dispose(); });
     },
     [resources],
   );
-  useEffect(() => () => Object.values(maps).forEach((map) => map.dispose()), [maps]);
+  useEffect(() => () =>{  Object.values(maps).forEach((map) => map.dispose()); }, [maps]);
   return (
     <CafeResources.Provider value={resources}>
       <group position={[0, -15.4, 0]} scale={20}>
@@ -659,7 +658,7 @@ export const CafeEnvironment = memo(function CafeEnvironment({
           radius={0.6}
           tube={0.04}
           colour={carving}
-          rotation={[Math.PI / 2, 0, 0]}
+          curve={{ rotation: [Math.PI / 2, 0, 0] }}
         />
         {[0.42, 0.5, 0.68].map((radius) => (
           <Ring
@@ -668,7 +667,7 @@ export const CafeEnvironment = memo(function CafeEnvironment({
             radius={radius}
             tube={0.018}
             colour={carving}
-            rotation={[Math.PI / 2, 0, 0]}
+            curve={{ rotation: [Math.PI / 2, 0, 0] }}
           />
         ))}
         {[-4.4, 1.85].map((z) => (
@@ -882,4 +881,6 @@ export const CafeEnvironment = memo(function CafeEnvironment({
       </group>
     </CafeResources.Provider>
   );
-});
+}
+
+export const CafeEnvironment = memo(CafeScene);

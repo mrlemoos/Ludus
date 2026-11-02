@@ -1,7 +1,12 @@
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'motion/react';
-import { type ReactNode, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
+import type { ReactNode } from 'react';
 
-function PanelContent({ children }: { children: ReactNode }) {
+interface PanelContentProps {
+  children: ReactNode;
+}
+
+function PanelContent({ children }: PanelContentProps) {
   const present = useIsPresent();
   return (
     <div inert={!present} aria-hidden={!present || undefined}>
@@ -11,24 +16,26 @@ function PanelContent({ children }: { children: ReactNode }) {
 }
 
 // Adapted from Skecher UI Sliding Panel; let content determine panel height.
+interface SlidingPanelProps {
+  activeKey: string;
+  direction: -1 | 1;
+  children: ReactNode;
+}
+
 export function SlidingPanel({
   activeKey,
   direction,
   children,
-}: {
-  activeKey: string;
-  direction: -1 | 1;
-  children: ReactNode;
-}) {
+}: SlidingPanelProps) {
   const reduceMotion = useReducedMotion();
   const keyboard = useRef(false);
   useEffect(() => {
-    const onKey = () => {
+    function onKey() {
       keyboard.current = true;
-    };
-    const onPointer = () => {
+    }
+    function onPointer() {
       keyboard.current = false;
-    };
+    }
     document.addEventListener('keydown', onKey, true);
     document.addEventListener('pointerdown', onPointer, true);
     return () => {
@@ -58,7 +65,7 @@ export function SlidingPanel({
             }),
           }}
           transition={{
-            duration: keyboard.current ? 0 : reduceMotion ? 0.12 : 0.18,
+            duration: keyboard.current ? 0 : (reduceMotion ? 0.12 : 0.18),
             ease: [0.23, 1, 0.32, 1],
           }}
         >

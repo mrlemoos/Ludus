@@ -54,7 +54,7 @@ function d1Database() {
   const db = new DatabaseSync(':memory:');
   db.exec(readFileSync('drizzle/0004_online.sql', 'utf8'));
   db.exec('CREATE TABLE account_deletions(user_id TEXT PRIMARY KEY)');
-  const prepare = (query: string) => {
+  function prepare(query: string) {
     let values: SQLInputValue[] = [];
     const statement = {
       bind(...params: SQLInputValue[]) {
@@ -75,7 +75,7 @@ function d1Database() {
       },
     };
     return statement;
-  };
+  }
   const batch = vi.fn(async (statements: ReturnType<typeof prepare>[]) => {
     db.exec('BEGIN');
     try {
@@ -113,7 +113,7 @@ describe('SQLite matchmaking assignment races', () => {
     const f = coordinator();
     const first = await f.coordinator.join('white', '5+3', false, 1500);
     expect(first.status).toBe('queued');
-    if (first.status !== 'queued') throw new Error('queued');
+    if (first.status !== 'queued') {throw new Error('queued');}
     let release!: () => void;
     const held = new Promise<void>((resolve) => {
       release = resolve;
@@ -126,7 +126,7 @@ describe('SQLite matchmaking assignment races', () => {
     expect(matched.status).toBe('assigned');
     expect(cancelled.status).toBe('assigned');
     if (matched.status !== 'assigned' || cancelled.status !== 'assigned')
-      throw new Error('assigned');
+      {throw new Error('assigned');}
     expect(cancelled.match.id).toBe(matched.match.id);
     expect(matched.match.players).toEqual({ w: 'white', b: 'black' });
     expect(await f.coordinator.join('white', '10+5', false, 1500)).toMatchObject({
@@ -137,7 +137,7 @@ describe('SQLite matchmaking assignment races', () => {
   it('cancels before assignment and requires explicit delayed AI acceptance with exact token', async () => {
     const f = coordinator(),
       queued = await f.coordinator.join('one', '5+3', false, 1500);
-    if (queued.status !== 'queued') throw new Error('queued');
+    if (queued.status !== 'queued') {throw new Error('queued');}
     await expect(f.coordinator.cancel('one', queued.entry.token, true)).rejects.toThrow(
       'too_early',
     );
@@ -200,8 +200,8 @@ describe('SQLite matchmaking assignment races', () => {
   it('seats the guest on the requested side and keeps friend matches casual', async () => {
     const original = crypto.getRandomValues.bind(crypto);
     const spy = vi.spyOn(crypto, 'getRandomValues').mockImplementation((array) => {
-      if (array instanceof Uint8Array && array.length === 1) array[0] = 255;
-      else return original(array);
+      if (array instanceof Uint8Array && array.length === 1) {array[0] = 255;}
+      else {return original(array);}
       return array;
     });
     try {
@@ -211,8 +211,8 @@ describe('SQLite matchmaking assignment races', () => {
       expect(asWhite.match.players).toEqual({ w: 'guest', b: 'host' });
       expect(asWhite.match.rated).toBe(false);
       spy.mockImplementation((array) => {
-        if (array instanceof Uint8Array && array.length === 1) array[0] = 0;
-        else return original(array);
+        if (array instanceof Uint8Array && array.length === 1) {array[0] = 0;}
+        else {return original(array);}
         return array;
       });
       const black = coordinator(),
@@ -227,12 +227,11 @@ describe('SQLite matchmaking assignment races', () => {
   it('rolls random guest colour once on the server and ignores a later colour', async () => {
     const original = crypto.getRandomValues.bind(crypto);
     const spy = vi.spyOn(crypto, 'getRandomValues').mockImplementation((array) => {
-      if (array instanceof Uint8Array && array.length === 1) array[0] = 127;
-      else return original(array);
+      if (array instanceof Uint8Array && array.length === 1) {array[0] = 127;}
+      else {return original(array);}
       return array;
     });
-    const rolls = () =>
-      spy.mock.calls.filter((call) => call[0] instanceof Uint8Array && call[0].length === 1).length;
+    function rolls() { return spy.mock.calls.filter((call) => call[0] instanceof Uint8Array && call[0].length === 1).length; }
     try {
       const low = coordinator(),
         lowInvite = await low.coordinator.createInvite('host', '5+3');
@@ -244,8 +243,8 @@ describe('SQLite matchmaking assignment races', () => {
       expect(retry.match.players).toEqual(lowMatch.match.players);
       expect(rolls()).toBe(1);
       spy.mockImplementation((array) => {
-        if (array instanceof Uint8Array && array.length === 1) array[0] = 128;
-        else return original(array);
+        if (array instanceof Uint8Array && array.length === 1) {array[0] = 128;}
+        else {return original(array);}
         return array;
       });
       const high = coordinator(),
@@ -260,13 +259,13 @@ describe('SQLite matchmaking assignment races', () => {
   });
   it('pushes one assigned match to both players after initialisation', async () => {
     const f = coordinator();
-    const socket = (player: string) => ({
+    function socket(player: string) { return ({
       player,
       readyState: 1,
       send: vi.fn(),
       close: vi.fn(),
       deserializeAttachment: () => ({ player }),
-    });
+    }); }
     const waiting = socket('white'),
       joining = socket('black');
     f.sockets.push(waiting, joining);
@@ -275,16 +274,15 @@ describe('SQLite matchmaking assignment races', () => {
       order.push('ensure');
     });
     waiting.send.mockImplementation((payload: string) => {
-      if (JSON.parse(payload).status === 'assigned') order.push('waiting');
+      if (JSON.parse(payload).status === 'assigned') {order.push('waiting');}
     });
     joining.send.mockImplementation((payload: string) => {
-      if (JSON.parse(payload).status === 'assigned') order.push('joining');
+      if (JSON.parse(payload).status === 'assigned') {order.push('joining');}
     });
     expect((await f.coordinator.join('white', '5+3', false, 1500)).status).toBe('queued');
     const matched = await f.coordinator.join('black', '5+3', false, 1500);
-    if (matched.status !== 'assigned') throw new Error('assigned');
-    const assigned = (send: { mock: { calls: unknown[][] } }) =>
-      send.mock.calls.filter((call) => JSON.parse(String(call[0])).status === 'assigned');
+    if (matched.status !== 'assigned') {throw new Error('assigned');}
+    function assigned(send: { mock: { calls: unknown[][] } }) { return send.mock.calls.filter((call) => JSON.parse(String(call[0])).status === 'assigned'); }
     expect(assigned(waiting.send)).toHaveLength(1);
     expect(assigned(joining.send)).toHaveLength(1);
     expect(assigned(waiting.send)[0][0]).toBe(assigned(joining.send)[0][0]);
@@ -364,7 +362,7 @@ async function postOnline(env: Env, path: string, data: Record<string, unknown>)
     env,
     'guest',
   );
-  if (!response) throw new Error('missing');
+  if (!response) {throw new Error('missing');}
   return response;
 }
 describe('online invitation HTTP and matchmaking socket', () => {
@@ -451,7 +449,7 @@ function humanFixture(initial?: HumanGame) {
     MATCHMAKING: { getByName: () => ({ release }) },
   } as unknown as Env;
   const match = new HumanMatch(local.ctx, env);
-  if (initial) local.db.prepare('INSERT INTO state VALUES(1,?)').run(JSON.stringify(initial));
+  if (initial) {local.db.prepare('INSERT INTO state VALUES(1,?)').run(JSON.stringify(initial));}
   return {
     ...local,
     database,
@@ -463,13 +461,12 @@ function humanFixture(initial?: HumanGame) {
       ) as HumanGame,
   };
 }
-const active = () =>
-  humanConnection(
+function active() { return humanConnection(
     humanConnection(createHumanGame('game', assignment.players, '5+3', false, 0), 'w', true, 0),
     'b',
     true,
     0,
-  );
+  ); }
 describe('SQLite human match durability and authorisation', () => {
   it('rejects non-members for reads/actions/socket admission without exposing state', async () => {
     const f = humanFixture(active());
@@ -535,13 +532,13 @@ describe('SQLite human match durability and authorisation', () => {
   });
   it('delivers preset IDs only to opposing sockets and keeps duplicate tabs connected', async () => {
     const f = humanFixture(active());
-    const socket = (player: string) => ({
+    function socket(player: string) { return ({
       player,
       readyState: 1,
       send: vi.fn(),
       close: vi.fn(),
       deserializeAttachment: () => ({ player }),
-    });
+    }); }
     const own = socket('white'),
       duplicate = socket('white'),
       opponent = socket('black');

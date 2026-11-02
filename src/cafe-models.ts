@@ -1,6 +1,7 @@
+import type {
+  BufferGeometry} from 'three';
 import {
   BoxGeometry,
-  BufferGeometry,
   CatmullRomCurve3,
   CylinderGeometry,
   Euler,
@@ -24,7 +25,7 @@ export type CafeModel = { material: CafeMaterial; geometry: BufferGeometry }[];
 
 // Merge by finish once. Every chair instance shares these buffers and materials.
 class Model {
-  private parts = new Map<CafeMaterial, BufferGeometry[]>();
+  private readonly parts = new Map<CafeMaterial, BufferGeometry[]>();
 
   add(
     material: CafeMaterial,
@@ -41,10 +42,10 @@ class Model {
       ),
     );
     const flat = geometry.index ? geometry.toNonIndexed() : geometry;
-    if (flat !== geometry) geometry.dispose();
+    if (flat !== geometry) {geometry.dispose();}
     // Only position, normal and UV are shared across these geometry types.
     for (const attribute of Object.keys(flat.attributes))
-      if (!['position', 'normal', 'uv'].includes(attribute)) flat.deleteAttribute(attribute);
+      {if (!['position', 'normal', 'uv'].includes(attribute)) {flat.deleteAttribute(attribute);}}
     const parts = this.parts.get(material) ?? [];
     parts.push(flat);
     this.parts.set(material, parts);
@@ -84,8 +85,8 @@ class Model {
 
   finish(): CafeModel {
     return [...this.parts].map(([material, parts]) => {
-      const geometry = mergeGeometries(parts)!;
-      parts.forEach((part) => part.dispose());
+      const geometry = mergeGeometries(parts);
+      parts.forEach((part) =>{  part.dispose(); });
       geometry.computeBoundingSphere();
       return { material, geometry };
     });
@@ -95,8 +96,8 @@ class Model {
 function scroll(model: Model, material: CafeMaterial, at: Point, side: number, size: number) {
   const points: Point[] = [];
   for (let i = 0; i <= 40; i++) {
-    const t = i / 40,
-      angle = t * Math.PI * 2.1;
+    const t = i / 40;
+      const angle = t * Math.PI * 2.1;
     const radius = size * (1 - t * 0.88);
     points.push([
       at[0] + side * Math.sin(angle) * radius,
@@ -221,13 +222,13 @@ function chair() {
   for (const side of [-1, 1]) {
     leaf(m, 'wood', [side * 0.075, 1.105, -0.255], -side * 0.8, 0.32);
     for (let i = 0; i < 7; i++)
-      m.add('brass', new SphereGeometry(0.006, 6, 4), [side * 0.19, 0.78 + i * 0.043, -0.207]);
+      {m.add('brass', new SphereGeometry(0.006, 6, 4), [side * 0.19, 0.78 + i * 0.043, -0.207]);}
     for (let i = 0; i < 7; i++)
-      m.add('brass', new SphereGeometry(0.006, 6, 4), [
+      {m.add('brass', new SphereGeometry(0.006, 6, 4), [
         -0.18 + i * 0.06,
         side === 1 ? 1.05 : 0.77,
         -0.207,
-      ]);
+      ]);}
   }
   return m.finish();
 }
@@ -235,7 +236,7 @@ function chair() {
 function tableBase() {
   const m = new Model();
   for (const x of [-0.46, 0.46])
-    for (const z of [-0.34, 0.34]) {
+    {for (const z of [-0.34, 0.34]) {
       m.turned(
         'wood',
         [x, 0, z],
@@ -253,9 +254,9 @@ function tableBase() {
           [0, 0.66],
         ],
       );
-    }
-  for (const x of [-0.46, 0.46]) m.box('wood', [x, 0.635, 0], [0.055, 0.12, 0.7], 0.008);
-  for (const z of [-0.34, 0.34]) m.box('wood', [0, 0.635, z], [0.96, 0.12, 0.055], 0.008);
+    }}
+  for (const x of [-0.46, 0.46]) {m.box('wood', [x, 0.635, 0], [0.055, 0.12, 0.7], 0.008);}
+  for (const z of [-0.34, 0.34]) {m.box('wood', [0, 0.635, z], [0.96, 0.12, 0.055], 0.008);}
   return m.finish();
 }
 
@@ -323,7 +324,7 @@ function entranceDoor() {
       0.012,
     );
     for (const y of [0.35, 1.3, 2.05])
-      m.turned(
+      {m.turned(
         'brass',
         [side * 0.727, y, -0.025],
         [
@@ -332,7 +333,7 @@ function entranceDoor() {
           [0.012, 0.09],
           [0, 0.09],
         ],
-      );
+      );}
   }
   m.box('wood', [0, 1.3, -0.035], [0.035, 2.6, 0.045], 0.006);
   m.curve(
@@ -353,7 +354,7 @@ function portal() {
   const m = new Model();
   for (const side of [-1, 1]) {
     for (const x of [-0.065, 0, 0.065])
-      m.turned(
+      {m.turned(
         'plaster',
         [side * 0.84 + x, 0.32, 0.285],
         [
@@ -362,16 +363,16 @@ function portal() {
           [0.014, 1.85],
           [0, 1.85],
         ],
-      );
+      );}
     scroll(m, 'plaster', [side * 0.84, 2.49, 0.32], side, 0.14);
     for (let i = 0; i < 3; i++)
-      leaf(
+      {leaf(
         m,
         'plaster',
         [side * (0.82 + i * 0.055), 2.22 + i * 0.025, 0.335],
         -side * (0.25 + i * 0.4),
         0.65,
-      );
+      );}
     scroll(m, 'plaster', [side * 0.3, 3.25, 0.31], side, 0.21);
     m.curve(
       'plaster',
@@ -384,13 +385,13 @@ function portal() {
       0.055,
     );
     for (let i = 0; i < 4; i++)
-      leaf(
+      {leaf(
         m,
         'plaster',
         [side * (0.3 + i * 0.14), 3.23 - i * 0.055, 0.36],
         -side * (0.6 + i * 0.15),
         0.45,
-      );
+      );}
   }
   m.add('plaster', new SphereGeometry(1, 20, 12), [0, 3.43, 0.32], [0, 0, 0], [0.12, 0.19, 0.055]);
   m.add(
@@ -400,7 +401,7 @@ function portal() {
     [0, 0, 0],
     [0.9, 1.4, 1],
   );
-  for (let i = -2; i <= 2; i++) leaf(m, 'plaster', [i * 0.035, 2.8, 0.29], -i * 0.24, 0.63);
+  for (let i = -2; i <= 2; i++) {leaf(m, 'plaster', [i * 0.035, 2.8, 0.29], -i * 0.24, 0.63);}
   return m.finish();
 }
 
@@ -417,7 +418,7 @@ function mirror() {
     for (const y of [-1.04, 1.04]) {
       scroll(m, 'brass', [side * 0.76, y, 0.105], side, 0.13);
       for (let i = 0; i < 3; i++)
-        leaf(m, 'brass', [side * 0.7, y - 0.1, 0.095], -side * (0.3 + i * 0.55), 0.6);
+        {leaf(m, 'brass', [side * 0.7, y - 0.1, 0.095], -side * (0.3 + i * 0.55), 0.6);}
     }
     m.curve(
       'brass',
@@ -442,7 +443,7 @@ function espressoMachine() {
   m.box('black', [0, 0.19, 0.198], [0.72, 0.22, 0.014], 0.006);
   m.box('steel', [0, 0.045, 0.17], [0.84, 0.035, 0.27], 0.012);
   for (let i = 0; i < 16; i++)
-    m.box('black', [-0.36 + i * 0.048, 0.065, 0.19], [0.011, 0.004, 0.2]);
+    {m.box('black', [-0.36 + i * 0.048, 0.065, 0.19], [0.011, 0.004, 0.2]);}
   m.box('brass', [0, 0.43, 0], [0.81, 0.025, 0.36], 0.008);
   for (const x of [-0.24, 0.24]) {
     m.add('steel', new CylinderGeometry(0.05, 0.06, 0.045, 20), [x, 0.225, 0.23]);
@@ -457,13 +458,13 @@ function espressoMachine() {
       0.008,
     );
     for (const dx of [-0.055, 0, 0.055])
-      m.add(
+      {m.add(
         'black',
         new SphereGeometry(0.012, 8, 6),
         [x + dx, 0.34, 0.202],
         [0, 0, 0],
         [1, 1, 0.35],
-      );
+      );}
   }
   m.add(
     'brass',
@@ -496,7 +497,7 @@ function espressoMachine() {
     0.009,
   );
   for (const x of [-0.33, 0.33])
-    for (const z of [-0.12, 0.12]) m.box('black', [x, 0.012, z], [0.055, 0.024, 0.055], 0.005);
+    {for (const z of [-0.12, 0.12]) {m.box('black', [x, 0.012, z], [0.055, 0.024, 0.055], 0.005);}}
   return m.finish();
 }
 

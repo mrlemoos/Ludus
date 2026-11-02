@@ -1,48 +1,34 @@
-import {
-  type Appearance,
-  appearanceMaterials,
-  defaultAppearance,
-  finishMaterials,
-} from '../shared/cosmetics';
+import { appearanceMaterials, defaultAppearance, finishMaterials } from '../shared/cosmetics';
+import type { Appearance } from '../shared/cosmetics';
 import type { BoardProps } from './board';
 import { CafeEnvironment } from './cafe-environment';
 import type { CapturedPiece } from './captured-pieces';
 import { createPieceGeometries } from './piece-geometry';
 import { pieceMotion } from './piece-motion';
-import { TableClock, type TableClockProps } from './table-clock';
+import { TableClock } from './table-clock';
+import type { TableClockProps } from './table-clock';
 import { animated, useSpring } from '@react-spring/three';
 import { ContactShadows, OrbitControls, PerformanceMonitor } from '@react-three/drei';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Chess, type PieceSymbol, type Square } from 'chess.js';
-import { type ComponentRef, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  type BufferGeometry,
-  DataTexture,
-  PerspectiveCamera,
-  RGBAFormat,
-  RepeatWrapping,
-  SRGBColorSpace,
-  type Texture,
-  Vector3,
-} from 'three';
+import { Chess } from 'chess.js';
+import type { PieceSymbol, Square } from 'chess.js';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import type { ComponentRef } from 'react';
+import { DataTexture, PerspectiveCamera, RGBAFormat, RepeatWrapping, SRGBColorSpace, Vector3 } from 'three';
+import type { BufferGeometry, Texture } from 'three';
 
-type TableProps = { captured: CapturedPiece[]; tableClock: TableClockProps };
+interface TableProps { captured: CapturedPiece[]; tableClock: TableClockProps }
 
-function Piece({
-  type,
-  colour,
-  selected,
-  wood,
-  geometry,
-  finish = 'wood',
-}: {
-  finish?: Appearance['pieces'];
+interface PieceProps {
   type: PieceSymbol;
   colour: 'w' | 'b';
   selected: boolean;
-  wood: Texture;
   geometry: BufferGeometry;
-}) {
+  surface: { wood: Texture; finish?: Appearance['pieces'] };
+}
+
+function Piece({ type, colour, selected, geometry, surface }: PieceProps) {
+  const { wood, finish = 'wood' } = surface;
   const { lift } = useSpring({
     lift: selected ? 0.2 : 0.02,
     immediate: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -73,13 +59,12 @@ function Piece({
     </animated.group>
   );
 }
-function MovingPiece({
-  from = [0, 0, 0],
-  children,
-}: {
+interface MovingPieceProps {
   from?: [number, number, number];
   children: React.ReactNode;
-}) {
+}
+
+function MovingPiece({ from = [0, 0, 0], children }: MovingPieceProps) {
   const { x, z } = useSpring({
     from: { x: from[0], z: from[2] },
     to: { x: 0, z: 0 },
@@ -92,18 +77,17 @@ function MovingPiece({
     </animated.group>
   );
 }
-function Scene({
-  fen,
-  selected,
-  destinations,
-  lastMove,
-  onSquare,
-  looking,
-  lowQuality,
-  captured,
-  tableClock,
-  appearance = defaultAppearance,
-}: BoardProps & TableProps & { looking: boolean; lowQuality: boolean }) {
+interface SceneProps {
+  board: BoardProps;
+  table: TableProps;
+  looking: boolean;
+  lowQuality: boolean;
+}
+
+function Scene({ board: boardProps, table, looking, lowQuality }: SceneProps) {
+  const { position, onSquare, appearance = defaultAppearance } = boardProps;
+  const { fen, selected, destinations, lastMove } = position;
+  const { captured, tableClock } = table;
   const material = appearanceMaterials[appearance.board];
   const board = useMemo(() => new Chess(fen).board(), [fen]);
   const previousFen = useRef(fen);
@@ -116,13 +100,13 @@ function Scene({
   }, [fen]);
   const geometries = useMemo(createPieceGeometries, []);
   useEffect(
-    () => () => Object.values(geometries).forEach((geometry) => geometry.dispose()),
+    () => () =>{  Object.values(geometries).forEach((geometry) => geometry.dispose()); },
     [geometries],
   );
   const wood = useMemo(() => {
     const data = new Uint8Array(256 * 256 * 4);
     for (let y = 0; y < 256; y++)
-      for (let x = 0; x < 256; x++) {
+      {for (let x = 0; x < 256; x++) {
         const grain =
           245 +
           Math.sin(x * 0.39 + Math.sin(y * 0.025) * 4 + Math.sin(y * 0.007) * 8) * 3 +
@@ -132,17 +116,17 @@ function Scene({
         data[i + 1] = grain;
         data[i + 2] = grain;
         data[i + 3] = 255;
-      }
+      }}
     const texture = new DataTexture(data, 256, 256, RGBAFormat);
     texture.colorSpace = SRGBColorSpace;
     texture.wrapS = texture.wrapT = RepeatWrapping;
     texture.needsUpdate = true;
     return texture;
   }, []);
-  useEffect(() => () => wood.dispose(), [wood]);
+  useEffect(() => () =>{  wood.dispose(); }, [wood]);
   return (
     <group>
-      {/* shortcut: ambient fill approximates indirect light; bake architectural lighting before beta. */}
+      {/* Shortcut: ambient fill approximates indirect light; bake architectural lighting before beta. */}
       <ambientLight intensity={0.35} />
       <hemisphereLight args={['#e3edff', '#796951', 1.5]} />
       <directionalLight
@@ -182,7 +166,7 @@ function Scene({
               position={[file - 3.5, 0.02, rank - 3.5]}
               onClick={(e) => {
                 e.stopPropagation();
-                if (!looking && e.delta < 5) onSquare(square);
+                if (!looking && e.delta < 5) {onSquare(square);}
               }}
             >
               <mesh receiveShadow position={[0, -0.02, 0]}>
@@ -192,9 +176,8 @@ function Scene({
               {piece && (
                 <MovingPiece key={motion[square] ? fen : square} from={motion[square]}>
                   <Piece
-                    finish={appearance.pieces}
+                    surface={{ finish: appearance.pieces, wood }}
                     geometry={geometries[piece.type]}
-                    wood={wood}
                     type={piece.type}
                     colour={piece.color}
                     selected={selected === square}
@@ -221,7 +204,7 @@ function Scene({
               <group
                 key={`${colour}-${i}`}
                 name={`captured-${colour}-${piece.type}`}
-                onClick={(event) => event.stopPropagation()}
+                onClick={(event) =>{  event.stopPropagation(); }}
                 position={[
                   side * (5.2 + (i % 2) * 0.85),
                   -0.42,
@@ -229,9 +212,8 @@ function Scene({
                 ]}
               >
                 <Piece
-                  finish={appearance.pieces}
+                  surface={{ finish: appearance.pieces, wood }}
                   geometry={geometries[piece.type]}
-                  wood={wood}
                   type={piece.type}
                   colour={colour}
                   selected={false}
@@ -252,17 +234,14 @@ function Scene({
     </group>
   );
 }
-function Camera({
-  flipped,
-  looking,
-  resetKey,
-  presentation = false,
-}: {
+interface CameraProps {
   flipped: boolean;
   looking: boolean;
   resetKey: number;
   presentation?: boolean;
-}) {
+}
+
+function Camera({ flipped, looking, resetKey, presentation = false }: CameraProps) {
   const { camera, size } = useThree();
   const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
   const motion = useRef<{
@@ -275,7 +254,7 @@ function Camera({
   const previousSize = useRef(size);
   useEffect(() => {
     const orbit = controls.current;
-    if (!orbit || !(camera instanceof PerspectiveCamera) || !size.width || !size.height) return;
+    if (!orbit || !(camera instanceof PerspectiveCamera) || !size.width || !size.height) {return;}
     const resized =
       previousSize.current.width !== size.width || previousSize.current.height !== size.height;
     previousSize.current = size;
@@ -290,7 +269,7 @@ function Camera({
     const position = looking
       ? new Vector3(0, 8.6, side * 22)
       : new Vector3(0, Math.sin(elevation) * distance, side * Math.cos(elevation) * distance);
-    if (presentation && !looking) position.applyAxisAngle(new Vector3(0, 1, 0), -0.32);
+    if (presentation && !looking) {position.applyAxisAngle(new Vector3(0, 1, 0), -0.32);}
     const target = looking ? new Vector3(flipped ? 10 : 35, 10, side * -52) : new Vector3(0, 0, 0);
     const azimuth = looking
       ? Math.atan2(position.x - target.x, position.z - target.z)
@@ -299,19 +278,20 @@ function Camera({
       minDistance: looking ? 60 : distance,
       maxDistance: looking ? 88 : distance + 7,
       minPolarAngle: looking ? 1.48 : 0.25,
-      maxPolarAngle: looking ? 1.63 : presentation ? 1.05 : 0.84,
+      maxPolarAngle: looking ? 1.63 : (presentation ? 1.05 : 0.84),
       minAzimuthAngle: azimuth - (looking ? 0.3 : 0.4),
       maxAzimuthAngle: azimuth + (looking ? 0.3 : 0.4),
     };
-    const finish = () => {
+    function finish() {
+      if (!orbit) {return;}
       camera.position.copy(position);
       orbit.target.copy(target);
       Object.assign(orbit, limits);
       orbit.update();
       motion.current = null;
-    };
+    }
     if (initial.current || resized || window.matchMedia('(prefers-reduced-motion: reduce)').matches)
-      finish();
+      {finish();}
     else {
       // Destination constraints would clamp intermediate frames into a jump.
       Object.assign(orbit, {
@@ -327,14 +307,14 @@ function Camera({
     initial.current = false;
   }, [camera, size.width, size.height, flipped, looking, resetKey, presentation]);
   useFrame((_, delta) => {
-    const move = motion.current,
-      orbit = controls.current;
-    if (!move || !orbit) return;
+    const move = motion.current;
+      const orbit = controls.current;
+    if (!move || !orbit) {return;}
     move.elapsed += delta;
     const amount = 1 - Math.exp(-delta * 16);
     camera.position.lerp(move.position, amount);
     orbit.target.lerp(move.target, amount);
-    if (move.elapsed >= 0.35) move.finish();
+    if (move.elapsed >= 0.35) {move.finish();}
     orbit.update();
   }, -2);
   return (
@@ -348,12 +328,24 @@ function Camera({
     />
   );
 }
-export default function Board3D(
-  props: BoardProps & TableProps & { resetKey: number; looking: boolean; presentation?: boolean },
-) {
+interface Board3DProps {
+  board: BoardProps;
+  table: TableProps;
+  resetKey: number;
+  looking: boolean;
+  presentation?: boolean;
+}
+
+export default function Board3D({
+  board,
+  table,
+  resetKey,
+  looking,
+  presentation = false,
+}: Board3DProps) {
   const [lowQuality, setLowQuality] = useState(false);
   return (
-    <div className="three-board" aria-hidden="true" data-view={props.looking ? 'room' : 'board'}>
+    <div className="three-board" aria-hidden="true" data-view={looking ? 'room' : 'board'}>
       <Canvas
         shadows={!lowQuality}
         dpr={lowQuality ? 0.75 : [1, 1.5]}
@@ -362,14 +354,14 @@ export default function Board3D(
           gl.setClearColor('#c5baa2');
         }}
       >
-        <PerformanceMonitor bounds={() => [30, 45]} onDecline={() => setLowQuality(true)} />
+        <PerformanceMonitor bounds={() => [30, 45]} onDecline={() =>{  setLowQuality(true); }} />
         <Suspense fallback={null}>
-          <Scene {...props} lowQuality={lowQuality} />
+          <Scene board={board} table={table} looking={looking} lowQuality={lowQuality} />
           <Camera
-            flipped={props.flipped}
-            looking={props.looking}
-            resetKey={props.resetKey}
-            presentation={props.presentation}
+            flipped={board.position.flipped}
+            looking={looking}
+            resetKey={resetKey}
+            presentation={presentation}
           />
         </Suspense>
       </Canvas>

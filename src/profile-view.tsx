@@ -114,7 +114,12 @@ export const profileCopy = {
   },
 };
 
-export function ShareProfile({ username, language }: { username: string; language: Language }) {
+interface ShareProfileProps {
+  username: string;
+  language: Language;
+}
+
+export function ShareProfile({ username, language }: ShareProfileProps) {
   const copy = profileCopy[language];
   const [result, setResult] = useState<'copied' | 'shareError' | null>(null);
   const url = `${typeof window === 'undefined' ? publicOrigin : window.location.origin}${profilePath(username)}`;
@@ -163,15 +168,17 @@ export function ShareProfile({ username, language }: { username: string; languag
     </div>
   );
 }
+interface ActivityGridProps {
+  activity: Activity;
+  language: Language;
+  privateActivity?: boolean;
+}
+
 export function ActivityGrid({
   activity,
   language,
   privateActivity = false,
-}: {
-  activity: Activity;
-  language: Language;
-  privateActivity?: boolean;
-}) {
+}: ActivityGridProps) {
   const copy = profileCopy[language];
   const grid = useRef<HTMLDivElement>(null);
   const today = activity.today ?? new Date().toISOString().slice(0, 10);
@@ -290,7 +297,12 @@ export function ActivityGrid({
     </section>
   );
 }
-export function Ratings({ ratings, language }: { ratings: Rating[]; language: Language }) {
+interface RatingsProps {
+  ratings: Rating[];
+  language: Language;
+}
+
+export function Ratings({ ratings, language }: RatingsProps) {
   const copy = profileCopy[language];
   return (
     <section className="profile-ratings" aria-label={copy.ratings}>
@@ -315,21 +327,23 @@ export function Ratings({ ratings, language }: { ratings: Rating[]; language: La
   );
 }
 
+export interface PublicProfilePageProps {
+  data: PublicPlayerProfile | null;
+  username: string;
+  language: Language;
+  header: ReactNode;
+  availability?: { missing?: boolean; unavailable?: boolean };
+}
+
 export function PublicProfilePage({
   data,
   username,
   language,
-  missing = false,
-  unavailable = false,
   header,
-}: {
-  data: PublicPlayerProfile | null;
-  username: string;
-  language: Language;
-  missing?: boolean;
-  unavailable?: boolean;
-  header: ReactNode;
-}) {
+  availability,
+}: PublicProfilePageProps) {
+  const missing = availability?.missing ?? false;
+  const unavailable = availability?.unavailable ?? false;
   const copy = publicLabels[language];
   const text = profileCopy[language];
   return (

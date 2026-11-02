@@ -12,7 +12,7 @@ function fixture() {
   for (const file of readdirSync('drizzle')
     .filter((name) => name.endsWith('.sql'))
     .sort())
-    db.exec(readFileSync(`drizzle/${file}`, 'utf8'));
+    {db.exec(readFileSync(`drizzle/${file}`, 'utf8'));}
   db.prepare(
     "INSERT INTO user(id,name,email,created_at,updated_at) VALUES('owner','Owner','owner@example.test',0,0)",
   ).run();
@@ -47,12 +47,11 @@ function fixture() {
   } as unknown as Env;
   return { db, stub, env, reserveComputer, releaseComputer };
 }
-const request = (control = '10+5', difficulty = 4) =>
-  new Request('https://ludus.test/api/games', {
+function request(control = '10+5', difficulty = 4) { return new Request('https://ludus.test/api/games', {
     method: 'POST',
     headers: { Origin: 'https://ludus.test', 'Content-Type': 'application/json' },
     body: JSON.stringify({ control, difficulty, colour: 'b' }),
-  });
+  }); }
 afterEach(() => vi.restoreAllMocks());
 describe('computer creation recovery', () => {
   it('resumes the same persisted creation settings after interrupted durable initialisation', async () => {

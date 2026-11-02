@@ -1,4 +1,5 @@
 import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+
 export const onlineMatches = sqliteTable(
   'online_matches',
   {

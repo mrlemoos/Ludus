@@ -1,11 +1,12 @@
-import { Chess, type Square } from 'chess.js';
+import { Chess } from 'chess.js';
+import type { Square } from 'chess.js';
 
 export function pieceMotion(
   previousFen: string,
   fen: string,
   lastMove: string[],
 ): Partial<Record<Square, [number, number, number]>> {
-  if (previousFen === fen || lastMove.length !== 2) return {};
+  if (previousFen === fen || lastMove.length !== 2) {return {};}
   const chess = new Chess(previousFen);
   const move = chess
     .moves({ verbose: true })
@@ -15,14 +16,14 @@ export function pieceMotion(
         move.to === lastMove[1] &&
         (!move.promotion || move.promotion === new Chess(fen).get(move.to)?.type),
     );
-  if (!move) return {};
+  if (!move) {return {};}
   chess.move(move);
-  if (chess.fen() !== fen) return {};
-  const offset = (from: string, to: string): [number, number, number] => [
+  if (chess.fen() !== fen) {return {};}
+  function offset(from: string, to: string): [number, number, number]  { return [
     from.charCodeAt(0) - to.charCodeAt(0),
     0,
     Number(to[1]) - Number(from[1]),
-  ];
+  ]; }
   const motion: Partial<Record<Square, [number, number, number]>> = {
     [move.to]: offset(move.from, move.to),
   };

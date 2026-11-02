@@ -1,19 +1,20 @@
 import type { Control } from './game';
-export type QueueEntry = {
+
+export interface QueueEntry {
   user: string;
   control: Control;
   rated: boolean;
   rating: number;
   joinedAt: number;
   token: string;
-};
-export type Assignment = {
+}
+export interface Assignment {
   id: string;
   players: { w: string; b: string };
   control: Control;
   rated: boolean;
   createdAt: number;
-};
+}
 export type QueueState =
   | { status: 'computer'; id: string }
   | { status: 'queued'; entry: QueueEntry }

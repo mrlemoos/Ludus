@@ -11,26 +11,26 @@ test('online lobby exposes friend links and requires explicit acceptance to leav
     localStorage.setItem('ludus-board', '2d');
   });
   await page.route('**/api/**', async (route) => {
-    const request = route.request(),
-      path = new URL(request.url()).pathname;
-    if (request.method() !== 'GET') writes.push(path);
+    const request = route.request();
+      const path = new URL(request.url()).pathname;
+    if (request.method() !== 'GET') {writes.push(path);}
     if (path === '/api/me')
-      return route.fulfill({ json: { user: { id: 'one', name: 'Player one' } } });
+      {return route.fulfill({ json: { user: { id: 'one', name: 'Player one' } } });}
     if (path === '/api/appearance')
-      return route.fulfill({ json: { appearance: { board: 'wood', pieces: 'wood' } } });
-    if (path.endsWith('/history')) return route.fulfill({ json: [] });
+      {return route.fulfill({ json: { appearance: { board: 'wood', pieces: 'wood' } } });}
+    if (path.endsWith('/history')) {return route.fulfill({ json: [] });}
     if (path === '/api/online/invitations') {
       state = {
         status: 'invited',
         token: '11111111-1111-4111-8111-111111111111',
-        expiresAt: Date.now() + 86400000,
+        expiresAt: Date.now() + 86_400_000,
       };
       return route.fulfill({ json: state });
     }
     if (path.endsWith('/invitations/cancel') || path.endsWith('/queue/cancel'))
-      state = { status: 'idle' };
+      {state = { status: 'idle' };}
     if (path.endsWith('/queue'))
-      state = {
+      {state = {
         status: 'queued',
         entry: {
           user: 'one',
@@ -40,7 +40,7 @@ test('online lobby exposes friend links and requires explicit acceptance to leav
           joinedAt: Date.now() - 31000,
           token: 'queue-token',
         },
-      };
+      };}
     if (path.endsWith('/queue/ai')) {
       expect(request.postDataJSON()).toEqual({ token: 'queue-token' });
       state = { status: 'idle' };

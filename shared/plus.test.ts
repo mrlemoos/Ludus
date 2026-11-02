@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 describe('independent beta and paid Plus access', () => {
   const now = Date.parse('2026-11-01T00:00:00Z');
+
   it('keeps complimentary Plus independent of expired beta and suspended paid access', () => {
     expect(
       hasPlusAccess(
@@ -40,7 +41,7 @@ describe('independent beta and paid Plus access', () => {
   });
 
   it('does not treat absent or invalid deadlines as permanent access', () => {
-    for (const paidAccessUntil of [undefined, null, NaN, Infinity, -Infinity, now]) {
+    for (const paidAccessUntil of [undefined, null, Number.NaN, Infinity, -Infinity, now]) {
       expect(hasPlusAccess({ trialExpiresAt: null, paidAccessUntil }, now)).toBe(false);
     }
   });

@@ -11,28 +11,22 @@ export const symbols = {
   b: { b: '♝', k: '♚', n: '♞', p: '♟', q: '♛', r: '♜' },
   w: { b: '♗', k: '♔', n: '♘', p: '♙', q: '♕', r: '♖' },
 };
-export interface BoardProps {
+export interface BoardPosition {
   fen: string;
   flipped: boolean;
   selected: Square | null;
   destinations: string[];
   lastMove: string[];
+}
+export interface BoardProps {
+  position: BoardPosition;
   onSquare: (square: Square) => void;
   copy: GameCopy;
   concealed?: boolean;
   appearance?: Appearance;
 }
-export function Board({
-  fen,
-  flipped,
-  selected,
-  destinations,
-  lastMove,
-  onSquare,
-  copy: c,
-  concealed,
-  appearance,
-}: BoardProps) {
+export function Board({ position, onSquare, copy: c, concealed, appearance }: BoardProps) {
+  const { fen, flipped, selected, destinations, lastMove } = position;
   const chess = new Chess(fen);
   const refs = useRef<(HTMLElement | null)[]>([]);
   const squares = Array.from(

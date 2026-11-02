@@ -1,10 +1,11 @@
 import type { ChessLevel } from './computer';
-import { type Language, isLanguage } from './waitlist';
+import { isLanguage } from './waitlist';
+import type { Language } from './waitlist';
 
 export const policyVersion = '2026-11-01';
 export const teachingProfiles = ['beginner', 'developing', 'club', 'advanced'] as const;
 export type TeachingProfile = (typeof teachingProfiles)[number];
-export type PlayerProfile = {
+export interface PlayerProfile {
   userId: string;
   username: string;
   language: Language;
@@ -18,7 +19,7 @@ export type PlayerProfile = {
   policyVersion: string;
   onboardedAt: number;
   trialExpiresAt: number;
-};
+}
 export type ProfileInput = Pick<
   PlayerProfile,
   'username' | 'language' | 'timezone' | 'chessLevel' | 'teachingProfile' | 'activityPublic'
@@ -29,7 +30,7 @@ export function validTimezone(value: unknown): value is string {
     value.length > 100 ||
     !/^[A-Za-z_]+(?:\/[A-Za-z0-9_+.-]+)*$/.test(value)
   )
-    return false;
+    {return false;}
   try {
     new Intl.DateTimeFormat('en-GB', { timeZone: value }).format();
     return true;
@@ -38,7 +39,7 @@ export function validTimezone(value: unknown): value is string {
   }
 }
 export function parseProfile(input: unknown): ProfileInput | null {
-  if (!input || typeof input !== 'object') return null;
+  if (!input || typeof input !== 'object') {return null;}
   const value = input as Record<string, unknown>;
   if (
     value.adult !== true ||
@@ -50,7 +51,7 @@ export function parseProfile(input: unknown): ProfileInput | null {
     !teachingProfiles.includes(value.teachingProfile as TeachingProfile) ||
     typeof value.activityPublic !== 'boolean'
   )
-    return null;
+    {return null;}
   return {
     username: value.username,
     language: value.language,

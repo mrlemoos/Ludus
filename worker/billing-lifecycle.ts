@@ -1,9 +1,8 @@
 import { liveCatalogue } from './stripe';
 import type Stripe from 'stripe';
 
-export const graceMilliseconds = 7 * 86400_000;
-const idOf = (value: string | { id: string } | null | undefined) =>
-  typeof value === 'string' ? value : value?.id;
+export const graceMilliseconds = 7 * 86_400_000;
+function idOf(value: string | { id: string } | null | undefined) { return typeof value === 'string' ? value : value?.id; }
 
 export async function reviewBilling(
   db: D1Database,
@@ -19,17 +18,17 @@ export async function reviewBilling(
     .bind(`${resource}:${reason}`, owner, reason, resource, now)
     .run();
   if (reason === 'reconciliation_failed')
-    await db
+    {await db
       .prepare('UPDATE billing_review_cases SET resolved_at=NULL WHERE id=?')
       .bind(`${resource}:${reason}`)
-      .run();
+      .run();}
 }
 
 export function invoicePeriod(invoice: Stripe.Invoice): { start: number; end: number } | null {
   const lines = invoice.lines.data.filter(
     (line) => line.pricing?.price_details?.price === liveCatalogue.price && line.amount > 0,
   );
-  if (!lines.length) return null;
+  if (lines.length === 0) {return null;}
   return {
     start: Math.min(...lines.map((line) => line.period.start)) * 1000,
     end: Math.max(...lines.map((line) => line.period.end)) * 1000,
@@ -45,31 +44,31 @@ async function invoiceRisk(
     status: 'paid',
     limit: 100,
   });
-  if (payments.has_more || !payments.data.length) throw new Error('payment_graph_incomplete');
-  let refunded = 0,
-    disputed = false;
+  if (payments.has_more || payments.data.length === 0) {throw new Error('payment_graph_incomplete');}
+  let disputed = false,
+    refunded = 0;
   for (const payment of payments.data) {
     let charge: Stripe.Charge;
-    const chargeId = idOf(payment.payment.charge),
-      intentId = idOf(payment.payment.payment_intent);
-    if (chargeId) charge = await stripe.charges.retrieve(chargeId);
+    const chargeId = idOf(payment.payment.charge);
+      const intentId = idOf(payment.payment.payment_intent);
+    if (chargeId) {charge = await stripe.charges.retrieve(chargeId);}
     else if (intentId) {
       const intent = await stripe.paymentIntents.retrieve(intentId);
       const latest = idOf(intent.latest_charge);
-      if (!latest) throw new Error('missing_charge');
+      if (!latest) {throw new Error('missing_charge');}
       charge = await stripe.charges.retrieve(latest);
-    } else throw new Error('payment_requires_review');
+    } else {throw new Error('payment_requires_review');}
     if (!charge.livemode || idOf(charge.customer) !== idOf(invoice.customer))
-      throw new Error('charge_owner_mismatch');
+      {throw new Error('charge_owner_mismatch');}
     refunded +=
       charge.amount > 0 ? (charge.amount_refunded * (payment.amount_paid ?? 0)) / charge.amount : 0;
     const disputes = await stripe.disputes.list({ charge: charge.id, limit: 100 });
-    if (disputes.has_more) throw new Error('dispute_history_requires_review');
+    if (disputes.has_more) {throw new Error('dispute_history_requires_review');}
     disputed ||= disputes.data.some(
       (dispute) => dispute.status !== 'won' && dispute.status !== 'warning_closed',
     );
   }
-  return refunded >= invoice.amount_paid ? 'refunded' : disputed ? 'disputed' : 'clear';
+  return refunded >= invoice.amount_paid ? 'refunded' : (disputed ? 'disputed' : 'clear');
 }
 
 /** Re-fetch current provider state; webhook arrival order is never an entitlement clock. */
@@ -86,22 +85,22 @@ export async function reconcileSubscription(
     subscription: subscription.id,
     limit: 100,
   });
-  if (invoices.has_more) throw new Error('billing_history_requires_review');
+  if (invoices.has_more) {throw new Error('billing_history_requires_review');}
   const previous = await db
     .prepare('SELECT grace_until,cancel_requested_at FROM billing_subscriptions WHERE id=?')
     .bind(subscription.id)
     .first<{ grace_until: number | null; cancel_requested_at: number | null }>();
-  let paidUntil: number | null = null,
+  let firstPaidAt: number | null = null,
     graceUntil: number | null = null,
-    firstPaidAt: number | null = null;
+    paidUntil: number | null = null;
   const positivePaid = invoices.data.filter(
     (invoice) => invoice.status === 'paid' && invoice.amount_paid > 0,
   );
   for (const invoice of invoices.data) {
-    if (!invoice.livemode || invoice.lines.has_more) throw new Error('invoice_requires_review');
+    if (!invoice.livemode || invoice.lines.has_more) {throw new Error('invoice_requires_review');}
     const period = invoicePeriod(invoice);
-    if (!period) continue;
-    if (invoice.status !== 'paid' || invoice.amount_paid <= 0) continue;
+    if (!period) {continue;}
+    if (invoice.status !== 'paid' || invoice.amount_paid <= 0) {continue;}
     const paidAt = (invoice.status_transitions.paid_at ?? invoice.created) * 1000;
     let risk: string = await invoiceRisk(stripe, invoice);
     const earlierPaid = positivePaid.some(
@@ -122,7 +121,7 @@ export async function reconcileSubscription(
       await reviewBilling(db, owner, invoice.id, 'late_payment', now);
     }
     if (risk === 'refunded' && period.end < now)
-      await reviewBilling(db, owner, invoice.id, 'historical_refund', now);
+      {await reviewBilling(db, owner, invoice.id, 'historical_refund', now);}
     await fence();
     await db
       .prepare(
@@ -131,7 +130,7 @@ export async function reconcileSubscription(
       .bind(invoice.id, subscription.id, owner, period.start, period.end, paidAt, risk)
       .run();
     firstPaidAt = Math.min(firstPaidAt ?? paidAt, paidAt);
-    if (risk === 'clear') paidUntil = Math.max(paidUntil ?? 0, period.end);
+    if (risk === 'clear') {paidUntil = Math.max(paidUntil ?? 0, period.end);}
   }
   for (const invoice of invoices.data) {
     const period = invoicePeriod(invoice);
@@ -142,7 +141,7 @@ export async function reconcileSubscription(
       firstPaidAt === null ||
       firstPaidAt >= period.start
     )
-      continue;
+      {continue;}
     // Period start is the renewal due time even when a provider attempt or event arrives later.
     graceUntil = Math.min(graceUntil ?? Infinity, period.start + graceMilliseconds);
   }
@@ -202,15 +201,15 @@ export async function recordRiskEvent(
     object?: string;
   };
   const chargeId = event.type === 'charge.refunded' ? resource.id : idOf(resource.charge);
-  if (!chargeId) throw new Error('risk_charge_missing');
+  if (!chargeId) {throw new Error('risk_charge_missing');}
   const charge = await stripe.charges.retrieve(chargeId);
   const customer = idOf(charge.customer);
-  if (!customer || !charge.livemode) return null;
+  if (!customer || !charge.livemode) {return null;}
   const owner = await db
     .prepare('SELECT owner FROM billing_accounts WHERE customer=?')
     .bind(customer)
     .first<{ owner: string }>();
-  if (!owner) return null;
+  if (!owner) {return null;}
   const intent = idOf(charge.payment_intent);
   if (!intent) {
     await reviewBilling(db, owner.owner, charge.id, 'payment_graph_requires_review', now);
@@ -220,14 +219,14 @@ export async function recordRiskEvent(
     payment: { type: 'payment_intent', payment_intent: intent },
     limit: 100,
   });
-  if (payments.has_more) throw new Error('payment_graph_requires_review');
+  if (payments.has_more) {throw new Error('payment_graph_requires_review');}
   if (event.type.startsWith('radar.') || payments.data.length > 1)
-    await reviewBilling(
+    {await reviewBilling(
       db,
       owner.owner,
       charge.id,
       event.type.startsWith('radar.') ? 'early_fraud_warning' : 'overlapping_payment_risk',
       now,
-    );
+    );}
   return customer;
 }

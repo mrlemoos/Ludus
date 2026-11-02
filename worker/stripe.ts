@@ -8,7 +8,7 @@ export const liveCatalogue = {
 } as const;
 
 export function stripeFor(env: Env) {
-  if (!env.STRIPE_API_KEY?.match(/^[sr]k_live_/)) throw new Error('stripe_live_key_required');
+  if (!env.STRIPE_API_KEY?.match(/^[sr]k_live_/)) {throw new Error('stripe_live_key_required');}
   return new Stripe(env.STRIPE_API_KEY, {
     apiVersion: '2026-10-28.endive',
     httpClient: Stripe.createFetchHttpClient(),
@@ -31,7 +31,7 @@ export function betaBilling(
   now: number,
 ): Stripe.Checkout.SessionCreateParams.SubscriptionData {
   const end = Math.ceil(trialExpiresAt / 1000);
-  if (trialExpiresAt <= now) return { billing_mode: { type: 'flexible' } };
+  if (trialExpiresAt <= now) {return { billing_mode: { type: 'flexible' } };}
   return {
     billing_mode: { type: 'flexible' },
     ...(trialExpiresAt - now >= 49 * 3_600_000

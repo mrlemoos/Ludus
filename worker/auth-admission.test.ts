@@ -2,6 +2,7 @@ import { admitSession } from './auth';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
+
 function fixture() {
   const sqlite = new DatabaseSync(':memory:');
   for (const file of [
@@ -10,7 +11,7 @@ function fixture() {
     '0003_accounts.sql',
     '0011_nifty_redwing.sql',
   ])
-    sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));
+    {sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));}
   sqlite
     .prepare(
       'INSERT INTO user(id,name,email,email_verified,created_at,updated_at) VALUES (?,?,?,?,?,?)',
@@ -34,41 +35,45 @@ describe('atomic invitation redemption before session creation', () => {
     sqlite
       .prepare("INSERT INTO complimentary_plus(email,granted_at) VALUES('player@example.com',0)")
       .run();
-    expect(await admitSession(db, 'player', 1001)).toBe(true);
+    await expect(admitSession(db, 'player', 1001)).resolves.toBe(true);
     sqlite.prepare("UPDATE invitations SET redeemed_by='another-account'").run();
-    expect(await admitSession(db, 'player', 1002)).toBe(false);
+    await expect(admitSession(db, 'player', 1002)).resolves.toBe(false);
     sqlite.prepare('UPDATE invitations SET redeemed_by=NULL').run();
     sqlite.prepare('UPDATE user SET email_verified=0').run();
-    expect(await admitSession(db, 'player', 1003)).toBe(false);
+    await expect(admitSession(db, 'player', 1003)).resolves.toBe(false);
   });
+
   it('admits verified invited email once and preserves admission after expiry', async () => {
     const { db, sqlite } = fixture();
-    expect(await admitSession(db, 'player', 999)).toBe(true);
-    expect(await admitSession(db, 'player', 2000)).toBe(true);
+    await expect(admitSession(db, 'player', 999)).resolves.toBe(true);
+    await expect(admitSession(db, 'player', 2000)).resolves.toBe(true);
     expect(sqlite.prepare('SELECT redeemed_by,redeemed_at FROM invitations').get()).toEqual({
       redeemed_by: 'player',
       redeemed_at: 999,
     });
   });
+
   it('rejects expiration at exact boundary', async () => {
     const { db } = fixture();
-    expect(await admitSession(db, 'player', 1000)).toBe(false);
+    await expect(admitSession(db, 'player', 1000)).resolves.toBe(false);
   });
+
   it('rejects unverified emails, unknown users and mismatched redemption', async () => {
     const { db, sqlite } = fixture();
     sqlite.prepare('UPDATE user SET email_verified=0').run();
-    expect(await admitSession(db, 'player', 1)).toBe(false);
-    expect(await admitSession(db, 'unknown', 1)).toBe(false);
+    await expect(admitSession(db, 'player', 1)).resolves.toBe(false);
+    await expect(admitSession(db, 'unknown', 1)).resolves.toBe(false);
     sqlite.prepare('UPDATE user SET email_verified=1').run();
     sqlite.prepare('UPDATE invitations SET redeemed_by=?').run('another-account');
-    expect(await admitSession(db, 'player', 1)).toBe(false);
+    await expect(admitSession(db, 'player', 1)).resolves.toBe(false);
   });
+
   it('refuses to recreate access after deletion starts', async () => {
     const { db, sqlite } = fixture();
-    expect(await admitSession(db, 'player', 1)).toBe(true);
+    await expect(admitSession(db, 'player', 1)).resolves.toBe(true);
     sqlite
       .prepare('INSERT INTO account_deletions(user_id,requested_at) VALUES (?,?)')
       .run('player', 2);
-    expect(await admitSession(db, 'player', 3)).toBe(false);
+    await expect(admitSession(db, 'player', 3)).resolves.toBe(false);
   });
 });

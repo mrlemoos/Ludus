@@ -1,5 +1,6 @@
 import { user } from './schema';
 import { sqliteTable, text } from 'drizzle-orm/sqlite-core';
+
 export const playerCosmetics = sqliteTable('player_cosmetics', {
   owner: text('owner')
     .primaryKey()

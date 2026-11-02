@@ -11,7 +11,7 @@ import { CoachStore } from './coach-store';
 import { reserveCoachReviewCredit, reviewCreditStatus } from './review-credits';
 
 const now = Date.parse('2026-10-30T12:00:00Z');
-const lineFor = (match: SavedCoachMatch): AnalysisLine => {
+function lineFor(match: SavedCoachMatch): AnalysisLine  {
   const move = positionAt(match.moves, 0).move(match.moves[0]);
   const uci = `${move.from}${move.to}${move.promotion ?? ''}`;
   return {
@@ -26,14 +26,14 @@ const lineFor = (match: SavedCoachMatch): AnalysisLine => {
     moves: [uci],
     variations: [[uci]],
   };
-};
+}
 function fixture() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec('PRAGMA foreign_keys=ON');
   for (const file of readdirSync('drizzle')
     .filter((name) => /^\d{4}_.+\.sql$/.test(name))
     .sort())
-    sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));
+    {sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));}
   for (const id of ['owner', 'other']) {
     sqlite
       .prepare(
@@ -48,9 +48,9 @@ function fixture() {
   }
   function statement(query: string, parameters: unknown[] = []) {
     const bindings = parameters as (string | number | null)[];
-    const execute = () => ({
+    function execute() { return ({
       meta: { changes: Number(sqlite.prepare(query).run(...bindings).changes) },
-    });
+    }); }
     return {
       bind: (...values: unknown[]) => statement(query, values),
       first: async <T>() => (sqlite.prepare(query).get(...bindings) as T) ?? null,
@@ -168,11 +168,11 @@ function fixture() {
     },
   };
 }
-const input = (
+function input(
   key = 'idempotency-key-0001',
   matchId = 'match-1',
   history: { matchId: string; analysis: AnalysisLine[] | null }[] = [],
-) => ({
+) { return ({
   key,
   matchId,
   language: 'en-GB',
@@ -186,7 +186,7 @@ const input = (
     }),
   ],
   history,
-});
+}); }
 function request(
   path = '/api/coach/reviews',
   body?: unknown,
@@ -527,7 +527,7 @@ describe('private engine-grounded coach API', () => {
       { ...f.older3, id: 'middle-computer', kind: 'computer', completedAt: now - 5_000 },
       { ...f.previous, id: 'oldest-human', kind: 'human', completedAt: now - 30_000 },
     ];
-    for (const game of candidates) f.matches.set(game.id, game);
+    for (const game of candidates) {f.matches.set(game.id, game);}
     for (const game of candidates.filter((item) => item.kind === 'computer')) {
       await f.db
         .prepare(

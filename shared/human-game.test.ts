@@ -16,8 +16,7 @@ import {
 } from './human-game';
 import { Chess } from 'chess.js';
 import { describe, expect, it } from 'vitest';
-const start = () =>
-  humanConnection(
+function start() { return humanConnection(
     humanConnection(
       createHumanGame('id', { w: 'white', b: 'black' }, '5+3', false, 0),
       'w',
@@ -27,7 +26,7 @@ const start = () =>
     'b',
     true,
     0,
-  );
+  ); }
 function move(game: HumanGame, uci: string, now = game.updatedAt + 1000) {
   return applyHumanAction(
     game,

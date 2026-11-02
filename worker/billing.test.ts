@@ -26,7 +26,7 @@ function fixture() {
   for (const file of readdirSync('drizzle')
     .filter((file) => file.endsWith('.sql'))
     .sort())
-    sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));
+    {sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));}
   sqlite
     .prepare(
       "INSERT INTO user(id,name,email,email_verified,created_at,updated_at) VALUES('owner','Owner','owner@example.test',1,0,0)",
@@ -673,10 +673,10 @@ describe('Stripe webhook authentication and durable processing', () => {
       billingWebhook(signed(dispute), f.env, f.deps),
     ]);
     for (const [index, result] of results.entries())
-      if (result.status === 503)
+      {if (result.status === 503)
         expect(
           (await billingWebhook(signed(index === 0 ? purchase : dispute), f.env, f.deps)).status,
-        ).toBe(200);
+        ).toBe(200);}
     expect(f.sqlite.prepare('SELECT frozen FROM review_credit_packs').get()).toEqual({ frozen: 1 });
   });
   it('does not accept mutated body bytes', async () => {

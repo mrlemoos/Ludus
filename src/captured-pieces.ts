@@ -1,6 +1,6 @@
 import type { Chess, Color, PieceSymbol } from 'chess.js';
 
-export type CapturedPiece = { type: PieceSymbol; colour: Color };
+export interface CapturedPiece { type: PieceSymbol; colour: Color }
 export function capturedPieces(chess: Chess): CapturedPiece[] {
   return chess
     .history({ verbose: true })

@@ -58,13 +58,16 @@ async function api<T>(
 function languageName(language: Language, ui: Language) {
   return new Intl.DisplayNames([ui], { type: 'language' }).of(language) ?? language;
 }
-function ReviewText({
-  document,
-  onVariation,
-}: {
+interface NoticeProps {
+  savedLanguage: Language;
+}
+
+interface ReviewTextProps {
   document: CoachDocument;
   onVariation: (ply: number, moves: string[]) => void;
-}) {
+}
+
+function ReviewText({ document, onVariation }: ReviewTextProps) {
   return (
     <>
       <p className="whitespace-pre-wrap">{document.summary}</p>
@@ -125,7 +128,7 @@ export function Coach() {
     profile: TeachingProfile;
   } | null>(null);
   const loadVersion = useRef(0);
-  const load = async () => {
+  async function load() {
     const version = ++loadVersion.current;
     setError('');
     try {
@@ -153,7 +156,7 @@ export function Coach() {
         setError('load');
       }
     }
-  };
+  }
   useEffect(() => {
     setStatus(null);
     setMatch(null);
@@ -377,12 +380,14 @@ export function Coach() {
       board.move(move);
     }
   }
-  const notice = (savedLanguage: Language) =>
-    savedLanguage === language ? null : (
+  function Notice({ savedLanguage }: NoticeProps) {
+    if (savedLanguage === language) {return null;}
+    return (
       <p role="note" className="game-notice my-3">
         {c.language} {languageName(savedLanguage, language)}. {c.preserved}
       </p>
     );
+  }
   const errorText =
     error === 'load'
       ? c.error
@@ -500,9 +505,9 @@ export function Coach() {
               >
                 {pending === 'analysis'
                   ? `${c.analysing} ${progress}`
-                  : pending === 'generation'
+                  : (pending === 'generation'
                     ? c.generating
-                    : c.generate}
+                    : c.generate)}
               </Button>
             )}
             {!review && status.reviewCredits.available < 1 && (
@@ -542,11 +547,13 @@ export function Coach() {
               {board && (
                 <section aria-label={c.position}>
                   <Board
-                    fen={board.fen()}
-                    flipped={match?.colour === 'b'}
-                    selected={null}
-                    destinations={[]}
-                    lastMove={[]}
+                    position={{
+                      fen: board.fen(),
+                      flipped: match?.colour === 'b',
+                      selected: null,
+                      destinations: [],
+                      lastMove: [],
+                    }}
                     onSquare={() => {}}
                     copy={gameCopy[language]}
                   />
@@ -599,7 +606,7 @@ export function Coach() {
                 {!review && <p>{c.empty}</p>}
                 {review && (
                   <article>
-                    {notice(review.language)}
+                    <Notice savedLanguage={review.language} />
                     <ReviewText document={review.document} onVariation={variation} />
                     <p className="mt-4 text-sm">{c.untrusted}</p>
                     <Button className="mt-4 text-sm underline" onClick={() => void removeReview()}>
@@ -609,7 +616,7 @@ export function Coach() {
                     {replies.map((reply) => (
                       <div key={reply.id} className="my-5 border-t pt-4">
                         <p className="font-medium">{reply.question}</p>
-                        {notice(reply.language)}
+                        <Notice savedLanguage={reply.language} />
                         <ReviewText document={reply.document} onVariation={variation} />
                       </div>
                     ))}

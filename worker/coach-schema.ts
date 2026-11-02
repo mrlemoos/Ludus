@@ -1,4 +1,5 @@
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+
 export const coachRequests = sqliteTable('coach_requests', {
   id: text('id').primaryKey(),
   owner: text('owner').notNull(),

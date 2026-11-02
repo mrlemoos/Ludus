@@ -18,7 +18,7 @@ function fixture() {
   for (const file of readdirSync('drizzle')
     .filter((name) => name.endsWith('.sql'))
     .sort())
-    sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));
+    {sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));}
   for (const id of ['owner', 'other']) {
     sqlite
       .prepare(
@@ -29,7 +29,7 @@ function fixture() {
       .prepare(
         "INSERT INTO player_profiles(user_id,username,language,timezone,chess_level,teaching_profile,adult_attested_at,policy_version,onboarded_at,trial_expires_at) VALUES (?,?,'en-GB','UTC','casual','beginner',0,'v1',?,?)",
       )
-      .run(id, id, now, now + 86400_000);
+      .run(id, id, now, now + 86_400_000);
   }
   function statement(query: string, parameters: unknown[] = []) {
     const values = parameters as (string | number | null)[];
@@ -66,7 +66,7 @@ describe('review credit accounting', () => {
       now + 2,
     );
     expect(retried?.source).toBe('intro');
-    expect(await commitCoachReviewCredit(f.db, retried!.reservationId, now + 3)).toBe(true);
+    await expect(commitCoachReviewCredit(f.db, retried!.reservationId, now + 3)).resolves.toBe(true);
     expect(
       (await reserveCoachReviewCredit(f.db, 'owner', 'match-beta', 'beta-reservation', now + 4))
         ?.source,
@@ -103,9 +103,7 @@ describe('review credit accounting', () => {
         ?.source,
     ).toBe('complimentary');
     expect((await reviewCreditStatus(f.db, 'owner', now)).monthlyFreeRemaining).toBe(0);
-    expect(
-      await reserveCoachReviewCredit(f.db, 'owner', 'match-extra', 'no-credit', now),
-    ).toBeNull();
+    await expect(reserveCoachReviewCredit(f.db, 'owner', 'match-extra', 'no-credit', now)).resolves.toBeNull();
   });
 
   it('grants each verified pack once, isolates owners, and freezes only credits tied to a disputed pack', async () => {
@@ -170,7 +168,7 @@ describe('review credit accounting', () => {
       frozen: true,
       now: now + 1,
     });
-    expect(await commitCoachReviewCredit(f.db, reservation!.reservationId, now + 2)).toBe(false);
+    await expect(commitCoachReviewCredit(f.db, reservation!.reservationId, now + 2)).resolves.toBe(false);
     expect((await reviewCreditStatus(f.db, 'owner', now + 2)).paidRemaining).toBe(10);
     await restoreCoachReviewCredit(f.db, reservation!.reservationId, now + 2);
     await applyReviewPackRisk(f.db, {
@@ -194,6 +192,7 @@ describe('review credit accounting', () => {
     await restoreCoachReviewCredit(f.db, reservation.reservationId, now + 1);
     expect((await reviewCreditStatus(f.db, 'owner', now + 1)).introAvailable).toBe(true);
   });
+
   it('releases abandoned reservations after the coach request timeout', async () => {
     const f = fixture();
     const abandoned = await reserveCoachReviewCredit(
@@ -205,7 +204,7 @@ describe('review credit accounting', () => {
     );
     expect(abandoned?.source).toBe('intro');
     expect((await reviewCreditStatus(f.db, 'owner', now + 90_000)).introAvailable).toBe(true);
-    expect(await commitCoachReviewCredit(f.db, abandoned!.reservationId, now + 90_000)).toBe(false);
+    await expect(commitCoachReviewCredit(f.db, abandoned!.reservationId, now + 90_000)).resolves.toBe(false);
     expect(
       (
         await reserveCoachReviewCredit(

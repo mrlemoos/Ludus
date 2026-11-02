@@ -35,11 +35,11 @@ it('keeps button hover and press feedback on the shared button class', () => {
   const applies: string[] = [];
   for (const line of css.split('\n')) {
     if (line.includes('@apply')) {
-      if (targets.test(header)) applies.push(line);
-    } else if (line.includes('{')) header = line;
+      if (targets.test(header)) {applies.push(line);}
+    } else if (line.includes('{')) {header = line;}
   }
   expect(applies.length).toBeGreaterThan(0);
-  for (const line of applies) expect(line).not.toMatch(/(?<![\w-])hover:/);
+  for (const line of applies) {expect(line).not.toMatch(/(?<![\w-])hover:/);}
   const button = ruleBody(css, '.ui-button {');
   expect(button).toMatch(/-webkit-tap-highlight-color:\s*transparent/);
   expect(button).toMatch(/touch-action:\s*manipulation/);

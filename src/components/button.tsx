@@ -1,7 +1,10 @@
 import { pressFromPointer } from './button-press';
-import { Button as BaseButton, type ButtonProps } from '@base-ui/react/button';
-import { type HTMLMotionProps, motion } from 'motion/react';
-import { type PointerEvent, useState } from 'react';
+import { Button as BaseButton } from '@base-ui/react/button';
+import type { ButtonProps } from '@base-ui/react/button';
+import { motion } from 'motion/react';
+import type { HTMLMotionProps } from 'motion/react';
+import { useState } from 'react';
+import type { PointerEvent } from 'react';
 
 function trackPress(
   setPressed: (pressed: boolean) => void,
@@ -9,7 +12,7 @@ function trackPress(
   disabled: boolean,
 ) {
   const next = pressFromPointer(event, disabled);
-  if (next !== null) setPressed(next);
+  if (next !== null) {setPressed(next);}
 }
 
 function buttonClass(className?: string) {

@@ -1,7 +1,11 @@
 import { Link } from 'react-router';
 
 /** Shared lettering and proportions for every Ludus wordmark. */
-export function Wordmark({ decorative = false }: { decorative?: boolean }) {
+interface WordmarkProps {
+  decorative?: boolean;
+}
+
+export function Wordmark({ decorative = false }: WordmarkProps) {
   const lettering = (
     <>
       ludus<span aria-hidden="true">.</span>

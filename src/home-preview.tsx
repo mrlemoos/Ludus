@@ -37,12 +37,8 @@ export function HomePreview() {
   const copy = gameCopy[isLanguage(i18n.language) ? i18n.language : 'en-GB'];
   const props = {
     copy,
-    destinations: [],
-    fen,
-    flipped: false,
-    lastMove: [],
     onSquare: () => {},
-    selected: null,
+    position: { destinations: [], fen, flipped: false, lastMove: [], selected: null },
   };
   const flatBoard = (
     <div className="home-flat-board" inert aria-hidden="true">
@@ -55,11 +51,13 @@ export function HomePreview() {
       <AppleMailTabs
         value={view}
         onValueChange={setView}
-        label={t('boardView')}
-        tabs={[
-          { icon: <ControlIcon name="look" />, label: '3D', value: '3d' },
-          { icon: <ControlIcon name="board" />, label: '2D', value: '2d' },
-        ]}
+        menu={{
+          label: t('boardView'),
+          tabs: [
+            { icon: <ControlIcon name="look" />, label: '3D', value: '3d' },
+            { icon: <ControlIcon name="board" />, label: '2D', value: '2d' },
+          ],
+        }}
       >
         <div className="preview-stage">
           <Tabs.Panel value="3d">
@@ -75,12 +73,14 @@ export function HomePreview() {
             >
               <Suspense fallback={flatBoard}>
                 <Board3D
-                  {...props}
+                  board={props}
                   presentation
                   resetKey={resetKey}
                   looking={false}
-                  captured={[]}
-                  tableClock={{ active: null, times: { b: '10:00', w: '10:00' } }}
+                  table={{
+                    captured: [],
+                    tableClock: { active: null, times: { b: '10:00', w: '10:00' } },
+                  }}
                 />
               </Suspense>
             </PreviewBoundary>

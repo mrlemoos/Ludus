@@ -1,4 +1,8 @@
-export function ControlIcon({ name }: { name: 'board' | 'flip' | 'look' | 'reset' }) {
+interface ControlIconProps {
+  name: 'board' | 'flip' | 'look' | 'reset';
+}
+
+export function ControlIcon({ name }: ControlIconProps) {
   return (
     <svg
       className={`control-icon control-icon-${name}`}

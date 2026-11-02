@@ -87,9 +87,9 @@ export function Play() {
   const [history, setHistory] = useState<History>([]);
   const [game, setGame] = useState<Game | null>(null);
   const lobbyTab = params.get('tab') === 'history' ? 'history' : 'play';
-  const setLobbyTab = (tab: 'play' | 'history') => {
+  function setLobbyTab(tab: 'play' | 'history') {
     setParams(tab === 'history' ? { tab } : {});
-  };
+  }
   const [email, setEmail] = useState('');
   const [adult, setAdult] = useState(false);
   const [sent, setSent] = useState(false);
@@ -455,19 +455,20 @@ export function Play() {
     ? shown.moves({ square: selected, verbose: true }).map((move) => move.to)
     : [];
   const clocks = game ? remaining(game, now) : { b: 0, w: 0 };
-  const clock = (time: number) =>
-    `${Math.floor(Math.ceil(time / 1000) / 60)}:${String(Math.ceil(time / 1000) % 60).padStart(2, '0')}`;
+  function clock(time: number) { return `${Math.floor(Math.ceil(time / 1000) / 60)}:${String(Math.ceil(time / 1000) % 60).padStart(2, '0')}`; }
   const topColour = flipped ? 'w' : 'b';
   const topIsYou = topColour === game?.colour;
   const boardProps = {
     appearance: appearanceState.appearance,
     copy: c,
-    destinations,
-    fen: shown.fen(),
-    flipped,
-    lastMove: lastShown ? [lastShown.from, lastShown.to] : [],
     onSquare: chooseSquare,
-    selected,
+    position: {
+      destinations,
+      fen: shown.fen(),
+      flipped,
+      lastMove: lastShown ? [lastShown.from, lastShown.to] : [],
+      selected,
+    },
   };
   const resultTitle = game?.result
     ? game.result.winner === null
@@ -591,14 +592,16 @@ export function Play() {
                 <div className="lobby-grid">
                   <div className="lobby-controls">
                     <AppleMailTabs
-                      minimal
                       value={lobbyTab}
                       onValueChange={setLobbyTab}
-                      label={c.play}
-                      tabs={[
-                        { value: 'play', label: c.newGame, icon: '♞' },
-                        { value: 'history', label: c.history, icon: '↺' },
-                      ]}
+                      menu={{
+                        minimal: true,
+                        label: c.play,
+                        tabs: [
+                          { value: 'play', label: c.newGame, icon: '♞' },
+                          { value: 'history', label: c.history, icon: '↺' },
+                        ],
+                      }}
                     >
                       <SlidingPanel activeKey={lobbyTab} direction={lobbyTab === 'play' ? -1 : 1}>
                         <Tabs.Panel value={lobbyTab} className="lobby-tab-panel">
@@ -794,13 +797,15 @@ export function Play() {
                             }
                           >
                             <Board3D
-                              {...boardProps}
+                              board={boardProps}
                               resetKey={resetKey}
                               looking={looking}
-                              captured={captured}
-                              tableClock={{
-                                times: { w: clock(clocks.w), b: clock(clocks.b) },
-                                active: game.result || pause > 0 ? null : boardChess.turn(),
+                              table={{
+                                captured,
+                                tableClock: {
+                                  times: { w: clock(clocks.w), b: clock(clocks.b) },
+                                  active: game.result || pause > 0 ? null : boardChess.turn(),
+                                },
                               }}
                             />
                           </Suspense>
@@ -1041,7 +1046,7 @@ export function Play() {
                   <Dialog.Root
                     open
                     onOpenChange={(open) => {
-                      if (!open) setPromotion(null);
+                      if (!open) {setPromotion(null);}
                     }}
                   >
                     <Dialog.Portal>
@@ -1095,7 +1100,7 @@ export function Play() {
                   className="mt-8 grid gap-5"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (adult) void signIn(false);
+                    if (adult) {void signIn(false);}
                   }}
                 >
                   <label className="grid gap-2 text-sm">

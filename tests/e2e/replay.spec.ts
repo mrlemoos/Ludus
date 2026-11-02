@@ -10,11 +10,11 @@ test('finished replay explores both sides locally and restores the recorded line
     0,
   );
   for (const uci of ['e2e4', 'e7e5', 'g1f3', 'b8c6'])
-    game = applyAction(
+    {game = applyAction(
       game,
       { type: 'move', from: uci.slice(0, 2), to: uci.slice(2), revision: game.revision },
       game.updatedAt + 1000,
-    );
+    );}
   game = applyAction(game, { type: 'resign', revision: game.revision }, 5000);
   const writes: string[] = [];
   await page.addInitScript(() => {
@@ -23,18 +23,18 @@ test('finished replay explores both sides locally and restores the recorded line
   });
   await page.route('**/api/**', async (route) => {
     const request = route.request();
-    if (request.method() !== 'GET') writes.push(request.url());
+    if (request.method() !== 'GET') {writes.push(request.url());}
     const path = new URL(request.url()).pathname;
     if (path === '/api/me')
-      return route.fulfill({
+      {return route.fulfill({
         json: { user: { id: 'replay-owner', name: 'Replay player' }, local: false },
-      });
+      });}
     if (path === '/api/account')
-      return route.fulfill({ json: { profile: { chessLevel: 'intermediate' } } });
+      {return route.fulfill({ json: { profile: { chessLevel: 'intermediate' } } });}
     if (path === '/api/games')
-      return route.fulfill({
+      {return route.fulfill({
         json: [{ id: game.id, createdAt: 0, result: JSON.stringify(game.result) }],
-      });
+      });}
     return route.fulfill({ json: { game, serverNow: 5000 } });
   });
   await page.goto(`/play?game=${game.id}`);

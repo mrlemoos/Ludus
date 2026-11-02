@@ -1,8 +1,11 @@
 import { coachFixtures } from './coach-fixtures';
-import { type TeachingProfile, teachingProfiles } from './coaching';
-import { type Language, languages } from './waitlist';
+import { teachingProfiles } from './coaching';
+import type { TeachingProfile } from './coaching';
+import { languages } from './waitlist';
+import type { Language } from './waitlist';
 import { Chess } from 'chess.js';
-export type EvaluationObservation = {
+
+export interface EvaluationObservation {
   position: string;
   profile: TeachingProfile;
   language: Language;
@@ -12,8 +15,8 @@ export type EvaluationObservation = {
   latencyMs: number;
   costUsd: number;
   model: string;
-};
-export type EvaluationReport = {
+}
+export interface EvaluationReport {
   version: 1;
   model: string;
   corpusHash: string;
@@ -28,7 +31,7 @@ export type EvaluationReport = {
   maxCostUsd: number;
   passed: boolean;
   evaluatedAt: string;
-};
+}
 export async function corpusHash(): Promise<string> {
   const bytes = await crypto.subtle.digest(
     'SHA-256',
@@ -52,7 +55,7 @@ export async function evaluateCoach(
         profile,
         language,
         count: rows.length,
-        passRate: rows.length ? rows.filter((row) => row.rubricPass).length / rows.length : 0,
+        passRate: rows.length > 0 ? rows.filter((row) => row.rubricPass).length / rows.length : 0,
       };
     }),
   );
@@ -73,16 +76,16 @@ export async function evaluateCoach(
       typeof row.criticalError !== 'boolean' ||
       !Array.isArray(row.variations)
     )
-      throw new Error('invalid_evaluation_observation');
+      {throw new Error('invalid_evaluation_observation');}
     seen.add(key);
     for (const line of row.variations) {
-      if (!Array.isArray(line) || !line.length || line.length > 16) {
+      if (!Array.isArray(line) || line.length === 0 || line.length > 16) {
         allLegal = false;
         continue;
       }
       try {
         const chess = new Chess(fixture.fen);
-        for (const move of line) chess.move(move);
+        for (const move of line) {chess.move(move);}
       } catch {
         allLegal = false;
       }
@@ -120,17 +123,19 @@ export async function modelApproved(
   model: string | undefined,
   json: string | undefined,
 ): Promise<boolean> {
-  if (!model || !json) return false;
+  if (!model || !json) {return false;}
   try {
     const report = JSON.parse(json) as EvaluationReport;
     return (
       report.version === 1 &&
       report.model === model &&
       report.corpusHash === (await corpusHash()) &&
-      report.passed === true &&
+      
+      report.passed &&
       report.positions >= 40 &&
       report.observations >= 480 &&
-      report.allLegal === true &&
+      
+      report.allLegal &&
       report.criticalErrors === 0 &&
       report.totalCostUsd <= 10 &&
       report.maxCostUsd <= 0.05 &&

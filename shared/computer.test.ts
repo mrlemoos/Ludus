@@ -1,22 +1,18 @@
-import {
-  type ComputerHistory,
-  coachIdentity,
-  computerSettings,
-  suggestDifficulty,
-} from './computer';
+import { coachIdentity, computerSettings, suggestDifficulty } from './computer';
+import type { ComputerHistory } from './computer';
 import type { Difficulty } from './game';
 import { describe, expect, it } from 'vitest';
 
-const game = (
+function game(
   winner: 'w' | 'b' | null,
   completedAt: number,
   difficulty: Difficulty = 2,
-): ComputerHistory => ({
+): ComputerHistory  { return ({
   difficulty,
   colour: 'w',
   result: { winner, reason: 'checkmate' },
   completedAt,
-});
+}); }
 
 describe('computer strength suggestions', () => {
   it('shares a named opponent and coach identity without an Elo claim', () => {
@@ -32,11 +28,13 @@ describe('computer strength suggestions', () => {
       ),
     ).toBe(true);
   });
+
   it('suggests an initial strength independently of teaching vocabulary', () => {
     expect(suggestDifficulty('beginner', 2, [])).toEqual({ difficulty: 1, reason: 'onboarding' });
     expect(suggestDifficulty('advanced', 1, [])).toEqual({ difficulty: 4, reason: 'onboarding' });
     expect(suggestDifficulty('casual', 2, [])).toBeNull();
   });
+
   it('requires enough finished games at the selected strength', () => {
     expect(suggestDifficulty('advanced', 2, [game('w', 1)])).toBeNull();
     expect(
@@ -47,6 +45,7 @@ describe('computer strength suggestions', () => {
       ),
     ).toBeNull();
   });
+
   it('suggests one step up after four wins among five most recent games', () => {
     const history = [
       game('b', 0),
@@ -60,6 +59,7 @@ describe('computer strength suggestions', () => {
     });
     expect(history).toEqual(snapshot);
   });
+
   it('counts player colour, excludes unfinished games and never counts draws as losses', () => {
     const losses = Array.from({ length: 5 }, (_, i) => ({ ...game('w', i), colour: 'b' as const }));
     expect(suggestDifficulty('advanced', 2, losses)).toEqual({
@@ -81,6 +81,7 @@ describe('computer strength suggestions', () => {
       ),
     ).toEqual({ difficulty: 4, reason: 'onboarding' });
   });
+
   it('does not exceed the four available strengths', () => {
     expect(
       suggestDifficulty(

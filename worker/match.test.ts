@@ -25,7 +25,7 @@ function fixture(
   let revoked = false;
   const sockets: { send: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> }[] = [];
   const sql = vi.fn((query: string, value?: string) => {
-    if (query.startsWith('INSERT')) stored = value;
+    if (query.startsWith('INSERT')) {stored = value;}
     return { toArray: () => (stored ? [{ data: stored }] : []) };
   });
   const ctx = {

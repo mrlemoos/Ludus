@@ -22,7 +22,7 @@ function fixture() {
   for (const file of readdirSync('drizzle')
     .filter((file) => file.endsWith('.sql'))
     .sort())
-    sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));
+    {sqlite.exec(readFileSync(`drizzle/${file}`, 'utf8'));}
   sqlite
     .prepare(
       'INSERT INTO user(id,name,email,email_verified,created_at,updated_at) VALUES (?,?,?,?,?,?)',
@@ -48,7 +48,7 @@ function fixture() {
       sqlite.exec('BEGIN');
       try {
         const results = [];
-        for (const query of queries) results.push(query.run());
+        for (const query of queries) {results.push(query.run());}
         sqlite.exec('COMMIT');
         return results;
       } catch (error) {
@@ -299,9 +299,9 @@ describe('account lifecycle with real SQLite migrations', () => {
     const { db, sqlite } = fixture();
     const old = Math.floor((Date.now() - 181 * 86400000) / 1000);
     for (const email of ['old@example.com', 'admitted@example.com', 'expired@example.com'])
-      sqlite
+      {sqlite
         .prepare('INSERT INTO waitlist(email,language,created_at) VALUES (?,?,?)')
-        .run(email, 'en-GB', old);
+        .run(email, 'en-GB', old);}
     sqlite
       .prepare('INSERT INTO invitations(email,expires_at,redeemed_by) VALUES (?,?,?)')
       .run('admitted@example.com', 0, 'owner');
@@ -322,7 +322,7 @@ describe('operator invitation batches', () => {
   it('does not merge different recipient lists racing for one batch ID', async () => {
     const { env, sqlite } = fixture();
     for (const email of ['first@example.com', 'second@example.com'])
-      sqlite.prepare('INSERT INTO waitlist(email,language) VALUES (?,?)').run(email, 'en-GB');
+      {sqlite.prepare('INSERT INTO waitlist(email,language) VALUES (?,?)').run(email, 'en-GB');}
     const batchId = crypto.randomUUID();
     const results = await Promise.all(
       ['first@example.com', 'second@example.com'].map((email) =>
@@ -340,7 +340,7 @@ describe('operator invitation batches', () => {
   it('stops at delivery failure and refuses a blind retry beyond the provider idempotency window', async () => {
     const { env, sqlite } = fixture();
     for (const email of ['first@example.com', 'second@example.com'])
-      sqlite.prepare('INSERT INTO waitlist(email,language) VALUES (?,?)').run(email, 'en-GB');
+      {sqlite.prepare('INSERT INTO waitlist(email,language) VALUES (?,?)').run(email, 'en-GB');}
     const batchId = crypto.randomUUID();
     await accountsApi(
       request('/api/operator/invitations/preview', 'POST', {
@@ -518,7 +518,7 @@ describe('public profile SEO privacy and discovery', () => {
     expect(data).toMatchObject({ username: profile.username, activityPublic: false });
     expect(data).not.toHaveProperty('activity');
     for (const privateKey of ['email', 'userId', 'timezone', 'teachingProfile', 'trialExpiresAt'])
-      expect(data).not.toHaveProperty(privateKey);
+      {expect(data).not.toHaveProperty(privateKey);}
     expect(await (await profileSitemap(db, '/sitemaps/profiles-1.xml')).text()).toContain(
       '/@ownerplayer',
     );

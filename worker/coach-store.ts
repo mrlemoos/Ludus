@@ -1,15 +1,9 @@
-import {
-  type AnalysisLine,
-  type CoachDocument,
-  type SavedCoachHistory,
-  type SavedReply,
-  type SavedReview,
-  type SavedReviewWithAnalysis,
-  monthKey,
-} from '../shared/coaching';
+import { monthKey } from '../shared/coaching';
+import type { AnalysisLine, CoachDocument, SavedCoachHistory, SavedReply, SavedReview, SavedReviewWithAnalysis } from '../shared/coaching';
 import type { TeachingProfile } from '../shared/coaching';
 import type { Language } from '../shared/waitlist';
-export type Reservation = {
+
+export interface Reservation {
   id: string;
   owner: string;
   key: string;
@@ -18,8 +12,8 @@ export type Reservation = {
   reviewId: string | null;
   now: number;
   reserveMicros: number;
-};
-type Row = {
+}
+interface Row {
   id: string;
   owner: string;
   match_id: string;
@@ -30,22 +24,22 @@ type Row = {
   history?: string;
   history_gaps?: number;
   created_at: number;
-};
-type ReplyRow = {
+}
+interface ReplyRow {
   id: string;
   review_id: string;
   language: Language;
   question: string;
   document: string;
   created_at: number;
-};
-export type RequestState = {
+}
+export interface RequestState {
   id: string;
   fingerprint: string;
   state: 'pending' | 'complete' | 'failed';
-};
+}
 export class CoachStore {
-  constructor(private db: D1Database) {}
+  constructor(private readonly db: D1Database) {}
   async expire(now: number) {
     // A timed-out provider may still have billed. Preserve the reserved maximum in the cost ledger.
     await this.db.batch([

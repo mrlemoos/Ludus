@@ -185,7 +185,11 @@ interface BillingStatus {
   enabled: boolean;
   reviewCredits?: ReviewCreditStatus;
 }
-function BillingSection({ language }: { language: Language }) {
+interface BillingSectionProps {
+  language: Language;
+}
+
+function BillingSection({ language }: BillingSectionProps) {
   const copy = billingCopy[language];
   const [params] = useSearchParams();
   const [status, setStatus] = useState<BillingStatus | null>(null);
@@ -684,8 +688,7 @@ export function PublicProfile() {
       data={data}
       username={username}
       language={language}
-      missing={missing}
-      unavailable={unavailable && !data}
+      availability={{ missing, unavailable: unavailable && !data }}
       header={<Header />}
     />
   );

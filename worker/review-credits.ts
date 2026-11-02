@@ -1,10 +1,6 @@
 import { monthKey } from '../shared/coaching';
-import {
-  MONTHLY_FREE_REVIEW_CREDITS,
-  REVIEW_CREDIT_RESERVATION_TIMEOUT_MS,
-  type ReviewCreditReservation,
-  type ReviewCreditStatus,
-} from '../shared/review-credits';
+import { MONTHLY_FREE_REVIEW_CREDITS, REVIEW_CREDIT_RESERVATION_TIMEOUT_MS } from '../shared/review-credits';
+import type { ReviewCreditReservation, ReviewCreditStatus } from '../shared/review-credits';
 
 export async function reserveCoachReviewCredit(
   db: D1Database,
@@ -71,7 +67,7 @@ export async function reserveCoachReviewCredit(
       matchId,
     )
     .run();
-  if (!inserted.meta.changes) return null;
+  if (!inserted.meta.changes) {return null;}
   const row = await db
     .prepare('SELECT source,pack_id FROM review_credit_reservations WHERE id=? AND owner=?')
     .bind(reservationId, owner)
@@ -242,9 +238,9 @@ export async function applyReviewPackRisk(
     now: number;
   },
 ): Promise<void> {
-  const frozen = Number(input.frozen ?? false),
-    refunded = Number(input.refunded ?? false),
-    id = input.charge ?? `pi:${input.paymentIntent ?? 'unknown'}`;
+  const frozen = Number(input.frozen ?? false);
+    const refunded = Number(input.refunded ?? false);
+    const id = input.charge ?? `pi:${input.paymentIntent ?? 'unknown'}`;
   const existing = await db
     .prepare(
       'SELECT id FROM review_credit_pack_risks WHERE (? IS NOT NULL AND charge=?) OR (? IS NOT NULL AND payment_intent=?) ORDER BY updated_at DESC LIMIT 1',

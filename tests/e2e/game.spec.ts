@@ -1,4 +1,5 @@
-import { type Page, expect, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 async function signIn(page: Page) {
   await page.addInitScript(() => {
@@ -73,7 +74,7 @@ test('plays Stockfish, recovers accepted moves, resigns, replays and downloads P
   let historyReads = 0;
   page.on('request', (request) => {
     if (request.method() === 'GET' && new URL(request.url()).pathname === '/api/games')
-      historyReads++;
+      {historyReads++;}
   });
   await signIn(page);
   await finishActive(page);
@@ -83,7 +84,7 @@ test('plays Stockfish, recovers accepted moves, resigns, replays and downloads P
   await expect(page.locator('[data-square="e4"]')).toHaveAccessibleName(/Legal destination/);
   await page.locator('[data-square="e4"]').click();
   await expect(page.getByRole('heading', { name: 'Your move', exact: true })).toBeVisible({
-    timeout: 30000,
+    timeout: 30_000,
   });
   await expect(page.getByRole('button', { name: 'e4', exact: true })).toBeVisible();
   const id = new URL(page.url()).searchParams.get('game');
@@ -123,7 +124,7 @@ test('server rejects illegal/stale actions and foreign sessions; finalises check
   await expect(page.getByRole('button', { name: 'Resign', exact: true })).toBeEnabled();
   const id = new URL(page.url()).searchParams.get('game');
   const path = `/api/games/${id}`;
-  const post = (data: unknown) => page.request.post(path, { data, headers: { Origin: baseURL! } });
+  function post(data: unknown) { return page.request.post(path, { data, headers: { Origin: baseURL! } }); }
   expect((await post({ type: 'move', from: 'e2', to: 'e5', revision: 0 })).status()).toBe(409);
   expect((await post({ type: 'move', from: 'e7', to: 'e5', revision: 0 })).status()).toBe(409);
   const moves = ['f2f3', 'e7e5', 'g2g4', 'd8h4'];
@@ -133,7 +134,7 @@ test('server rejects illegal/stale actions and foreign sessions; finalises check
       (await post({ type: 'move', from: uci.slice(0, 2), to: uci.slice(2), revision })).ok(),
     ).toBe(true);
     if (!revision)
-      expect((await post({ type: 'move', from: 'e7', to: 'e5', revision: 0 })).status()).toBe(409);
+      {expect((await post({ type: 'move', from: 'e7', to: 'e5', revision: 0 })).status()).toBe(409);}
   }
   await expect(page.getByRole('heading', { name: 'Lucía won · Checkmate' })).toBeVisible();
   const finished = await page.request.get(path).then((r) => r.json());
@@ -200,7 +201,7 @@ test('3D board renders, switches to keyboard board, stays within mobile viewport
   await page.getByLabel('Time control').selectOption('10+5');
   await page.getByRole('button', { name: 'Start game' }).click();
   await expect(page.getByRole('heading', { name: 'Your move', exact: true })).toBeVisible({
-    timeout: 30000,
+    timeout: 30_000,
   });
   await page.getByRole('button', { name: '3D board', exact: true }).click();
   await expect(page.locator('canvas')).toBeVisible();
@@ -300,7 +301,7 @@ test('2D board and graphics fallback keep every square clear of player overlays'
   await page.evaluate(() => {
     const original = HTMLCanvasElement.prototype.getContext;
     Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
-      value: function (this: HTMLCanvasElement, kind: string, options?: unknown) {
+      value (this: HTMLCanvasElement, kind: string, options?: unknown) {
         return kind.startsWith('webgl') ? null : original.call(this, kind, options);
       },
     });

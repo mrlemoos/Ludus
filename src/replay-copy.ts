@@ -1,4 +1,5 @@
 import type { Language } from '../shared/waitlist';
+
 export const replayCopy: Record<
   Language,
   { variation: string; hint: string; saved: string; cancelPromotion: string }

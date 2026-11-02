@@ -1,11 +1,8 @@
 import { modelApproved } from '../shared/coach-evaluation';
-import {
-  type AnalysisLine,
-  type SavedCoachMatch,
-  type TeachingProfile,
-  profileInstructions,
-} from '../shared/coaching';
+import { profileInstructions } from '../shared/coaching';
+import type { AnalysisLine, SavedCoachMatch, TeachingProfile } from '../shared/coaching';
 import type { Language } from '../shared/waitlist';
+
 export type CoachEnvironment = Pick<Env, 'DB' | 'MATCHES'> & {
   COACH_API_KEY?: string;
   COACH_API_URL?: string;
@@ -14,8 +11,8 @@ export type CoachEnvironment = Pick<Env, 'DB' | 'MATCHES'> & {
   COACH_INPUT_USD_PER_MILLION?: string;
   COACH_OUTPUT_USD_PER_MILLION?: string;
 };
-export type ProviderHistory = { match: SavedCoachMatch; analysis: AnalysisLine[] | null };
-export type ProviderPrompt = {
+export interface ProviderHistory { match: SavedCoachMatch; analysis: AnalysisLine[] | null }
+export interface ProviderPrompt {
   language: Language;
   profile: TeachingProfile;
   match: SavedCoachMatch;
@@ -25,13 +22,13 @@ export type ProviderPrompt = {
   summary?: string;
   conversation?: { question: string; summary: string }[];
   question?: string;
-};
-export type ProviderPayload = {
+}
+export interface ProviderPayload {
   model: string;
   messages: { role: 'system' | 'user'; content: string }[];
   response_format: { type: 'json_object' };
   max_tokens: number;
-};
+}
 export async function providerAvailable(env: CoachEnvironment) {
   return Boolean(
     env.COACH_API_KEY &&
@@ -84,7 +81,7 @@ export function providerPayload(model: string, prompt: ProviderPrompt): Provider
   };
 }
 function sampleLines(lines: AnalysisLine[], maximum: number) {
-  if (lines.length <= maximum) return lines;
+  if (lines.length <= maximum) {return lines;}
   return Array.from(
     { length: maximum },
     (_, index) => lines[Math.round((index * (lines.length - 1)) / (maximum - 1))],
@@ -106,8 +103,8 @@ function compactAnalysis(lines: AnalysisLine[]) {
   );
 }
 export function reserveCostMicros(env: CoachEnvironment, payload: ProviderPayload): number | null {
-  const input = Number(env.COACH_INPUT_USD_PER_MILLION),
-    output = Number(env.COACH_OUTPUT_USD_PER_MILLION);
+  const input = Number(env.COACH_INPUT_USD_PER_MILLION);
+    const output = Number(env.COACH_OUTPUT_USD_PER_MILLION);
   // UTF-8 bytes conservatively upper-bound input token count. Include role/framing overhead.
   const bytes = new TextEncoder().encode(JSON.stringify(payload)).byteLength + 2048;
   if (
@@ -117,7 +114,7 @@ export function reserveCostMicros(env: CoachEnvironment, payload: ProviderPayloa
     output <= 0 ||
     bytes > 32_000
   )
-    return null;
+    {return null;}
   const cost = Math.ceil(bytes * input + payload.max_tokens * output);
   return cost > 0 && cost <= 50_000 ? cost : null;
 }
@@ -132,14 +129,14 @@ export async function callProvider(
     signal: AbortSignal.timeout(45_000),
     redirect: 'error',
   });
-  if (!response.ok) throw new Error('provider_unavailable');
+  if (!response.ok) {throw new Error('provider_unavailable');}
   const reader = response.body?.getReader();
-  if (!reader) throw new Error('provider_unavailable');
+  if (!reader) {throw new Error('provider_unavailable');}
   let length = 0;
   const chunks: Uint8Array[] = [];
   while (true) {
     const next = await reader.read();
-    if (next.done) break;
+    if (next.done) {break;}
     length += next.value.length;
     if (length > 64_000) {
       await reader.cancel();
@@ -155,8 +152,8 @@ export async function callProvider(
   }
   const result = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   const content = result.choices?.[0]?.message?.content;
-  const input = result.usage?.prompt_tokens,
-    output = result.usage?.completion_tokens;
+  const input = result.usage?.prompt_tokens;
+    const output = result.usage?.completion_tokens;
   if (
     typeof content !== 'string' ||
     !Number.isSafeInteger(input) ||
@@ -165,12 +162,12 @@ export async function callProvider(
     output < 0 ||
     output > payload.max_tokens
   )
-    throw new Error('invalid_provider_response');
+    {throw new Error('invalid_provider_response');}
   const costMicros = Math.ceil(
     input * Number(env.COACH_INPUT_USD_PER_MILLION) +
       output * Number(env.COACH_OUTPUT_USD_PER_MILLION),
   );
   const reserved = reserveCostMicros(env, payload);
-  if (reserved === null || costMicros > reserved) throw new Error('provider_cost_exceeded');
+  if (reserved === null || costMicros > reserved) {throw new Error('provider_cost_exceeded');}
   return { document: JSON.parse(content), costMicros };
 }

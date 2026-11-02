@@ -1,10 +1,10 @@
-import { type HumanGame, createHumanGame, humanConnection } from '../shared/human-game';
+import { createHumanGame, humanConnection } from '../shared/human-game';
+import type { HumanGame } from '../shared/human-game';
 import { predictMove, shouldApplySnapshot } from './online-move';
 import { Chess } from 'chess.js';
 import { describe, expect, it } from 'vitest';
 
-const fresh = () =>
-  humanConnection(
+function fresh() { return humanConnection(
     humanConnection(
       createHumanGame('id', { w: 'white', b: 'black' }, '5+3', false, 1),
       'w',
@@ -14,14 +14,14 @@ const fresh = () =>
     'b',
     true,
     1,
-  );
-const sample = (revision: number, moves: string[], updatedAt = 10, id = 'id'): HumanGame => ({
+  ); }
+function sample(revision: number, moves: string[], updatedAt = 10, id = 'id'): HumanGame  { return ({
   ...fresh(),
   id,
   revision,
   moves,
   updatedAt,
-});
+}); }
 
 describe('optimistic online moves', () => {
   it('appends the SAN and position without touching clocks, revision, or the original game', () => {

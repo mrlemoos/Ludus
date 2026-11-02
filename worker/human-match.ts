@@ -1,18 +1,8 @@
-import {
-  type HumanGame,
-  type PhraseId,
-  applyHumanAction,
-  createHumanGame,
-  humanColour,
-  humanConnection,
-  humanTiming,
-  parseHumanAction,
-  phraseIds,
-  reportCategories,
-  settleHuman,
-} from '../shared/human-game';
+import { applyHumanAction, createHumanGame, humanColour, humanConnection, humanTiming, parseHumanAction, phraseIds, reportCategories, settleHuman } from '../shared/human-game';
+import type { HumanGame, PhraseId } from '../shared/human-game';
 import type { Assignment } from '../shared/matchmaking';
-import { type Rating, initialRating, rateMatch } from '../shared/rating';
+import { initialRating, rateMatch } from '../shared/rating';
+import type { Rating } from '../shared/rating';
 import { recordActivity } from './accounts';
 import { DurableObject } from 'cloudflare:workers';
 
@@ -37,7 +27,7 @@ export class HumanMatch extends DurableObject<Env> {
     );
   }
   private async finalise(game: HumanGame) {
-    if (!game.result) return;
+    if (!game.result) {return;}
     await this.env.DB.prepare(
       'INSERT INTO online_matches(id,white_id,black_id,control,rated,result,finished_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET result=excluded.result,finished_at=excluded.finished_at WHERE online_matches.result IS NULL',
     )
@@ -62,8 +52,7 @@ export class HumanMatch extends DurableObject<Env> {
       )
         .bind(game.control, game.players.w, game.players.b)
         .all<RatingRow>();
-      const before = (id: string) =>
-        rows.results.find((row) => row.user_id === id) ?? initialRating();
+      function before(id: string) { return rows.results.find((row) => row.user_id === id) ?? initialRating(); }
       const after = rateMatch(before(game.players.w), before(game.players.b), game.result.winner);
       for (const colour of ['w', 'b'] as const) {
         const rating = after[colour];
@@ -114,7 +103,7 @@ export class HumanMatch extends DurableObject<Env> {
       await this.ctx.storage.deleteAlarm();
     } else {
       const current = this.load();
-      if (!current || current.result) return;
+      if (!current || current.result) {return;}
       const turn = current.fen.split(' ')[1] as 'w' | 'b';
       const paused = humanTiming(current, current.updatedAt).pauseRemaining;
       await this.ctx.storage.setAlarm(
@@ -129,12 +118,12 @@ export class HumanMatch extends DurableObject<Env> {
   }
   async anonymise(player: string) {
     const game = this.load();
-    if (!game) return;
+    if (!game) {return;}
     const marker = `deleted:${player}`;
     const colour = (['w', 'b'] as const).find(
       (side) => game.players[side] === player || game.players[side] === marker,
     );
-    if (!colour) return;
+    if (!colour) {return;}
     const other = colour === 'w' ? 'b' : 'w';
     const result = game.result ?? { winner: other, reason: 'resignation' as const, at: Date.now() };
     const next: HumanGame = {
@@ -144,7 +133,7 @@ export class HumanMatch extends DurableObject<Env> {
       revision: game.result ? game.revision : game.revision + 1,
     };
     this.save(next);
-    for (const socket of this.ctx.getWebSockets(player)) socket.close(1008, 'Account deleted');
+    for (const socket of this.ctx.getWebSockets(player)) {socket.close(1008, 'Account deleted');}
     await this.ctx.storage.setAlarm(Date.now() + 5000);
     await this.env.DB.prepare(
       'UPDATE online_matches SET white_id=CASE WHEN white_id=? THEN ? ELSE white_id END,black_id=CASE WHEN black_id=? THEN ? ELSE black_id END WHERE id=?',
@@ -155,14 +144,14 @@ export class HumanMatch extends DurableObject<Env> {
   }
   async initialise(assignment: Assignment) {
     if ((await this.revoked(assignment.players.w)) || (await this.revoked(assignment.players.b)))
-      throw new Error('account_deleted');
+      {throw new Error('account_deleted');}
     const existing = this.load();
     if (existing) {
       if (
         existing.players.w !== assignment.players.w ||
         existing.players.b !== assignment.players.b
       )
-        throw new Error('conflict');
+        {throw new Error('conflict');}
       return existing;
     }
     const game = createHumanGame(
@@ -187,10 +176,10 @@ export class HumanMatch extends DurableObject<Env> {
       )
       .run();
     for (const player of [assignment.players.w, assignment.players.b])
-      if (await this.revoked(player)) {
+      {if (await this.revoked(player)) {
         await this.anonymise(player);
         throw new Error('account_deleted');
-      }
+      }}
     const current = this.load()!;
     await this.publish(current);
     return current;
@@ -201,14 +190,14 @@ export class HumanMatch extends DurableObject<Env> {
       return null;
     }
     const game = this.load();
-    if (!game) return null;
+    if (!game) {return null;}
     try {
       humanColour(game, player);
     } catch {
       return null;
     }
     const current = settleHuman(game, Date.now());
-    if (current !== game || current.result) await this.publish(current);
+    if (current !== game || current.result) {await this.publish(current);}
     return { game: current, serverNow: Date.now() };
   }
   async act(player: string, input: unknown) {
@@ -217,9 +206,9 @@ export class HumanMatch extends DurableObject<Env> {
       return { error: 'not_found' };
     }
     const game = this.load();
-    if (!game) return { error: 'not_found' };
+    if (!game) {return { error: 'not_found' };}
     const action = parseHumanAction(input);
-    if (!action) return { error: 'invalid' };
+    if (!action) {return { error: 'invalid' };}
     let next: HumanGame;
     try {
       next = applyHumanAction(game, player, action, Date.now());
@@ -230,16 +219,16 @@ export class HumanMatch extends DurableObject<Env> {
     return { game: next, serverNow: Date.now() };
   }
   async phrase(player: string, phrase: PhraseId) {
-    if (await this.revoked(player)) throw new Error('not_found');
+    if (await this.revoked(player)) {throw new Error('not_found');}
     const game = this.load();
-    if (!game) throw new Error('not_found');
+    if (!game) {throw new Error('not_found');}
     const colour = humanColour(game, player);
-    if (!phraseIds.includes(phrase)) throw new Error('invalid_phrase');
-    const now = Date.now(),
-      last = this.ctx.storage.sql
+    if (!phraseIds.includes(phrase)) {throw new Error('invalid_phrase');}
+    const now = Date.now();
+      const last = this.ctx.storage.sql
         .exec<{ sent_at: number }>('SELECT sent_at FROM phrases WHERE user_id=?', player)
         .toArray()[0];
-    if (last && now - last.sent_at < 3000) throw new Error('rate_limited');
+    if (last && now - last.sent_at < 3000) {throw new Error('rate_limited');}
     this.ctx.storage.sql.exec(
       'INSERT INTO phrases VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET sent_at=excluded.sent_at',
       player,
@@ -248,16 +237,16 @@ export class HumanMatch extends DurableObject<Env> {
     for (const socket of this.ctx.getWebSockets()) {
       const attachment = socket.deserializeAttachment() as { player?: string } | null;
       if (attachment?.player !== player)
-        socket.send(JSON.stringify({ phrase, from: colour, at: now }));
+        {socket.send(JSON.stringify({ phrase, from: colour, at: now }));}
     }
     return { ok: true };
   }
   async report(player: string, category: (typeof reportCategories)[number]) {
-    if (await this.revoked(player)) throw new Error('not_found');
+    if (await this.revoked(player)) {throw new Error('not_found');}
     const game = this.load();
-    if (!game) throw new Error('not_found');
+    if (!game) {throw new Error('not_found');}
     const colour = humanColour(game, player);
-    if (!reportCategories.includes(category)) throw new Error('invalid_report');
+    if (!reportCategories.includes(category)) {throw new Error('invalid_report');}
     await this.env.DB.prepare(
       'INSERT INTO match_reports(id,match_id,reporter_id,opponent_id,category,created_at) VALUES(?,?,?,?,?,?) ON CONFLICT DO NOTHING',
     )
@@ -275,12 +264,12 @@ export class HumanMatch extends DurableObject<Env> {
   async fetch(request: Request) {
     const identity = request.headers.get('X-Player');
     if (!identity || (await this.revoked(identity))) {
-      if (identity) await this.anonymise(identity);
+      if (identity) {await this.anonymise(identity);}
       return new Response(null, { status: 404 });
     }
-    const game = this.load(),
-      player = request.headers.get('X-Player');
-    if (!game || !player) return new Response(null, { status: 404 });
+    const game = this.load();
+      const player = request.headers.get('X-Player');
+    if (!game || !player) {return new Response(null, { status: 404 });}
     let colour: 'w' | 'b';
     try {
       colour = humanColour(game, player);
@@ -288,7 +277,7 @@ export class HumanMatch extends DurableObject<Env> {
       return new Response(null, { status: 404 });
     }
     if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket')
-      return new Response(null, { status: 426 });
+      {return new Response(null, { status: 426 });}
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1], [player]);
     pair[1].serializeAttachment({ player });
@@ -304,16 +293,16 @@ export class HumanMatch extends DurableObject<Env> {
         .getWebSockets(player)
         .some((other) => other !== socket && other.readyState === WebSocket.OPEN)
     )
-      return;
+      {return;}
     const game = this.load();
     if (game)
-      await this.publish(humanConnection(game, humanColour(game, player), false, Date.now()));
+      {await this.publish(humanConnection(game, humanColour(game, player), false, Date.now()));}
   }
   async webSocketError(socket: WebSocket) {
     await this.webSocketClose(socket, 1011);
   }
   async alarm() {
     const game = this.load();
-    if (game) await this.publish(settleHuman(game, Date.now()));
+    if (game) {await this.publish(settleHuman(game, Date.now()));}
   }
 }

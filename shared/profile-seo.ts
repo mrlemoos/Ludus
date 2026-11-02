@@ -1,9 +1,9 @@
 import type { Language } from './waitlist';
 
 export const publicOrigin = 'https://ludus.mrlemoos.dev';
-export const profilePath = (username: string) => `/@${encodeURIComponent(username.toLowerCase())}`;
-export const profileUrl = (username: string) => `${publicOrigin}${profilePath(username)}`;
-export const validPublicUsername = (username: string) => /^[a-zA-Z0-9_]{3,24}$/.test(username);
+export function profilePath(username: string) { return `/@${encodeURIComponent(username.toLowerCase())}`; }
+export function profileUrl(username: string) { return `${publicOrigin}${profilePath(username)}`; }
+export function validPublicUsername(username: string) { return /^[a-zA-Z0-9_]{3,24}$/.test(username); }
 
 export function profileMetadata(username: string, language: Language = 'en-GB') {
   const copy = {
@@ -23,7 +23,7 @@ export function profileMetadata(username: string, language: Language = 'en-GB') 
   return { ...copy[language], canonical: profileUrl(username) };
 }
 
-export const profileStructuredData = (username: string) => ({
+export function profileStructuredData(username: string) { return ({
   '@context': 'https://schema.org',
   '@type': 'ProfilePage',
   url: profileUrl(username),
@@ -33,4 +33,4 @@ export const profileStructuredData = (username: string) => ({
     identifier: username,
     url: profileUrl(username),
   },
-});
+}); }

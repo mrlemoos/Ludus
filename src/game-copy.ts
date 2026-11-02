@@ -1,4 +1,5 @@
 import type { Language } from '../shared/waitlist';
+
 const en = {
   title: 'Your table is ready.',
   subtitle: 'A quiet game. A worthy opponent.',

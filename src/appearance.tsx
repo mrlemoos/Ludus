@@ -84,13 +84,15 @@ export function useAppearance(enabled = true) {
   }
   return { appearance, error, pending, save };
 }
+interface AppearanceControlsProps {
+  state: ReturnType<typeof useAppearance>;
+  swatches?: boolean;
+}
+
 export function AppearanceControls({
   state,
   swatches = false,
-}: {
-  state: ReturnType<typeof useAppearance>;
-  swatches?: boolean;
-}) {
+}: AppearanceControlsProps) {
   const { i18n } = useTranslation();
   const c = labels[i18n.language as keyof typeof labels] ?? labels['en-GB'];
   if (swatches) {
