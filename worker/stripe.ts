@@ -1,5 +1,5 @@
-import Stripe from 'stripe';
 import type { Language } from '../shared/waitlist';
+import Stripe from 'stripe';
 
 export const liveCatalogue = {
   product: 'ludus_plus',
@@ -18,11 +18,18 @@ export function stripeFor(env: Env) {
 }
 
 export function billingEnabled(env: Env): boolean {
-  return env.STRIPE_BILLING_ENABLED === 'true' && env.STRIPE_TAX_READY === 'true' && env.STRIPE_LIFECYCLE_READY === 'true';
+  return (
+    env.STRIPE_BILLING_ENABLED === 'true' &&
+    env.STRIPE_TAX_READY === 'true' &&
+    env.STRIPE_LIFECYCLE_READY === 'true'
+  );
 }
 
 /** Stripe Checkout needs 48 hours for trial_end; short beta remainders use a free initial billing period. */
-export function betaBilling(trialExpiresAt: number, now: number): Stripe.Checkout.SessionCreateParams.SubscriptionData {
+export function betaBilling(
+  trialExpiresAt: number,
+  now: number,
+): Stripe.Checkout.SessionCreateParams.SubscriptionData {
   const end = Math.ceil(trialExpiresAt / 1000);
   if (trialExpiresAt <= now) return { billing_mode: { type: 'flexible' } };
   return {
@@ -33,12 +40,22 @@ export function betaBilling(trialExpiresAt: number, now: number): Stripe.Checkou
   };
 }
 
-export function checkoutParams(customer: string, trialExpiresAt: number, now: number, language: Language, identifier: string, attempt = identifier): Stripe.Checkout.SessionCreateParams {
+export function checkoutParams(
+  customer: string,
+  trialExpiresAt: number,
+  now: number,
+  language: Language,
+  identifier: string,
+  attempt = identifier,
+): Stripe.Checkout.SessionCreateParams {
   return {
-    mode: 'subscription', customer,
+    mode: 'subscription',
+    customer,
     adaptive_pricing: { enabled: true },
     line_items: [{ price: liveCatalogue.price, quantity: 1 }],
-    locale: { 'en-GB': 'en-GB', 'es-ES': 'es', 'fr-FR': 'fr' }[language] as Stripe.Checkout.SessionCreateParams.Locale,
+    locale: { 'en-GB': 'en-GB', 'es-ES': 'es', 'fr-FR': 'fr' }[
+      language
+    ] as Stripe.Checkout.SessionCreateParams.Locale,
     subscription_data: betaBilling(trialExpiresAt, now),
     integration_identifier: `ludus_${identifier}`,
     client_reference_id: attempt,
@@ -48,6 +65,18 @@ export function checkoutParams(customer: string, trialExpiresAt: number, now: nu
   };
 }
 
-export async function verifyStripeEvent(body: string, signature: string, secret: string, now = Date.now()): Promise<Stripe.Event> {
-  return Stripe.webhooks.constructEventAsync(body, signature, secret, 300, Stripe.createSubtleCryptoProvider(), now);
+export async function verifyStripeEvent(
+  body: string,
+  signature: string,
+  secret: string,
+  now = Date.now(),
+): Promise<Stripe.Event> {
+  return Stripe.webhooks.constructEventAsync(
+    body,
+    signature,
+    secret,
+    300,
+    Stripe.createSubtleCryptoProvider(),
+    now,
+  );
 }

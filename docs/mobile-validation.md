@@ -14,9 +14,9 @@ Approved reference devices: iPhone 13 with Safari, Pixel 6 with Chrome. Record a
 
 ## Evidence
 
-| Device | OS/browser | Commit | FPS | Load/memory | Input/accessibility | Result |
-| --- | --- | --- | --- | --- | --- | --- |
-| iPhone 13 | Not measured | Pending | Pending | Pending | Pending | Not accepted |
-| Pixel 6 | Not measured | Pending | Pending | Pending | Pending | Not accepted |
+| Device    | OS/browser   | Commit  | FPS     | Load/memory | Input/accessibility | Result       |
+| --------- | ------------ | ------- | ------- | ----------- | ------------------- | ------------ |
+| iPhone 13 | Not measured | Pending | Pending | Pending     | Pending             | Not accepted |
+| Pixel 6   | Not measured | Pending | Pending | Pending     | Pending             | Not accepted |
 
 No real-device performance claim is made by local Chromium tests.

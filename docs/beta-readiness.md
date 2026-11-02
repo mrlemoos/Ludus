@@ -20,14 +20,14 @@ The 2026-11-01 review-pack policy supersedes this page's earlier Plus wording. S
 
 ## Remaining release gates
 
-| Gate | Current state |
-| --- | --- |
-| Rated timeout rules | Material checks cover known insufficient-material classes. General possible-mate reachability, including blocked/forced-line dead positions, is not proved. `RATED_ENABLED=false` rejects rated entry server-side. No ranked beta admission until this is resolved. |
-| Coach selection | No measured candidate evaluation or provider credentials. The 40-position, four-profile, three-language harness requires 480 reviewed observations. Synthetic unit evidence does not select a model. |
-| Mobile acceptance | iPhone 13/Safari and Pixel 6/Chrome actual-device FPS/input/strength measurements remain absent. See `mobile-validation.md`. |
-| Final artwork | Original procedural café/set and materials implemented. Final realistic art acceptance remains for visual review. |
-| Operational release | Production email sender/secrets, provider costs, Cloudflare/Resend capacity and actual live workflows need validation before inviting batches. No production invitation was sent by this implementation. |
-| Billing | Stripe-hosted one-time review packs are provisioned, but charging remains disabled. Account verification, tax, published controller/contact details, Checkout terms/privacy URLs, AI-provider retention disclosures, refund operation and exact payment-record retention still need review. No card is needed for beta access. |
+| Gate                | Current state                                                                                                                                                                                                                                                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Rated timeout rules | Material checks cover known insufficient-material classes. General possible-mate reachability, including blocked/forced-line dead positions, is not proved. `RATED_ENABLED=false` rejects rated entry server-side. No ranked beta admission until this is resolved.                                                            |
+| Coach selection     | No measured candidate evaluation or provider credentials. The 40-position, four-profile, three-language harness requires 480 reviewed observations. Synthetic unit evidence does not select a model.                                                                                                                           |
+| Mobile acceptance   | iPhone 13/Safari and Pixel 6/Chrome actual-device FPS/input/strength measurements remain absent. See `mobile-validation.md`.                                                                                                                                                                                                   |
+| Final artwork       | Original procedural café/set and materials implemented. Final realistic art acceptance remains for visual review.                                                                                                                                                                                                              |
+| Operational release | Production email sender/secrets, provider costs, Cloudflare/Resend capacity and actual live workflows need validation before inviting batches. No production invitation was sent by this implementation.                                                                                                                       |
+| Billing             | Stripe-hosted one-time review packs are provisioned, but charging remains disabled. Account verification, tax, published controller/contact details, Checkout terms/privacy URLs, AI-provider retention disclosures, refund operation and exact payment-record retention still need review. No card is needed for beta access. |
 
 See `coaching.md`, `assets.md`, `development.md` and `deployment.md` for exact configuration and validation boundaries. A local commit is not a deployment or a decision to admit players.
 

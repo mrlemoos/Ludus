@@ -1,7 +1,10 @@
-import { test, expect, type Page } from '@playwright/test';
+import { type Page, expect, test } from '@playwright/test';
 
 async function signIn(page: Page) {
-  await page.addInitScript(() => { localStorage.setItem('ludus-language', 'en-GB'); localStorage.setItem('ludus-board', '2d'); });
+  await page.addInitScript(() => {
+    localStorage.setItem('ludus-language', 'en-GB');
+    localStorage.setItem('ludus-board', '2d');
+  });
   await page.goto('/play');
   await page.getByRole('button', { name: 'Sign in as dev' }).click();
   await expect(page.getByRole('heading', { name: 'Take a seat.' })).toBeVisible();
@@ -17,7 +20,9 @@ async function finishActive(page: Page) {
   }
   await page.goto('/play');
 }
-test('Skecher lobby tabs support keyboard navigation, language changes and narrow screens', async ({ page }) => {
+test('Skecher lobby tabs support keyboard navigation, language changes and narrow screens', async ({
+  page,
+}) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/play');
@@ -29,7 +34,8 @@ test('Skecher lobby tabs support keyboard navigation, language changes and narro
   await expect(page.locator('.skip-link')).toHaveCSS('opacity', '1');
   await page.keyboard.press('Tab');
   await page.screenshot({ path: 'test-results/sign-in-desktop.png', fullPage: true });
-  await signIn(page); await finishActive(page);
+  await signIn(page);
+  await finishActive(page);
   const newGame = page.getByRole('tab', { name: 'New game', exact: true });
   await expect(newGame).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.lobby-controls')).toHaveCSS('opacity', '1');
@@ -54,23 +60,39 @@ test('Skecher lobby tabs support keyboard navigation, language changes and narro
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole('tab', { name: 'Nouvelle partie', exact: true }).blur();
   await expect(page.locator('.skip-link')).not.toBeInViewport();
-  await expect(page.getByRole('tab', { name: 'Nouvelle partie', exact: true })).toHaveCSS('flex-grow', '0');
+  await expect(page.getByRole('tab', { name: 'Nouvelle partie', exact: true })).toHaveCSS(
+    'flex-grow',
+    '0',
+  );
   await page.screenshot({ path: 'test-results/lobby-mobile.png', fullPage: true });
   expect(errors).toEqual([]);
 });
-test('plays Stockfish, recovers accepted moves, resigns, replays and downloads PGN', async ({ page }) => {
+test('plays Stockfish, recovers accepted moves, resigns, replays and downloads PGN', async ({
+  page,
+}) => {
   let historyReads = 0;
-  page.on('request', (request) => { if (request.method() === 'GET' && new URL(request.url()).pathname === '/api/games') historyReads++; });
-  await signIn(page); await finishActive(page);
+  page.on('request', (request) => {
+    if (request.method() === 'GET' && new URL(request.url()).pathname === '/api/games')
+      historyReads++;
+  });
+  await signIn(page);
+  await finishActive(page);
   await page.getByRole('button', { name: 'Start game' }).click();
   await expect(page.locator('[data-square="e2"]')).toBeVisible();
   await page.locator('[data-square="e2"]').click();
   await expect(page.locator('[data-square="e4"]')).toHaveAccessibleName(/Legal destination/);
   await page.locator('[data-square="e4"]').click();
-  await expect(page.getByRole('heading', { name: 'Your move', exact: true })).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole('heading', { name: 'Your move', exact: true })).toBeVisible({
+    timeout: 30000,
+  });
   await expect(page.getByRole('button', { name: 'e4', exact: true })).toBeVisible();
   const id = new URL(page.url()).searchParams.get('game');
-  await expect.poll(async () => (await page.request.get(`/api/games/${id}`).then((r) => r.json())).game.moves.length).toBe(2);
+  await expect
+    .poll(
+      async () =>
+        (await page.request.get(`/api/games/${id}`).then((r) => r.json())).game.moves.length,
+    )
+    .toBe(2);
   await page.reload();
   await expect(page.getByRole('button', { name: 'e4', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Resign', exact: true }).click();
@@ -89,8 +111,13 @@ test('plays Stockfish, recovers accepted moves, resigns, replays and downloads P
   expect(historyReads - readsAfterDownload).toBeLessThanOrEqual(2);
   await page.screenshot({ path: 'test-results/game-desktop.png', fullPage: true });
 });
-test('server rejects illegal/stale actions and foreign sessions; finalises checkmate once', async ({ page, playwright, baseURL }) => {
-  await signIn(page); await finishActive(page);
+test('server rejects illegal/stale actions and foreign sessions; finalises checkmate once', async ({
+  page,
+  playwright,
+  baseURL,
+}) => {
+  await signIn(page);
+  await finishActive(page);
   await page.route('**/engine/stockfish*', (route) => route.abort());
   await page.getByRole('button', { name: 'Start game' }).click();
   await expect(page.getByRole('button', { name: 'Resign', exact: true })).toBeEnabled();
@@ -102,8 +129,11 @@ test('server rejects illegal/stale actions and foreign sessions; finalises check
   const moves = ['f2f3', 'e7e5', 'g2g4', 'd8h4'];
   for (let revision = 0; revision < moves.length; revision++) {
     const uci = moves[revision];
-    expect((await post({ type: 'move', from: uci.slice(0, 2), to: uci.slice(2), revision })).ok()).toBe(true);
-    if (!revision) expect((await post({ type: 'move', from: 'e7', to: 'e5', revision: 0 })).status()).toBe(409);
+    expect(
+      (await post({ type: 'move', from: uci.slice(0, 2), to: uci.slice(2), revision })).ok(),
+    ).toBe(true);
+    if (!revision)
+      expect((await post({ type: 'move', from: 'e7', to: 'e5', revision: 0 })).status()).toBe(409);
   }
   await expect(page.getByRole('heading', { name: 'Lucía won · Checkmate' })).toBeVisible();
   const finished = await page.request.get(path).then((r) => r.json());
@@ -112,17 +142,37 @@ test('server rejects illegal/stale actions and foreign sessions; finalises check
   expect(duplicate.game.revision).toBe(4);
   const stranger = await playwright.request.newContext({ baseURL });
   expect((await stranger.get(path)).status()).toBe(401);
-  expect((await stranger.post(path, { data: { type: 'resign', revision: 4 }, headers: { Origin: baseURL! } })).status()).toBe(401);
-  expect((await page.request.post(path, { data: {}, headers: { Origin: 'https://elsewhere.test' } })).status()).toBe(403);
+  expect(
+    (
+      await stranger.post(path, {
+        data: { type: 'resign', revision: 4 },
+        headers: { Origin: baseURL! },
+      })
+    ).status(),
+  ).toBe(401);
+  expect(
+    (
+      await page.request.post(path, { data: {}, headers: { Origin: 'https://elsewhere.test' } })
+    ).status(),
+  ).toBe(403);
   await stranger.dispose();
 });
-test('a delayed initial read cannot restore the pause after the socket connects', async ({ page, baseURL }) => {
-  await signIn(page); await finishActive(page);
-  const response = await page.request.post('/api/games', { data: { control: '10+5', difficulty: 1, colour: 'w' }, headers: { Origin: baseURL! } });
+test('a delayed initial read cannot restore the pause after the socket connects', async ({
+  page,
+  baseURL,
+}) => {
+  await signIn(page);
+  await finishActive(page);
+  const response = await page.request.post('/api/games', {
+    data: { control: '10+5', difficulty: 1, colour: 'w' },
+    headers: { Origin: baseURL! },
+  });
   expect(response.ok()).toBe(true);
   const initial = await response.json();
   expect(initial.game.pauseStarted).not.toBeNull();
-  const socketFrame = page.waitForEvent('websocket').then((socket) => socket.waitForEvent('framereceived'));
+  const socketFrame = page
+    .waitForEvent('websocket')
+    .then((socket) => socket.waitForEvent('framereceived'));
   let delivered = false;
   await page.route(`**/api/games/${initial.game.id}`, async (route) => {
     await socketFrame;
@@ -137,23 +187,28 @@ test('a delayed initial read cannot restore the pause after the socket connects'
   await page.getByRole('button', { name: 'Flip board', exact: true }).click();
   await expect(page.getByText(/Disconnect pause/)).toHaveCount(0);
 });
-test('3D board renders, switches to keyboard board, stays within mobile viewport and translates', async ({ page }) => {
+test('3D board renders, switches to keyboard board, stays within mobile viewport and translates', async ({
+  page,
+}) => {
   // CI uses SwiftShader; six scene captures took 83 seconds in the failing trace.
   test.setTimeout(process.env.CI ? 300_000 : 150_000);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await signIn(page); await finishActive(page);
+  await signIn(page);
+  await finishActive(page);
   await page.getByLabel('Your pieces').selectOption('b');
   await page.getByLabel('Time control').selectOption('10+5');
   await page.getByRole('button', { name: 'Start game' }).click();
-  await expect(page.getByRole('heading', { name: 'Your move', exact: true })).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole('heading', { name: 'Your move', exact: true })).toBeVisible({
+    timeout: 30000,
+  });
   await page.getByRole('button', { name: '3D board', exact: true }).click();
   await expect(page.locator('canvas')).toBeVisible();
   await page.waitForTimeout(1500);
   async function expectLargeScene() {
     const viewport = page.viewportSize()!;
     const scene = (await page.locator('canvas').boundingBox())!;
-    expect(scene.width * scene.height).toBeGreaterThan(viewport.width * viewport.height * .5);
+    expect(scene.width * scene.height).toBeGreaterThan(viewport.width * viewport.height * 0.5);
     expect(scene.y).toBeGreaterThanOrEqual(0);
     expect(scene.y + scene.height).toBeLessThanOrEqual(viewport.height);
     await expect(page.locator('.board-tools')).toBeInViewport();
@@ -165,7 +220,9 @@ test('3D board renders, switches to keyboard board, stays within mobile viewport
   await expect(page.locator('[data-square]')).toHaveCount(0);
   await page.waitForTimeout(500);
   await page.screenshot({ path: 'test-results/cafe-black.png', fullPage: true });
-  const before = await page.request.get(`/api/games/${new URL(page.url()).searchParams.get('game')}`).then((r) => r.json());
+  const before = await page.request
+    .get(`/api/games/${new URL(page.url()).searchParams.get('game')}`)
+    .then((r) => r.json());
   await page.locator('canvas').click({ position: { x: 200, y: 200 } });
   const after = await page.request.get(`/api/games/${before.game.id}`).then((r) => r.json());
   expect(after.game.moves).toEqual(before.game.moves);
@@ -186,7 +243,9 @@ test('3D board renders, switches to keyboard board, stays within mobile viewport
   await expectLargeScene();
   await page.screenshot({ path: 'test-results/game-3d-mobile.png', fullPage: true });
   const mobileScene = (await page.locator('canvas').boundingBox())!;
-  await page.locator('canvas').click({ position: { x: mobileScene.width * .535, y: mobileScene.height * .434 } });
+  await page
+    .locator('canvas')
+    .click({ position: { x: mobileScene.width * 0.535, y: mobileScene.height * 0.434 } });
   await expect(page.locator('[data-square="e7"]')).toHaveAttribute('aria-pressed', 'true');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.getByRole('button', { name: 'Look around', exact: true }).click();
@@ -219,8 +278,11 @@ test('3D board renders, switches to keyboard board, stays within mobile viewport
   await page.getByRole('button', { name: 'Abandonner', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Lucía a gagné · Abandon' })).toBeVisible();
 });
-test('2D board and graphics fallback keep every square clear of player overlays', async ({ page }) => {
-  await signIn(page); await finishActive(page);
+test('2D board and graphics fallback keep every square clear of player overlays', async ({
+  page,
+}) => {
+  await signIn(page);
+  await finishActive(page);
   await page.setViewportSize({ width: 1024, height: 900 });
   await page.route('**/engine/stockfish*', (route) => route.abort());
   await page.getByRole('button', { name: 'Start game' }).click();
@@ -237,26 +299,39 @@ test('2D board and graphics fallback keep every square clear of player overlays'
   await expectClearBoard();
   await page.evaluate(() => {
     const original = HTMLCanvasElement.prototype.getContext;
-    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', { value: function (this: HTMLCanvasElement, kind: string, options?: unknown) {
-      return kind.startsWith('webgl') ? null : original.call(this, kind, options);
-    } });
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      value: function (this: HTMLCanvasElement, kind: string, options?: unknown) {
+        return kind.startsWith('webgl') ? null : original.call(this, kind, options);
+      },
+    });
   });
   await page.getByRole('button', { name: '3D board', exact: true }).click();
   await expect(page.getByText('3D is unavailable on this device. Use the 2D board.')).toBeVisible();
   await expectClearBoard();
   await page.screenshot({ path: 'test-results/game-graphics-fallback.png', fullPage: true });
 });
-test('tabletop clock and captured pieces render from both seats and follow replay', async ({ page, baseURL }) => {
+test('tabletop clock and captured pieces render from both seats and follow replay', async ({
+  page,
+  baseURL,
+}) => {
   test.setTimeout(90_000);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await signIn(page); await finishActive(page);
+  await signIn(page);
+  await finishActive(page);
   await page.route('**/engine/stockfish*', (route) => route.abort());
   await page.getByRole('button', { name: 'Start game' }).click();
   await expect(page.getByRole('button', { name: 'Resign', exact: true })).toBeEnabled();
   const id = new URL(page.url()).searchParams.get('game');
   for (const [revision, uci] of ['e2e4', 'd7d5', 'e4d5', 'd8d5'].entries()) {
-    expect((await page.request.post(`/api/games/${id}`, { headers: { Origin: baseURL! }, data: { type: 'move', from: uci.slice(0, 2), to: uci.slice(2), revision } })).ok()).toBe(true);
+    expect(
+      (
+        await page.request.post(`/api/games/${id}`, {
+          headers: { Origin: baseURL! },
+          data: { type: 'move', from: uci.slice(0, 2), to: uci.slice(2), revision },
+        })
+      ).ok(),
+    ).toBe(true);
   }
   await expect(page.locator('[data-square="d5"]')).toHaveAccessibleName(/Black Queen/);
   await page.getByRole('button', { name: '3D board', exact: true }).click();
@@ -278,14 +353,34 @@ test('tabletop clock and captured pieces render from both seats and follow repla
   await page.screenshot({ path: 'test-results/tabletop-mobile.png', fullPage: true });
   expect(errors).toEqual([]);
 });
-test('promotion uses a keyboard-accessible choice and persists an underpromotion', async ({ page, baseURL }) => {
-  await signIn(page); await finishActive(page);
+test('promotion uses a keyboard-accessible choice and persists an underpromotion', async ({
+  page,
+  baseURL,
+}) => {
+  await signIn(page);
+  await finishActive(page);
   await page.route('**/engine/stockfish*', (route) => route.abort());
   await page.getByRole('button', { name: 'Start game' }).click();
   await expect(page.getByRole('button', { name: 'Resign', exact: true })).toBeEnabled();
   const id = new URL(page.url()).searchParams.get('game');
-  for (const [revision, uci] of ['a2a4','h7h5','a4a5','h5h4','a5a6','h4h3','a6b7','h3g2'].entries()) {
-    expect((await page.request.post(`/api/games/${id}`, { headers: { Origin: baseURL! }, data: { type: 'move', from: uci.slice(0, 2), to: uci.slice(2), revision } })).ok()).toBe(true);
+  for (const [revision, uci] of [
+    'a2a4',
+    'h7h5',
+    'a4a5',
+    'h5h4',
+    'a5a6',
+    'h4h3',
+    'a6b7',
+    'h3g2',
+  ].entries()) {
+    expect(
+      (
+        await page.request.post(`/api/games/${id}`, {
+          headers: { Origin: baseURL! },
+          data: { type: 'move', from: uci.slice(0, 2), to: uci.slice(2), revision },
+        })
+      ).ok(),
+    ).toBe(true);
   }
   await expect(page.getByRole('heading', { name: 'Your move', exact: true })).toBeVisible();
   await page.locator('[data-square="b7"]').click();
@@ -296,20 +391,45 @@ test('promotion uses a keyboard-accessible choice and persists an underpromotion
   await expect(page.getByRole('dialog')).not.toBeVisible();
   await expect(page.locator('[data-square="a8"]')).toHaveAccessibleName(/White Knight/);
   await page.goto('/play');
-  await expect.poll(async () => (await page.request.get(`/api/games/${id}`).then((r) => r.json())).game.pauseStarted).not.toBeNull();
+  await expect
+    .poll(
+      async () =>
+        (await page.request.get(`/api/games/${id}`).then((r) => r.json())).game.pauseStarted,
+    )
+    .not.toBeNull();
   await page.goto(`/play?game=${id}`);
   await expect(page.getByRole('button', { name: 'Resign', exact: true })).toBeEnabled();
-  await expect.poll(async () => (await page.request.get(`/api/games/${id}`).then((r) => r.json())).game.pauseUsed).toBeGreaterThan(0);
+  await expect
+    .poll(
+      async () => (await page.request.get(`/api/games/${id}`).then((r) => r.json())).game.pauseUsed,
+    )
+    .toBeGreaterThan(0);
   await page.getByRole('button', { name: 'Resign', exact: true }).click();
   await page.getByRole('button', { name: 'Resign', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Lucía won · Resignation' })).toBeVisible();
 });
-test('magic links are single use and sign-out revokes the game session', async ({ request, baseURL }) => {
-  expect((await request.post('/api/auth/sign-in/magic-link', { data: { email: 'uninvited@example.com' }, headers: { Origin: baseURL! } })).status()).toBe(400);
-  const uninvited = await request.post('/api/auth/sign-in/magic-link', { data: { email: 'uninvited@example.com', adult: true }, headers: { Origin: baseURL! } });
+test('magic links are single use and sign-out revokes the game session', async ({
+  request,
+  baseURL,
+}) => {
+  expect(
+    (
+      await request.post('/api/auth/sign-in/magic-link', {
+        data: { email: 'uninvited@example.com' },
+        headers: { Origin: baseURL! },
+      })
+    ).status(),
+  ).toBe(400);
+  const uninvited = await request.post('/api/auth/sign-in/magic-link', {
+    data: { email: 'uninvited@example.com', adult: true },
+    headers: { Origin: baseURL! },
+  });
   expect(uninvited.ok()).toBe(true);
   expect((await request.get('/api/me').then((r) => r.json())).user).toBeNull();
-  const response = await request.post('/api/dev/sign-in', { data: {}, headers: { Origin: baseURL! } });
+  const response = await request.post('/api/dev/sign-in', {
+    data: {},
+    headers: { Origin: baseURL! },
+  });
   expect(response.ok()).toBe(true);
   const { url } = await response.json();
   const verify = await request.get(url, { maxRedirects: 0 });
@@ -317,6 +437,8 @@ test('magic links are single use and sign-out revokes the game session', async (
   expect((await request.get('/api/me').then((r) => r.json())).user.name).toBe('Leo');
   const duplicate = await request.get(url, { maxRedirects: 0 });
   expect(duplicate.headers().location).toContain('error=INVALID_TOKEN');
-  expect((await request.post('/api/auth/sign-out', { data: {}, headers: { Origin: baseURL! } })).ok()).toBe(true);
+  expect(
+    (await request.post('/api/auth/sign-out', { data: {}, headers: { Origin: baseURL! } })).ok(),
+  ).toBe(true);
   expect((await request.get('/api/me').then((r) => r.json())).user).toBeNull();
 });

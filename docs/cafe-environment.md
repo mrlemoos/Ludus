@@ -30,18 +30,18 @@ The location, conversion story, furniture, colours and lighting are design choic
 
 Use metres for the design. The existing scene uses one unit per chess square. For implementation, use 20 scene units per metre and keep the current board geometry. A square then measures 50 mm and the framed board approximately 433 mm.
 
-| Element | Design dimension or placement |
-| --- | --- |
-| Main room | 6 m wide, 10 m deep, 4.2 m high |
-| Window wall | Left of the default white-side seat; two tall street windows, 0.45 m deep reveals |
-| Panelling | Walnut, 1.05 m high, with a continuous chair rail |
-| Main doorway | Rear wall, 1.5 m opening, 2.8 m to arch apex, carved surround above |
-| Player's table | 1.15 × 0.90 m, top 0.75 m above floor; board centred |
-| Playing station | Near the window, with at least 0.65 m between table edge and wall |
-| Opponent's chair | Across the board, turned about 8 degrees towards the window |
-| Mirror | Right wall, about 1.4 × 2.2 m; lower edge just above panelling |
-| Bar | Rear right, 2.4 m long; visible past the opponent's right shoulder |
-| Other seating | Two small tables; oxblood banquette along the right wall |
+| Element          | Design dimension or placement                                                     |
+| ---------------- | --------------------------------------------------------------------------------- |
+| Main room        | 6 m wide, 10 m deep, 4.2 m high                                                   |
+| Window wall      | Left of the default white-side seat; two tall street windows, 0.45 m deep reveals |
+| Panelling        | Walnut, 1.05 m high, with a continuous chair rail                                 |
+| Main doorway     | Rear wall, 1.5 m opening, 2.8 m to arch apex, carved surround above               |
+| Player's table   | 1.15 × 0.90 m, top 0.75 m above floor; board centred                              |
+| Playing station  | Near the window, with at least 0.65 m between table edge and wall                 |
+| Opponent's chair | Across the board, turned about 8 degrees towards the window                       |
+| Mirror           | Right wall, about 1.4 × 2.2 m; lower edge just above panelling                    |
+| Bar              | Rear right, 2.4 m long; visible past the opponent's right shoulder                |
+| Other seating    | Two small tables; oxblood banquette along the right wall                          |
 
 Room geography from the default white-side seat:
 
@@ -76,16 +76,16 @@ The mirror is the second ornamental focus. Its frame has softened gilt on raised
 
 ## Materials
 
-| Surface | Treatment | Colour reference |
-| --- | --- | --- |
-| Walls | Warm lime plaster, broad uneven colour variation, fine surface texture | `#d8c9ad` |
-| Carved plaster | Slightly lighter than walls, dirt only in recesses | `#e5d8bd` |
-| Panelling and furniture | Dark walnut, grain follows each board, polished contact edges | `#493024` |
-| Tabletop | Honed ivory limestone, fine veins, rounded worn edge | `#c8bba3` |
-| Floor | Pale limestone with occasional charcoal inserts, diagonal layout | `#b9ad95`, `#4c4942` |
-| Banquette | Oxblood leather, shallow creases around cushions | `#592d30` |
-| Metal | Aged brass, darkened near fixings | `#987447` |
-| Street plaster | Muted ochre and dusty terracotta | `#b08257`, `#925b47` |
+| Surface                 | Treatment                                                              | Colour reference     |
+| ----------------------- | ---------------------------------------------------------------------- | -------------------- |
+| Walls                   | Warm lime plaster, broad uneven colour variation, fine surface texture | `#d8c9ad`            |
+| Carved plaster          | Slightly lighter than walls, dirt only in recesses                     | `#e5d8bd`            |
+| Panelling and furniture | Dark walnut, grain follows each board, polished contact edges          | `#493024`            |
+| Tabletop                | Honed ivory limestone, fine veins, rounded worn edge                   | `#c8bba3`            |
+| Floor                   | Pale limestone with occasional charcoal inserts, diagonal layout       | `#b9ad95`, `#4c4942` |
+| Banquette               | Oxblood leather, shallow creases around cushions                       | `#592d30`            |
+| Metal                   | Aged brass, darkened near fixings                                      | `#987447`            |
+| Street plaster          | Muted ochre and dusty terracotta                                       | `#b08257`, `#925b47` |
 
 Colour values are starting points under neutral light, not final rendered pixels. Wood grain, stone veins and plaster noise need physical scale. Avoid uniform brown materials across the whole scene. Carving reads through profile and shadow before surface noise.
 
@@ -145,7 +145,7 @@ Accept the environment only when these checks pass:
 
 ## Implementation and remaining acceptance
 
-The room now lives in `src/CafeEnvironment.tsx`, with camera framing and board interaction in `src/Board3D.tsx`. Geometry and generated textures are original project code; no reference photographs or concept pixels are used as game assets. Repeated boxes share geometry and materials. The room stays fixed when the seat changes.
+The room now lives in `src/cafe-environment.tsx`, with camera framing and board interaction in `src/board-3d.tsx`. Geometry and generated textures are original project code; no reference photographs or concept pixels are used as game assets. Repeated boxes share geometry and materials. The room stays fixed when the seat changes.
 
 The 30 October model pass adds curved walnut chairs with turned legs, upholstered backs and brass studs; turned playing-table legs and spare-table pedestals; recessed entrance-door panels and handles; carved doorway scrolls and leaves; a layered gilt mirror frame; and an espresso machine with group heads, drip tray, pressure gauge and steam wand. `src/cafe-models.ts` builds these original meshes once per mounted room and merges each model by material. Repeated furniture shares the resulting geometry. The room disposes of its buffers and materials on unmount. Geometry tests check finite mesh data and dimensions; browser checks cover both seats and the mobile layout. These checks do not establish real-device frame rates or a photorealistic finish.
 

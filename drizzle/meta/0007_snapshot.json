@@ -105,12 +105,8 @@
           "name": "account_user_id_user_id_fk",
           "tableFrom": "account",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -202,12 +198,8 @@
           "name": "matches_owner_user_id_fk",
           "tableFrom": "matches",
           "tableTo": "user",
-          "columnsFrom": [
-            "owner"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -279,9 +271,7 @@
       "indexes": {
         "session_token_unique": {
           "name": "session_token_unique",
-          "columns": [
-            "token"
-          ],
+          "columns": ["token"],
           "isUnique": true
         }
       },
@@ -290,12 +280,8 @@
           "name": "session_user_id_user_id_fk",
           "tableFrom": "session",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -361,9 +347,7 @@
       "indexes": {
         "user_email_unique": {
           "name": "user_email_unique",
-          "columns": [
-            "email"
-          ],
+          "columns": ["email"],
           "isUnique": true
         }
       },
@@ -535,10 +519,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "activity_events_user_id_game_id_pk": {
-          "columns": [
-            "user_id",
-            "game_id"
-          ],
+          "columns": ["user_id", "game_id"],
           "name": "activity_events_user_id_game_id_pk"
         }
       },
@@ -771,9 +752,7 @@
       "indexes": {
         "player_profiles_username_unique": {
           "name": "player_profiles_username_unique",
-          "columns": [
-            "username"
-          ],
+          "columns": ["username"],
           "isUnique": true
         }
       },
@@ -782,12 +761,8 @@
           "name": "player_profiles_user_id_user_id_fk",
           "tableFrom": "player_profiles",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -825,10 +800,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "timezone_history_user_id_effective_at_pk": {
-          "columns": [
-            "user_id",
-            "effective_at"
-          ],
+          "columns": ["user_id", "effective_at"],
           "name": "timezone_history_user_id_effective_at_pk"
         }
       },
@@ -1047,10 +1019,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "ratings_user_id_control_pk": {
-          "columns": [
-            "user_id",
-            "control"
-          ],
+          "columns": ["user_id", "control"],
           "name": "ratings_user_id_control_pk"
         }
       },
@@ -1310,12 +1279,8 @@
           "name": "player_cosmetics_owner_user_id_fk",
           "tableFrom": "player_cosmetics",
           "tableTo": "user",
-          "columnsFrom": [
-            "owner"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }

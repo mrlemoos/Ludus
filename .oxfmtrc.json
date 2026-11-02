@@ -1,0 +1,46 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "singleQuote": true,
+  "semi": true,
+  "sortPackageJson": false,
+  "ignorePatterns": [
+    "dist",
+    "node_modules",
+    "coverage",
+    "playwright-report",
+    "test-results",
+    "worker-configuration.d.ts",
+    "pnpm-lock.yaml",
+    ".scratch",
+    ".galicia",
+    ".agents",
+    ".claude",
+    ".codex",
+    ".cursor"
+  ],
+  "sortImports": {
+    "ignoreCase": false,
+    "newlinesBetween": false,
+    "sortSideEffects": false,
+    "groups": [
+      "side_effect_style",
+      "side_effect",
+      [
+        "builtin",
+        "external",
+        "import",
+        "index",
+        "internal",
+        "parent",
+        "sibling",
+        "style",
+        "subpath",
+        "type",
+        "unknown"
+      ]
+    ]
+  },
+  "sortTailwindcss": {
+    "stylesheet": "./src/styles.css"
+  }
+}

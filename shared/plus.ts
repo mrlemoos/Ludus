@@ -7,6 +7,11 @@ export type PlusAccess = {
 };
 
 export function hasPlusAccess(access: PlusAccess, now: number): boolean {
-  const active = (until: number | null | undefined) => typeof until === 'number' && Number.isFinite(until) && until > now;
-  return access.complimentaryPlus === true || active(access.trialExpiresAt) || (!access.paidAccessSuspended && active(access.paidAccessUntil));
+  const active = (until: number | null | undefined) =>
+    typeof until === 'number' && Number.isFinite(until) && until > now;
+  return (
+    access.complimentaryPlus === true ||
+    active(access.trialExpiresAt) ||
+    (!access.paidAccessSuspended && active(access.paidAccessUntil))
+  );
 }

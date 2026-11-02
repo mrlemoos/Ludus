@@ -2,7 +2,11 @@ import { expect, test } from '@playwright/test';
 
 const canonical = 'https://ludus.mrlemoos.dev/@leo';
 
-test('serves public profile content and SEO metadata without JavaScript', async ({ browser, request, baseURL }) => {
+test('serves public profile content and SEO metadata without JavaScript', async ({
+  browser,
+  request,
+  baseURL,
+}) => {
   const response = await request.get('/@leo');
   expect(response.status()).toBe(200);
   expect(response.headers()['cache-control']).toBe('no-store');
@@ -22,14 +26,25 @@ test('serves public profile content and SEO metadata without JavaScript', async 
     await page.goto('/@leo');
     await expect(page.getByRole('heading', { name: '@Leo', exact: true })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Activity', exact: true })).toBeVisible();
-    await expect(page.locator('.profile-activity')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    await expect(page.locator('.profile-activity')).toHaveCSS(
+      'background-color',
+      'rgb(255, 255, 255)',
+    );
     const structured = await page.locator('#profile-structured-data').textContent();
-    expect(JSON.parse(structured!)).toMatchObject({ '@type': 'ProfilePage', mainEntity: { '@type': 'Person', name: '@Leo' }, url: canonical });
+    expect(JSON.parse(structured!)).toMatchObject({
+      '@type': 'ProfilePage',
+      mainEntity: { '@type': 'Person', name: '@Leo' },
+      url: canonical,
+    });
     await page.screenshot({ path: '.scratch/profile-seo-no-js.png', fullPage: true });
-  } finally { await context.close(); }
+  } finally {
+    await context.close();
+  }
 });
 
-test('keeps metadata after client rendering and restores the home title when leaving', async ({ page }) => {
+test('keeps metadata after client rendering and restores the home title when leaving', async ({
+  page,
+}) => {
   await page.addInitScript(() => localStorage.setItem('ludus-language', 'en-GB'));
   await page.goto('/@leo');
   await expect(page.getByRole('button', { name: 'Share profile' })).toBeVisible();
@@ -43,7 +58,9 @@ test('keeps metadata after client rendering and restores the home title when lea
   await expect(page.locator('meta[property="og:title"]')).toHaveCount(0);
 });
 
-test('redirects legacy and mixed-case URLs and returns a real 404 for missing profiles', async ({ request }) => {
+test('redirects legacy and mixed-case URLs and returns a real 404 for missing profiles', async ({
+  request,
+}) => {
   for (const path of ['/players/Leo', '/@Leo', '/@leo/']) {
     const response = await request.get(path, { maxRedirects: 0 });
     expect(response.status()).toBe(301);
@@ -72,10 +89,11 @@ test('publishes crawl rules and canonical profile sitemap entries', async ({ req
   expect((await request.get('/sitemaps/profiles-999999.xml')).status()).toBe(404);
 });
 
-
 test('retains server-rendered content when the background API refresh fails', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('ludus-language', 'en-GB'));
-  await page.route('**/api/profiles/leo', (route) => route.fulfill({ status: 503, json: { error: 'unavailable' } }));
+  await page.route('**/api/profiles/leo', (route) =>
+    route.fulfill({ status: 503, json: { error: 'unavailable' } }),
+  );
   const refresh = page.waitForResponse('**/api/profiles/leo');
   await page.goto('/@leo');
   await refresh;

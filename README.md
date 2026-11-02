@@ -50,12 +50,12 @@ The local setup runs the real Worker API, D1 database and match Durable Objects.
 
 ## Guides
 
-| Guide | What you'll find |
-| --- | --- |
-| [Development](docs/development.md) | Local accounts, checks, database migrations, keyboard controls and current chess policies. |
-| [Deployment and operations](docs/deployment.md) | Cloudflare setup, authentication secrets, invitations, waitlist data and usage limits. |
-| [Product plan](docs/specs/ludus.md) | The agreed scope for online play, coaching and the invite-only beta. |
-| [The café](docs/cafe-environment.md) | Madrid references, materials, lighting and the room around the board. |
+| Guide                                           | What you'll find                                                                           |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| [Development](docs/development.md)              | Local accounts, checks, database migrations, keyboard controls and current chess policies. |
+| [Deployment and operations](docs/deployment.md) | Cloudflare setup, authentication secrets, invitations, waitlist data and usage limits.     |
+| [Product plan](docs/specs/ludus.md)             | The agreed scope for online play, coaching and the invite-only beta.                       |
+| [The café](docs/cafe-environment.md)            | Madrid references, materials, lighting and the room around the board.                      |
 
 ## Built for the browser
 

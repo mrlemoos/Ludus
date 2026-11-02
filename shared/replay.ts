@@ -1,5 +1,5 @@
-import { Chess } from 'chess.js';
 import type { Game } from './game';
+import { Chess } from 'chess.js';
 
 export type Replay = { moves: string[]; ply: number; branchAt: number | null };
 type SavedGame = Pick<Game, 'moves' | 'result'>;
@@ -18,10 +18,18 @@ export function replayPosition(game: SavedGame, replay: Replay): Chess {
   for (const move of replay.moves.slice(0, replay.ply)) chess.move(move);
   return chess;
 }
-export function replayMove(game: SavedGame, replay: Replay, move: { from: string; to: string; promotion?: string }): Replay {
+export function replayMove(
+  game: SavedGame,
+  replay: Replay,
+  move: { from: string; to: string; promotion?: string },
+): Replay {
   const chess = replayPosition(game, replay);
   const played = chess.move(move);
-  return { moves: [...replay.moves.slice(0, replay.ply), played.san], ply: replay.ply + 1, branchAt: Math.min(replay.branchAt ?? replay.ply, replay.ply) };
+  return {
+    moves: [...replay.moves.slice(0, replay.ply), played.san],
+    ply: replay.ply + 1,
+    branchAt: Math.min(replay.branchAt ?? replay.ply, replay.ply),
+  };
 }
 export function stepReplay(replay: Replay, delta: number): Replay {
   return { ...replay, ply: Math.max(0, Math.min(replay.moves.length, replay.ply + delta)) };

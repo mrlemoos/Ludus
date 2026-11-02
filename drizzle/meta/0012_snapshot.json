@@ -105,12 +105,8 @@
           "name": "account_user_id_user_id_fk",
           "tableFrom": "account",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -230,10 +226,7 @@
       "indexes": {
         "matches_owner_finished": {
           "name": "matches_owner_finished",
-          "columns": [
-            "owner",
-            "finished_at"
-          ],
+          "columns": ["owner", "finished_at"],
           "isUnique": false
         }
       },
@@ -242,12 +235,8 @@
           "name": "matches_owner_user_id_fk",
           "tableFrom": "matches",
           "tableTo": "user",
-          "columnsFrom": [
-            "owner"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -319,9 +308,7 @@
       "indexes": {
         "session_token_unique": {
           "name": "session_token_unique",
-          "columns": [
-            "token"
-          ],
+          "columns": ["token"],
           "isUnique": true
         }
       },
@@ -330,12 +317,8 @@
           "name": "session_user_id_user_id_fk",
           "tableFrom": "session",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -401,9 +384,7 @@
       "indexes": {
         "user_email_unique": {
           "name": "user_email_unique",
-          "columns": [
-            "email"
-          ],
+          "columns": ["email"],
           "isUnique": true
         }
       },
@@ -575,10 +556,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "activity_events_user_id_game_id_pk": {
-          "columns": [
-            "user_id",
-            "game_id"
-          ],
+          "columns": ["user_id", "game_id"],
           "name": "activity_events_user_id_game_id_pk"
         }
       },
@@ -842,9 +820,7 @@
       "indexes": {
         "player_profiles_username_unique": {
           "name": "player_profiles_username_unique",
-          "columns": [
-            "username"
-          ],
+          "columns": ["username"],
           "isUnique": true
         }
       },
@@ -853,12 +829,8 @@
           "name": "player_profiles_user_id_user_id_fk",
           "tableFrom": "player_profiles",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -896,10 +868,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "timezone_history_user_id_effective_at_pk": {
-          "columns": [
-            "user_id",
-            "effective_at"
-          ],
+          "columns": ["user_id", "effective_at"],
           "name": "timezone_history_user_id_effective_at_pk"
         }
       },
@@ -1036,18 +1005,12 @@
       "indexes": {
         "online_matches_white_finished": {
           "name": "online_matches_white_finished",
-          "columns": [
-            "white_id",
-            "finished_at"
-          ],
+          "columns": ["white_id", "finished_at"],
           "isUnique": false
         },
         "online_matches_black_finished": {
           "name": "online_matches_black_finished",
-          "columns": [
-            "black_id",
-            "finished_at"
-          ],
+          "columns": ["black_id", "finished_at"],
           "isUnique": false
         }
       },
@@ -1135,10 +1098,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "ratings_user_id_control_pk": {
-          "columns": [
-            "user_id",
-            "control"
-          ],
+          "columns": ["user_id", "control"],
           "name": "ratings_user_id_control_pk"
         }
       },
@@ -1414,12 +1374,8 @@
           "name": "player_cosmetics_owner_user_id_fk",
           "tableFrom": "player_cosmetics",
           "tableTo": "user",
-          "columnsFrom": [
-            "owner"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1507,9 +1463,7 @@
       "indexes": {
         "billing_accounts_customer_unique": {
           "name": "billing_accounts_customer_unique",
-          "columns": [
-            "customer"
-          ],
+          "columns": ["customer"],
           "isUnique": true
         }
       },
@@ -1518,12 +1472,8 @@
           "name": "billing_accounts_owner_user_id_fk",
           "tableFrom": "billing_accounts",
           "tableTo": "user",
-          "columnsFrom": [
-            "owner"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1817,16 +1767,12 @@
       "indexes": {
         "review_credit_pack_risks_charge_unique": {
           "name": "review_credit_pack_risks_charge_unique",
-          "columns": [
-            "charge"
-          ],
+          "columns": ["charge"],
           "isUnique": true
         },
         "review_credit_pack_risks_payment_intent_unique": {
           "name": "review_credit_pack_risks_payment_intent_unique",
-          "columns": [
-            "payment_intent"
-          ],
+          "columns": ["payment_intent"],
           "isUnique": true
         }
       },
@@ -1916,32 +1862,22 @@
       "indexes": {
         "review_credit_packs_checkout_unique": {
           "name": "review_credit_packs_checkout_unique",
-          "columns": [
-            "checkout"
-          ],
+          "columns": ["checkout"],
           "isUnique": true
         },
         "review_credit_packs_payment_intent_unique": {
           "name": "review_credit_packs_payment_intent_unique",
-          "columns": [
-            "payment_intent"
-          ],
+          "columns": ["payment_intent"],
           "isUnique": true
         },
         "review_credit_packs_charge_unique": {
           "name": "review_credit_packs_charge_unique",
-          "columns": [
-            "charge"
-          ],
+          "columns": ["charge"],
           "isUnique": true
         },
         "review_credit_pack_owner": {
           "name": "review_credit_pack_owner",
-          "columns": [
-            "owner",
-            "created_at",
-            "id"
-          ],
+          "columns": ["owner", "created_at", "id"],
           "isUnique": false
         }
       },
@@ -1950,12 +1886,8 @@
           "name": "review_credit_packs_owner_user_id_fk",
           "tableFrom": "review_credit_packs",
           "tableTo": "user",
-          "columnsFrom": [
-            "owner"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2040,29 +1972,18 @@
       "indexes": {
         "review_credit_reservation_idempotency": {
           "name": "review_credit_reservation_idempotency",
-          "columns": [
-            "owner",
-            "match_id"
-          ],
+          "columns": ["owner", "match_id"],
           "isUnique": true,
           "where": "\"review_credit_reservations\".\"state\" in ('reserved','committed')"
         },
         "review_credit_reservation_month": {
           "name": "review_credit_reservation_month",
-          "columns": [
-            "owner",
-            "month",
-            "source",
-            "state"
-          ],
+          "columns": ["owner", "month", "source", "state"],
           "isUnique": false
         },
         "review_credit_reservation_pack": {
           "name": "review_credit_reservation_pack",
-          "columns": [
-            "pack_id",
-            "state"
-          ],
+          "columns": ["pack_id", "state"],
           "isUnique": false
         }
       },
@@ -2071,12 +1992,8 @@
           "name": "review_credit_reservations_owner_user_id_fk",
           "tableFrom": "review_credit_reservations",
           "tableTo": "user",
-          "columnsFrom": [
-            "owner"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2084,12 +2001,8 @@
           "name": "review_credit_reservations_pack_id_review_credit_packs_id_fk",
           "tableFrom": "review_credit_reservations",
           "tableTo": "review_credit_packs",
-          "columnsFrom": [
-            "pack_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["pack_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2161,24 +2074,17 @@
       "indexes": {
         "review_pack_checkouts_generation_unique": {
           "name": "review_pack_checkouts_generation_unique",
-          "columns": [
-            "generation"
-          ],
+          "columns": ["generation"],
           "isUnique": true
         },
         "review_pack_checkouts_checkout_unique": {
           "name": "review_pack_checkouts_checkout_unique",
-          "columns": [
-            "checkout"
-          ],
+          "columns": ["checkout"],
           "isUnique": true
         },
         "review_pack_checkout_owner": {
           "name": "review_pack_checkout_owner",
-          "columns": [
-            "owner",
-            "created_at"
-          ],
+          "columns": ["owner", "created_at"],
           "isUnique": false
         }
       },
@@ -2187,12 +2093,8 @@
           "name": "review_pack_checkouts_owner_user_id_fk",
           "tableFrom": "review_pack_checkouts",
           "tableTo": "user",
-          "columnsFrom": [
-            "owner"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }

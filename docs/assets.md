@@ -4,12 +4,12 @@ The café, pieces, board, generated wood grain and material variants are project
 
 Appearance preferences are checked against the shared material catalogue on the Worker. Every supported board and piece finish remains available without a subscription or payment. Selection is saved separately from match state. No cosmetic affects ratings or activity.
 
-| Asset | Source | Licence/rights |
-| --- | --- | --- |
-| Café and traditional chess set | `src/CafeEnvironment.tsx`, `src/cafe-models.ts`, `src/piece-geometry.ts` | Original project work, no third-party attribution |
-| Board/piece finishes | `shared/cosmetics.ts`, `src/Board3D.tsx` | Original project work |
-| Cormorant Garamond | Installed Fontsource distribution | SIL Open Font License, `/licences/cormorant-garamond.txt` |
-| Manrope | Installed Fontsource distribution | SIL Open Font License, `/licences/manrope.txt` |
-| Stockfish.js lite single-threaded | Installed pinned Stockfish distribution | GPLv3, generated `/engine/Copying.txt` and `/engine/SOURCE.txt` |
+| Asset                             | Source                                                                    | Licence/rights                                                  |
+| --------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Café and traditional chess set    | `src/cafe-environment.tsx`, `src/cafe-models.ts`, `src/piece-geometry.ts` | Original project work, no third-party attribution               |
+| Board/piece finishes              | `shared/cosmetics.ts`, `src/board-3d.tsx`                                 | Original project work                                           |
+| Cormorant Garamond                | Installed Fontsource distribution                                         | SIL Open Font License, `/licences/cormorant-garamond.txt`       |
+| Manrope                           | Installed Fontsource distribution                                         | SIL Open Font License, `/licences/manrope.txt`                  |
+| Stockfish.js lite single-threaded | Installed pinned Stockfish distribution                                   | GPLv3, generated `/engine/Copying.txt` and `/engine/SOURCE.txt` |
 
 Final art acceptance and named-device measurement remain release requirements. Materials are rendered procedurally, not photographic scans.

@@ -30,4 +30,3 @@ pnpm check
 ```
 
 Checks cover types, deterministic chess/clocks, authentication, production build and browser/API journeys against local D1 and match Durable Objects. Browser tests seed the development account locally and create computer games and synthetic waitlist emails. Screenshots are written to the ignored test-results directory. Apply new schema changes through `pnpm db:generate`, review the generated SQL, then `pnpm db:migrate`. Regenerate binding types with `pnpm cf:types` after changing Worker configuration.
-

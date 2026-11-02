@@ -10,19 +10,37 @@ export const computerSettings = {
 } as const satisfies Record<Difficulty, { skill: number; depth: number; moveTimeMs: number }>;
 
 export type ChessLevel = 'beginner' | 'casual' | 'intermediate' | 'advanced';
-export type ComputerHistory = { difficulty: Difficulty; colour: Color; result: Result | null; completedAt: number };
-export type DifficultySuggestion = { difficulty: Difficulty; reason: 'onboarding' | 'recentWins' | 'recentLosses' };
+export type ComputerHistory = {
+  difficulty: Difficulty;
+  colour: Color;
+  result: Result | null;
+  completedAt: number;
+};
+export type DifficultySuggestion = {
+  difficulty: Difficulty;
+  reason: 'onboarding' | 'recentWins' | 'recentLosses';
+};
 
 // Suggestions never update a selection. Callers require an explicit player choice.
 // Thresholds are provisional until representative-device strength calibration.
-export function suggestDifficulty(level: ChessLevel, selected: Difficulty, history: readonly ComputerHistory[]): DifficultySuggestion | null {
-  const recent = history.filter((game) => game.result && game.difficulty === selected)
-    .sort((a, b) => b.completedAt - a.completedAt).slice(0, 5);
+export function suggestDifficulty(
+  level: ChessLevel,
+  selected: Difficulty,
+  history: readonly ComputerHistory[],
+): DifficultySuggestion | null {
+  const recent = history
+    .filter((game) => game.result && game.difficulty === selected)
+    .sort((a, b) => b.completedAt - a.completedAt)
+    .slice(0, 5);
   if (recent.length === 5) {
     const wins = recent.filter((game) => game.result!.winner === game.colour).length;
-    const losses = recent.filter((game) => game.result!.winner !== null && game.result!.winner !== game.colour).length;
-    if (wins >= 4 && selected < 4) return { difficulty: (selected + 1) as Difficulty, reason: 'recentWins' };
-    if (losses >= 4 && selected > 1) return { difficulty: (selected - 1) as Difficulty, reason: 'recentLosses' };
+    const losses = recent.filter(
+      (game) => game.result!.winner !== null && game.result!.winner !== game.colour,
+    ).length;
+    if (wins >= 4 && selected < 4)
+      return { difficulty: (selected + 1) as Difficulty, reason: 'recentWins' };
+    if (losses >= 4 && selected > 1)
+      return { difficulty: (selected - 1) as Difficulty, reason: 'recentLosses' };
     return null;
   }
   if (history.some((game) => game.result)) return null;

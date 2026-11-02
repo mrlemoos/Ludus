@@ -5,6 +5,8 @@ A browser chess platform with a 3D board and chess pieces.
 ## Working rules
 
 - Write TypeScript. Use British spelling.
+- Put each unit test beside the module it covers. Browser journeys stay in `tests/e2e`.
+- Follow `.oxlintrc.json` and `.oxfmtrc.json` strictly. Name files in kebab-case for the domain concept, and put shared UI in `src/components/`. Components are PascalCase `function` declarations, take `ref` as a prop, and keep at most five props on a separate `interface NameProps` or an imported type (`...rest` excluded). Named bindings are `function` declarations; arrows are only inline. Import declarations are alphabetical by module specifier, with side-effect imports first.
 - Keep changes small and complete. Reuse platform capabilities and installed dependencies.
 - Preserve chess rules, accessibility and clear board interaction when adding 3D visuals.
 - Product plan and technical architecture are confirmed. Implement dependency-ready tickets; resolve their explicit policy gates before dependent work.
@@ -130,6 +132,15 @@ Use the five default triage labels. See `docs/agents/triage-labels.md`.
 ### Domain docs
 
 Single-context layout with root `GLOSSARY.md` and `docs/adr/`. See `docs/agents/domain.md`.
+
+<!-- galicia:start -->
+
+## Galicia
+
+Read context.md first; load relevant domain context only. Domain terms: docs/Language.md. Decisions: docs/adr/. Specs/tickets: docs/specs/. Local Markdown only. No emojis. Preserve checks, exact contracts and uncertainty. Before consequential ADR work, recommend scoped small-model research/review; spawn only when authorised.
+
+Startup review fallback: run `node .galicia/check.ts` once per session if no startup hook ran. Metadata flags are review candidates; never delete without explicit user approval. Follow relevant specs to compare implementation when needed; age alone proves nothing. Grilling cadence: read .galicia/config.json, ask user if unset.
+<!-- galicia:end -->
 
 ## Confirmed billing delivery update, 2026-10-31
 

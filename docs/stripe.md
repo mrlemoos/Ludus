@@ -6,11 +6,11 @@ The current offer is a one-time pack of 10 AI coach reviews for EUR 4.99. The pa
 
 The connected Stripe account readback supplied on 2026-11-01 shows:
 
-| Resource | ID | Readback |
-| --- | --- | --- |
-| Product | `ludus_coach_reviews_10` | Active one-time review pack |
-| Price | `price_1UWweXBVWchHmktzXDsCNIaA` | EUR 4.99 (499 cents), one-time, inclusive tax behaviour |
-| Former subscription product | `ludus_plus` | Archived; recurring offer retired |
+| Resource                    | ID                               | Readback                                                |
+| --------------------------- | -------------------------------- | ------------------------------------------------------- |
+| Product                     | `ludus_coach_reviews_10`         | Active one-time review pack                             |
+| Price                       | `price_1UWweXBVWchHmktzXDsCNIaA` | EUR 4.99 (499 cents), one-time, inclusive tax behaviour |
+| Former subscription product | `ludus_plus`                     | Archived; recurring offer retired                       |
 
 No Checkout session or charge was created. On 2026-11-01, the repository owner read the live Stripe account's subscriptions using the old monthly Price, `status=all`, `limit=100`; Stripe returned no subscriptions and `has_more=false`. No active Ludus monthly subscriptions exist in that account. Archiving the old product did not cancel or alter any customer subscription. Do not cancel subscriptions as part of this product change.
 
