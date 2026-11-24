@@ -425,10 +425,19 @@ export function Play() {
     setPending(true);
     setError(false);
     try {
-      const data = await api<{ user: { id: string; name: string }; guest: boolean }>(
-        '/api/guest/session',
-        { adult: true, language: isLanguage(i18n.language) ? i18n.language : 'en-GB' },
+      const [data, error] = await grab<{ user: { id: string; name: string }; guest: boolean }>(
+        'POST /api/guest/session',
+        {
+          body: {
+            adult: true,
+            language: isLanguage(i18n.language) ? i18n.language : 'en-GB',
+          },
+        },
       );
+      if (error || !data) {
+        setError(true);
+        return;
+      }
       setIdentity({ user: data.user, guest: true, local: false });
       setProfileLoaded(true);
       const next = new URLSearchParams(params);

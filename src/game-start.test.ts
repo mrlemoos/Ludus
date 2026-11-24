@@ -15,6 +15,47 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe('guest session grab', () => {
+  it('returns the guest identity', async () => {
+    // Arrange
+    const identity = { user: { id: 'guest_1', name: 'Guest' }, guest: true };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse(201, identity)),
+    );
+
+    // Act
+    const [data, error] = await grab<{ user: { id: string; name: string }; guest: boolean }>(
+      'POST /api/guest/session',
+      { body: { adult: true, language: 'en-GB' } },
+    );
+
+    // Assert
+    expect(error).toBeNull();
+    expect(data).toEqual(identity);
+  });
+
+  it('returns an error when adult confirmation is missing', async () => {
+    // Arrange
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse(400, { error: 'adult_confirmation_required' })),
+    );
+
+    // Act
+    const [data, error] = await grab('POST /api/guest/session', {
+      body: { adult: false, language: 'en-GB' },
+    });
+
+    // Assert
+    expect(data).toBeNull();
+    expect(error).toMatchObject({
+      statusCode: 400,
+      body: { error: 'adult_confirmation_required' },
+    });
+  });
+});
+
 describe('isGuestLimitError', () => {
   it('recognises a grabkit 403 guest limit', async () => {
     // Arrange
