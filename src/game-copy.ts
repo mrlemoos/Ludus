@@ -90,7 +90,6 @@ const en = {
   board: 'Chessboard',
   keyboard: 'Arrow keys move between squares. Enter selects a piece or destination.',
   unavailable3d: '3D is unavailable on this device. Use the 2D board.',
-  waitlist: 'Join the waitlist',
 };
 type Copy = { [K in keyof typeof en]: (typeof en)[K] extends string[] ? string[] : string };
 const es: Copy = {
@@ -185,7 +184,6 @@ const es: Copy = {
   board: 'Tablero de ajedrez',
   keyboard: 'Las flechas cambian de casilla. Intro selecciona una pieza o un destino.',
   unavailable3d: 'El 3D no está disponible en este dispositivo. Usa el tablero 2D.',
-  waitlist: 'Apuntarme a la lista',
 };
 const fr: Copy = {
   title: 'Votre table est prête.',
@@ -279,7 +277,6 @@ const fr: Copy = {
   board: 'Échiquier',
   keyboard: 'Les flèches changent de case. Entrée sélectionne une pièce ou une destination.',
   unavailable3d: 'La 3D est indisponible sur cet appareil. Utilisez l’échiquier 2D.',
-  waitlist: 'Rejoindre la liste d’attente',
 };
 export const gameCopy: Record<Language, Copy> = { 'en-GB': en, 'es-ES': es, 'fr-FR': fr };
 export type GameCopy = Copy;

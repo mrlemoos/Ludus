@@ -19,6 +19,7 @@ import { EngineCredit } from './engine-credit';
 import { gameCopy } from './game-copy';
 import { isGuestLimitError } from './game-start';
 import { replayCopy } from './replay-copy';
+import { translator } from './translate';
 import { Dialog } from '@base-ui/react/dialog';
 import { Input } from '@base-ui/react/input';
 import { Tabs } from '@base-ui/react/tabs';
@@ -76,6 +77,7 @@ class GraphicsBoundary extends Component<
 }
 export function Play() {
   const { i18n } = useTranslation();
+  const t = translator(i18n.language);
   const c = gameCopy[isLanguage(i18n.language) ? i18n.language : 'en-GB'];
   const rc = replayCopy[isLanguage(i18n.language) ? i18n.language : 'en-GB'];
   const [params, setParams] = useSearchParams();
@@ -887,7 +889,7 @@ export function Play() {
                             <p className="text-sm text-muted">
                               {c.guestUpsell}{' '}
                               <Link className="underline" to="/">
-                                {c.waitlist}
+                                {t('Join the waitlist')}
                               </Link>
                             </p>
                           ) : (
@@ -1039,7 +1041,7 @@ export function Play() {
                   <div role="alert" className="game-notice mb-5">
                     {c.guestLimit}{' '}
                     <Link className="underline" to="/">
-                      {c.waitlist}
+                      {t('Join the waitlist')}
                     </Link>
                   </div>
                 )}
@@ -1248,7 +1250,7 @@ export function Play() {
                 <p className="mt-4 text-xs leading-6 text-muted">
                   {c.invitation}{' '}
                   <Link className="underline" to="/">
-                    {c.waitlist}
+                    {t('Join the waitlist')}
                   </Link>
                 </p>
                 {identity.local && (
