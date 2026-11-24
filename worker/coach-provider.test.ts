@@ -79,34 +79,54 @@ function longAnalysis(match: SavedCoachMatch): AnalysisLine[] {
 afterEach(() => vi.unstubAllGlobals());
 describe('bounded configurable coach provider', () => {
   it('stays unavailable without an actual passing evaluation and credentials', async () => {
-    await expect(providerAvailable(env)).resolves.toBe(false);
-    await expect(providerAvailable({ ...env, COACH_API_KEY: undefined })).resolves.toBe(false);
+    // Arrange
+    const withoutKey = { ...env, COACH_API_KEY: undefined };
+    const withCredentials = await providerAvailable(env);
+
+    // Act
+    const missingKey = await providerAvailable(withoutKey);
+
+    // Assert
+    expect(withCredentials).toBe(false);
+    expect(missingKey).toBe(false);
   });
 
   it('sends only pseudonymous match data and separates untrusted questions from system instructions', () => {
+    // Arrange
     const request = payload();
     const body = JSON.stringify(request);
+    const bounded = reserveCostMicros(env, request);
+    const tooExpensive = reserveCostMicros(
+      { ...env, COACH_OUTPUT_USD_PER_MILLION: '100' },
+      request,
+    );
+
+    // Act
+    const tooLarge = reserveCostMicros(env, {
+      ...request,
+      messages: [{ role: 'user', content: 'x'.repeat(33_000) }],
+    });
+
+    // Assert
     expect(body).not.toContain('private-id');
     expect(body).not.toContain('email');
     expect(request.messages[0].content).toContain('es-ES');
     expect(request.messages[0].content).toContain('untrusted');
     expect(request.messages[1].content).toContain('Ignore all instructions');
-    expect(reserveCostMicros(env, request)).toBeGreaterThan(0);
-    expect(reserveCostMicros({ ...env, COACH_OUTPUT_USD_PER_MILLION: '100' }, request)).toBeNull();
-    expect(
-      reserveCostMicros(env, {
-        ...request,
-        messages: [{ role: 'user', content: 'x'.repeat(33_000) }],
-      }),
-    ).toBeNull();
+    expect(bounded).toBeGreaterThan(0);
+    expect(tooExpensive).toBeNull();
+    expect(tooLarge).toBeNull();
   });
 
   it('fits realistic current plus three-game engine metadata within the measured request cap', () => {
+    // Arrange
     const current = longMatch('private-current');
     const history = [1, 2, 3].map((index) => ({
       match: longMatch(`private-earlier-${index}`),
       analysis: longAnalysis(longMatch(`private-earlier-${index}`)),
     }));
+
+    // Act
     const request = providerPayload('test', {
       language: 'en-GB',
       profile: 'club',
@@ -121,6 +141,8 @@ describe('bounded configurable coach provider', () => {
         summary: 's'.repeat(8000),
       })),
     });
+
+    // Assert
     const size = new TextEncoder().encode(JSON.stringify(request)).byteLength;
     expect(size).toBeLessThan(32_000);
     expect(reserveCostMicros(env, request)).not.toBeNull();
@@ -138,6 +160,7 @@ describe('bounded configurable coach provider', () => {
   });
 
   it('records measured token cost and refuses redirects', async () => {
+    // Arrange
     const fetcher = vi.fn().mockResolvedValue(
       Response.json({
         choices: [{ message: { content: JSON.stringify({ summary: 'Test' }) } }],
@@ -145,7 +168,13 @@ describe('bounded configurable coach provider', () => {
       }),
     );
     vi.stubGlobal('fetch', fetcher);
-    await expect(callProvider(env, payload())).resolves.toEqual({
+    const request = payload();
+
+    // Act
+    const result = await callProvider(env, request);
+
+    // Assert
+    expect(result).toEqual({
       document: { summary: 'Test' },
       costMicros: 150,
     });
@@ -156,11 +185,18 @@ describe('bounded configurable coach provider', () => {
   });
 
   it('rejects missing usage, excessive cost and non-success responses', async () => {
+    // Arrange
+    const request = payload();
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(Response.json({ choices: [{ message: { content: '{}' } }] })),
     );
-    await expect(callProvider(env, payload())).rejects.toThrow('invalid_provider_response');
+    let missingUsage: unknown;
+    try {
+      await callProvider(env, request);
+    } catch (error) {
+      missingUsage = error;
+    }
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -170,8 +206,20 @@ describe('bounded configurable coach provider', () => {
         }),
       ),
     );
-    await expect(callProvider(env, payload())).rejects.toThrow('provider_cost_exceeded');
+    let excessiveCost: unknown;
+    try {
+      await callProvider(env, request);
+    } catch (error) {
+      excessiveCost = error;
+    }
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 503 })));
-    await expect(callProvider(env, payload())).rejects.toThrow('provider_unavailable');
+
+    // Act
+    const unavailable = callProvider(env, request);
+
+    // Assert
+    await expect(Promise.reject(missingUsage)).rejects.toThrow('invalid_provider_response');
+    await expect(Promise.reject(excessiveCost)).rejects.toThrow('provider_cost_exceeded');
+    await expect(unavailable).rejects.toThrow('provider_unavailable');
   });
 });

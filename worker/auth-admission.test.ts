@@ -32,22 +32,37 @@ function fixture() {
 }
 describe('atomic invitation redemption before session creation', () => {
   it('keeps a complimentary invite valid without bypassing email verification or another redemption', async () => {
+    // Arrange
     const { db, sqlite } = fixture();
     sqlite
       .prepare("INSERT INTO complimentary_plus(email,granted_at) VALUES('player@example.com',0)")
       .run();
-    await expect(admitSession(db, 'player', 1001)).resolves.toBe(true);
+    const withGrant = await admitSession(db, 'player', 1001);
     sqlite.prepare("UPDATE invitations SET redeemed_by='another-account'").run();
-    await expect(admitSession(db, 'player', 1002)).resolves.toBe(false);
+    const redeemedElsewhere = await admitSession(db, 'player', 1002);
     sqlite.prepare('UPDATE invitations SET redeemed_by=NULL').run();
     sqlite.prepare('UPDATE user SET email_verified=0').run();
-    await expect(admitSession(db, 'player', 1003)).resolves.toBe(false);
+
+    // Act
+    const unverified = await admitSession(db, 'player', 1003);
+
+    // Assert
+    expect(withGrant).toBe(true);
+    expect(redeemedElsewhere).toBe(false);
+    expect(unverified).toBe(false);
   });
 
   it('admits verified invited email once and preserves admission after expiry', async () => {
+    // Arrange
     const { db, sqlite } = fixture();
-    await expect(admitSession(db, 'player', 999)).resolves.toBe(true);
-    await expect(admitSession(db, 'player', 2000)).resolves.toBe(true);
+    const beforeExpiry = await admitSession(db, 'player', 999);
+
+    // Act
+    const afterExpiry = await admitSession(db, 'player', 2000);
+
+    // Assert
+    expect(beforeExpiry).toBe(true);
+    expect(afterExpiry).toBe(true);
     expect(sqlite.prepare('SELECT redeemed_by,redeemed_at FROM invitations').get()).toEqual({
       redeemed_by: 'player',
       redeemed_at: 999,
@@ -55,26 +70,47 @@ describe('atomic invitation redemption before session creation', () => {
   });
 
   it('rejects expiration at exact boundary', async () => {
+    // Arrange
     const { db } = fixture();
-    await expect(admitSession(db, 'player', 1000)).resolves.toBe(false);
+
+    // Act
+    const admitted = await admitSession(db, 'player', 1000);
+
+    // Assert
+    expect(admitted).toBe(false);
   });
 
   it('rejects unverified emails, unknown users and mismatched redemption', async () => {
+    // Arrange
     const { db, sqlite } = fixture();
     sqlite.prepare('UPDATE user SET email_verified=0').run();
-    await expect(admitSession(db, 'player', 1)).resolves.toBe(false);
-    await expect(admitSession(db, 'unknown', 1)).resolves.toBe(false);
+    const unverified = await admitSession(db, 'player', 1);
+    const unknown = await admitSession(db, 'unknown', 1);
     sqlite.prepare('UPDATE user SET email_verified=1').run();
     sqlite.prepare('UPDATE invitations SET redeemed_by=?').run('another-account');
-    await expect(admitSession(db, 'player', 1)).resolves.toBe(false);
+
+    // Act
+    const mismatched = await admitSession(db, 'player', 1);
+
+    // Assert
+    expect(unverified).toBe(false);
+    expect(unknown).toBe(false);
+    expect(mismatched).toBe(false);
   });
 
   it('refuses to recreate access after deletion starts', async () => {
+    // Arrange
     const { db, sqlite } = fixture();
-    await expect(admitSession(db, 'player', 1)).resolves.toBe(true);
+    const admitted = await admitSession(db, 'player', 1);
     sqlite
       .prepare('INSERT INTO account_deletions(user_id,requested_at) VALUES (?,?)')
       .run('player', 2);
-    await expect(admitSession(db, 'player', 3)).resolves.toBe(false);
+
+    // Act
+    const afterDeletion = await admitSession(db, 'player', 3);
+
+    // Assert
+    expect(admitted).toBe(true);
+    expect(afterDeletion).toBe(false);
   });
 });

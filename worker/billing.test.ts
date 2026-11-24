@@ -114,23 +114,37 @@ function signed(value: unknown, timestamp = Math.floor(now / 1000)) {
 
 describe('live Stripe purchase contracts', () => {
   it('supports purchase throughout beta without charging before exact expiry', () => {
-    expect(betaBilling(profile.trialExpiresAt, now)).toMatchObject({
+    // Arrange
+    const duringBeta = betaBilling(profile.trialExpiresAt, now);
+    const monthRemaining = betaBilling(now + 30 * 86_400_000, now);
+    const lastMoment = betaBilling(now + 1, now);
+
+    // Act
+    const atExpiry = betaBilling(now, now);
+
+    // Assert
+    expect(duringBeta).toMatchObject({
       billing_cycle_anchor: Math.ceil(profile.trialExpiresAt / 1000),
       proration_behavior: 'none',
     });
-    expect(betaBilling(now + 30 * 86_400_000, now)).toMatchObject({
+    expect(monthRemaining).toMatchObject({
       trial_end: Math.ceil((now + 30 * 86_400_000) / 1000),
     });
-    expect(betaBilling(now + 1, now)).toMatchObject({
+    expect(lastMoment).toMatchObject({
       billing_cycle_anchor: Math.ceil((now + 1) / 1000),
       proration_behavior: 'none',
     });
-    expect(betaBilling(now, now)).not.toHaveProperty('trial_end');
-    expect(betaBilling(now, now)).not.toHaveProperty('billing_cycle_anchor');
+    expect(atExpiry).not.toHaveProperty('trial_end');
+    expect(atExpiry).not.toHaveProperty('billing_cycle_anchor');
   });
 
   it('uses server-owned catalogue and return URLs with dynamic payment methods', () => {
+    // Arrange
+
+    // Act
     const params = checkoutParams('cus_fixture', profile.trialExpiresAt, now, 'fr-FR', 'abcdefgh');
+
+    // Assert
     expect(params).toMatchObject({
       customer: 'cus_fixture',
       locale: 'fr',
@@ -142,18 +156,31 @@ describe('live Stripe purchase contracts', () => {
   });
 
   it('requires all charging gates and never calls Stripe while disabled', async () => {
+    // Arrange
     const f = fixture();
     f.env.STRIPE_TAX_READY = 'false';
+
+    // Act
+    const response = await billingApi(request(), f.env, 'owner', profile, f.deps);
+
+    // Assert
     expect(billingEnabled(f.env)).toBe(false);
-    expect((await billingApi(request(), f.env, 'owner', profile, f.deps)).status).toBe(503);
+    expect(response.status).toBe(503);
     expect(f.customer).not.toHaveBeenCalled();
     expect(f.create).not.toHaveBeenCalled();
   });
 
   it('creates a hosted one-time pack Checkout and reuses the open session without granting credits', async () => {
+    // Arrange
     const f = fixture();
-    expect((await billingApi(request(), f.env, 'owner', profile, f.deps)).status).toBe(200);
-    expect((await billingApi(request(), f.env, 'owner', profile, f.deps)).status).toBe(200);
+    const created = await billingApi(request(), f.env, 'owner', profile, f.deps);
+
+    // Act
+    const reused = await billingApi(request(), f.env, 'owner', profile, f.deps);
+
+    // Assert
+    expect(created.status).toBe(200);
+    expect(reused.status).toBe(200);
     expect(f.customer).toHaveBeenCalledTimes(1);
     expect(f.create).toHaveBeenCalledTimes(1);
     expect(f.create.mock.calls[0][0]).toMatchObject({
@@ -169,23 +196,39 @@ describe('live Stripe purchase contracts', () => {
   });
 
   it('serialises concurrent pack Checkouts and leaves legacy subscription purchases blocked', async () => {
+    // Arrange
     const f = fixture();
     const results = await Promise.all([
       billingApi(request(), f.env, 'owner', profile, f.deps),
       billingApi(request(), f.env, 'owner', profile, f.deps),
     ]);
+    f.subscriptions.mockResolvedValue({ data: [{ status: 'active' }], has_more: false });
+
+    // Act
+    const legacy = await billingApi(
+      request('/api/billing/checkout'),
+      f.env,
+      'owner',
+      profile,
+      f.deps,
+    );
+
+    // Assert
     expect(results.map((r) => r.status).sort()).toEqual([200, 503]);
     expect(f.create).toHaveBeenCalledTimes(1);
-    f.subscriptions.mockResolvedValue({ data: [{ status: 'active' }], has_more: false });
-    expect(
-      (await billingApi(request('/api/billing/checkout'), f.env, 'owner', profile, f.deps)).status,
-    ).toBe(410);
+    expect(legacy.status).toBe(410);
   });
 
   it('blocks checkout after deletion starts', async () => {
+    // Arrange
     const f = fixture();
     f.sqlite.prepare("INSERT INTO account_deletions(user_id,requested_at) VALUES('owner',0)").run();
-    expect((await billingApi(request(), f.env, 'owner', profile, f.deps)).status).toBe(403);
+
+    // Act
+    const response = await billingApi(request(), f.env, 'owner', profile, f.deps);
+
+    // Assert
+    expect(response.status).toBe(403);
     expect(f.customer).not.toHaveBeenCalled();
   });
 });
@@ -200,28 +243,34 @@ describe('stripe webhook authentication and durable processing', () => {
   };
 
   it('rejects invalid signatures, stale signatures and test-mode delivery', async () => {
+    // Arrange
     const f = fixture();
-    expect(
-      (
-        await billingWebhook(
-          new Request('https://ludus.test/api/billing/webhook', { method: 'POST', body: '{}' }),
-          f.env,
-          f.deps,
-        )
-      ).status,
-    ).toBe(400);
-    expect(
-      (await billingWebhook(signed(event, Math.floor(now / 1000) - 301), f.env, f.deps)).status,
-    ).toBe(400);
-    expect(
-      (await billingWebhook(signed({ ...event, livemode: false }), f.env, f.deps)).status,
-    ).toBe(400);
+    const unsigned = await billingWebhook(
+      new Request('https://ludus.test/api/billing/webhook', { method: 'POST', body: '{}' }),
+      f.env,
+      f.deps,
+    );
+    const stale = await billingWebhook(signed(event, Math.floor(now / 1000) - 301), f.env, f.deps);
+
+    // Act
+    const testMode = await billingWebhook(signed({ ...event, livemode: false }), f.env, f.deps);
+
+    // Assert
+    expect(unsigned.status).toBe(400);
+    expect(stale.status).toBe(400);
+    expect(testMode.status).toBe(400);
     expect(f.subscriptions).not.toHaveBeenCalled();
   });
 
   it('verifies original bytes and never creates an account from unrelated billing events', async () => {
+    // Arrange
     const f = fixture();
-    expect((await billingWebhook(signed(event), f.env, f.deps)).status).toBe(200);
+
+    // Act
+    const response = await billingWebhook(signed(event), f.env, f.deps);
+
+    // Assert
+    expect(response.status).toBe(200);
     expect(f.subscriptions).not.toHaveBeenCalled();
     expect(f.sqlite.prepare('SELECT * FROM billing_accounts').all()).toEqual([]);
     expect(f.sqlite.prepare('SELECT processed_at FROM billing_events').get()).toEqual({
@@ -230,6 +279,7 @@ describe('stripe webhook authentication and durable processing', () => {
   });
 
   it('retries failed processing and acknowledges completed duplicates without reapplying', async () => {
+    // Arrange
     const f = fixture();
     f.sqlite
       .prepare(
@@ -237,16 +287,23 @@ describe('stripe webhook authentication and durable processing', () => {
       )
       .run();
     f.subscriptions.mockRejectedValueOnce(new Error('offline'));
-    expect((await billingWebhook(signed(event), f.env, f.deps)).status).toBe(503);
-    expect(f.sqlite.prepare('SELECT processed_at FROM billing_events').get()).toEqual({
-      processed_at: null,
-    });
-    expect((await billingWebhook(signed(event), f.env, f.deps)).status).toBe(200);
-    expect((await billingWebhook(signed(event), f.env, f.deps)).status).toBe(200);
+    const failed = await billingWebhook(signed(event), f.env, f.deps);
+    const pending = f.sqlite.prepare('SELECT processed_at FROM billing_events').get();
+    const recovered = await billingWebhook(signed(event), f.env, f.deps);
+
+    // Act
+    const duplicate = await billingWebhook(signed(event), f.env, f.deps);
+
+    // Assert
+    expect(failed.status).toBe(503);
+    expect(pending).toEqual({ processed_at: null });
+    expect(recovered.status).toBe(200);
+    expect(duplicate.status).toBe(200);
     expect(f.subscriptions).toHaveBeenCalledTimes(2);
   });
 
   it('records only paid invoice periods for the approved price, never the free beta period', async () => {
+    // Arrange
     const f = fixture();
     f.sqlite
       .prepare(
@@ -273,13 +330,19 @@ describe('stripe webhook authentication and durable processing', () => {
       ],
       has_more: false,
     } as never);
-    expect((await billingWebhook(signed(event), f.env, f.deps)).status).toBe(200);
+
+    // Act
+    const response = await billingWebhook(signed(event), f.env, f.deps);
+
+    // Assert
+    expect(response.status).toBe(200);
     expect(f.sqlite.prepare('SELECT paid_until FROM billing_subscriptions').get()).toEqual({
       paid_until: now + 86_400_000,
     });
   });
 
   it('grants ten non-expiring credits only after provider-confirmed paid Checkout and only once', async () => {
+    // Arrange
     const f = fixture();
     storedAccount(f);
     f.sqlite
@@ -311,20 +374,22 @@ describe('stripe webhook authentication and durable processing', () => {
       type: 'checkout.session.completed',
       data: { object: session },
     };
-    expect((await billingWebhook(signed(event), f.env, f.deps)).status).toBe(200);
-    expect(
-      (
-        await billingWebhook(
-          signed({
-            ...event,
-            id: 'evt_pack_async',
-            type: 'checkout.session.async_payment_succeeded',
-          }),
-          f.env,
-          f.deps,
-        )
-      ).status,
-    ).toBe(200);
+    const completed = await billingWebhook(signed(event), f.env, f.deps);
+
+    // Act
+    const asyncPayment = await billingWebhook(
+      signed({
+        ...event,
+        id: 'evt_pack_async',
+        type: 'checkout.session.async_payment_succeeded',
+      }),
+      f.env,
+      f.deps,
+    );
+
+    // Assert
+    expect(completed.status).toBe(200);
+    expect(asyncPayment.status).toBe(200);
     expect(f.sqlite.prepare('SELECT owner,credits,charge FROM review_credit_packs').get()).toEqual({
       owner: 'owner',
       credits: 10,
@@ -333,6 +398,7 @@ describe('stripe webhook authentication and durable processing', () => {
   });
 
   it('recovers a paid session whose Checkout ID was not persisted before webhook delivery', async () => {
+    // Arrange
     const f = fixture();
     storedAccount(f);
     f.sqlite
@@ -355,21 +421,22 @@ describe('stripe webhook authentication and durable processing', () => {
       ...session,
       line_items: { data: [{ quantity: 1, price: { id: 'price_review_fixture' } }] },
     } as never);
-    expect(
-      (
-        await billingWebhook(
-          signed({
-            id: 'evt_pack_recovered',
-            object: 'event',
-            livemode: true,
-            type: 'checkout.session.completed',
-            data: { object: session },
-          }),
-          f.env,
-          f.deps,
-        )
-      ).status,
-    ).toBe(200);
+
+    // Act
+    const response = await billingWebhook(
+      signed({
+        id: 'evt_pack_recovered',
+        object: 'event',
+        livemode: true,
+        type: 'checkout.session.completed',
+        data: { object: session },
+      }),
+      f.env,
+      f.deps,
+    );
+
+    // Assert
+    expect(response.status).toBe(200);
     expect(f.sqlite.prepare('SELECT checkout,state FROM review_pack_checkouts').get()).toEqual({
       checkout: 'cs_recovered',
       state: 'paid',
@@ -380,6 +447,7 @@ describe('stripe webhook authentication and durable processing', () => {
   });
 
   it('recovers a missed paid webhook from scheduled provider reconciliation', async () => {
+    // Arrange
     const f = fixture();
     storedAccount(f);
     f.sqlite
@@ -404,13 +472,18 @@ describe('stripe webhook authentication and durable processing', () => {
       ...session,
       line_items: { data: [{ quantity: 1, price: { id: 'price_review_fixture' } }] },
     } as never);
+
+    // Act
     await reconcileBilling(f.env, f.deps);
+
+    // Assert
     expect(f.sqlite.prepare('SELECT credits FROM review_credit_packs').get()).toEqual({
       credits: 10,
     });
   });
 
   it('retires a terminally failed async attempt so another purchase can proceed', async () => {
+    // Arrange
     const f = fixture();
     storedAccount(f);
     f.sqlite
@@ -429,13 +502,20 @@ describe('stripe webhook authentication and durable processing', () => {
       status: 'requires_payment_method',
     } as never);
     await reconcileBilling(f.env, f.deps);
-    expect(
-      f.sqlite.prepare('SELECT state FROM review_pack_checkouts WHERE id=?').get('failed-attempt'),
-    ).toEqual({ state: 'failed' });
-    expect((await billingApi(request(), f.env, 'owner', profile, f.deps)).status).toBe(200);
+    const retired = f.sqlite
+      .prepare('SELECT state FROM review_pack_checkouts WHERE id=?')
+      .get('failed-attempt');
+
+    // Act
+    const response = await billingApi(request(), f.env, 'owner', profile, f.deps);
+
+    // Assert
+    expect(retired).toEqual({ state: 'failed' });
+    expect(response.status).toBe(200);
   });
 
   it('acknowledges completed asynchronous payment while unpaid without granting credits', async () => {
+    // Arrange
     const f = fixture();
     storedAccount(f);
     f.sqlite
@@ -455,25 +535,27 @@ describe('stripe webhook authentication and durable processing', () => {
       amount_total: 499,
     };
     vi.mocked(f.stripe.checkout.sessions.retrieve).mockResolvedValue(session as never);
-    expect(
-      (
-        await billingWebhook(
-          signed({
-            id: 'evt_pack_pending',
-            object: 'event',
-            livemode: true,
-            type: 'checkout.session.completed',
-            data: { object: session },
-          }),
-          f.env,
-          f.deps,
-        )
-      ).status,
-    ).toBe(200);
+
+    // Act
+    const response = await billingWebhook(
+      signed({
+        id: 'evt_pack_pending',
+        object: 'event',
+        livemode: true,
+        type: 'checkout.session.completed',
+        data: { object: session },
+      }),
+      f.env,
+      f.deps,
+    );
+
+    // Assert
+    expect(response.status).toBe(200);
     expect(f.sqlite.prepare('SELECT * FROM review_credit_packs').all()).toEqual([]);
   });
 
   it('does not fulfil a payment when hosted terms consent is absent', async () => {
+    // Arrange
     const f = fixture();
     storedAccount(f);
     f.sqlite
@@ -497,25 +579,27 @@ describe('stripe webhook authentication and durable processing', () => {
       ...session,
       line_items: { data: [{ quantity: 1, price: { id: 'price_review_fixture' } }] },
     } as never);
-    expect(
-      (
-        await billingWebhook(
-          signed({
-            id: 'evt_pack_no_consent',
-            object: 'event',
-            livemode: true,
-            type: 'checkout.session.completed',
-            data: { object: session },
-          }),
-          f.env,
-          f.deps,
-        )
-      ).status,
-    ).toBe(503);
+
+    // Act
+    const response = await billingWebhook(
+      signed({
+        id: 'evt_pack_no_consent',
+        object: 'event',
+        livemode: true,
+        type: 'checkout.session.completed',
+        data: { object: session },
+      }),
+      f.env,
+      f.deps,
+    );
+
+    // Assert
+    expect(response.status).toBe(503);
     expect(f.sqlite.prepare('SELECT * FROM review_credit_packs').all()).toEqual([]);
   });
 
   it('applies disputes to only the affected pack and resolves from current provider dispute state', async () => {
+    // Arrange
     const f = fixture();
     storedAccount(f);
     f.sqlite
@@ -540,90 +624,81 @@ describe('stripe webhook authentication and durable processing', () => {
       ...session,
       line_items: { data: [{ quantity: 1, price: { id: 'price_review_fixture' } }] },
     } as never);
-    expect(
-      (
-        await billingWebhook(
-          signed({
-            id: 'evt_pack_paid',
-            object: 'event',
-            livemode: true,
-            type: 'checkout.session.completed',
-            data: { object: session },
-          }),
-          f.env,
-          f.deps,
-        )
-      ).status,
-    ).toBe(200);
+    const purchased = await billingWebhook(
+      signed({
+        id: 'evt_pack_paid',
+        object: 'event',
+        livemode: true,
+        type: 'checkout.session.completed',
+        data: { object: session },
+      }),
+      f.env,
+      f.deps,
+    );
     vi.mocked(f.stripe.disputes.list).mockResolvedValue({
       data: [{ status: 'needs_response' }],
       has_more: false,
     } as never);
-    expect(
-      (
-        await billingWebhook(
-          signed({
-            id: 'evt_pack_dispute',
-            object: 'event',
-            livemode: true,
-            type: 'charge.dispute.created',
-            data: { object: { id: 'dp_fixture', charge: 'ch_fixture', payment_intent: 'pi_paid' } },
-          }),
-          f.env,
-          f.deps,
-        )
-      ).status,
-    ).toBe(200);
-    expect(f.sqlite.prepare('SELECT frozen FROM review_credit_packs').get()).toEqual({ frozen: 1 });
+    const disputed = await billingWebhook(
+      signed({
+        id: 'evt_pack_dispute',
+        object: 'event',
+        livemode: true,
+        type: 'charge.dispute.created',
+        data: { object: { id: 'dp_fixture', charge: 'ch_fixture', payment_intent: 'pi_paid' } },
+      }),
+      f.env,
+      f.deps,
+    );
+    const frozen = f.sqlite.prepare('SELECT frozen FROM review_credit_packs').get();
     vi.mocked(f.stripe.disputes.list).mockResolvedValue({
       data: [{ status: 'won' }],
       has_more: false,
     } as never);
-    expect(
-      (
-        await billingWebhook(
-          signed({
-            id: 'evt_pack_dispute_won',
-            object: 'event',
-            livemode: true,
-            type: 'charge.dispute.closed',
-            data: {
-              object: {
-                id: 'dp_fixture',
-                charge: 'ch_fixture',
-                payment_intent: 'pi_paid',
-                status: 'lost',
-              },
-            },
-          }),
-          f.env,
-          f.deps,
-        )
-      ).status,
-    ).toBe(200);
-    expect(f.sqlite.prepare('SELECT frozen,refunded FROM review_credit_packs').get()).toEqual({
-      frozen: 0,
-      refunded: 0,
-    });
+    const won = await billingWebhook(
+      signed({
+        id: 'evt_pack_dispute_won',
+        object: 'event',
+        livemode: true,
+        type: 'charge.dispute.closed',
+        data: {
+          object: {
+            id: 'dp_fixture',
+            charge: 'ch_fixture',
+            payment_intent: 'pi_paid',
+            status: 'lost',
+          },
+        },
+      }),
+      f.env,
+      f.deps,
+    );
+    const afterWin = f.sqlite.prepare('SELECT frozen,refunded FROM review_credit_packs').get();
     vi.mocked(f.stripe.disputes.list).mockResolvedValue({
       data: [{ status: 'warning_closed' }],
       has_more: false,
     } as never);
-    expect(
-      (
-        await billingWebhook(
-          signed({
-            id: 'evt_pack_warning_closed',
-            object: 'event',
-            livemode: true,
-            type: 'charge.dispute.closed',
-            data: { object: { id: 'dp_fixture', charge: 'ch_fixture', payment_intent: 'pi_paid' } },
-          }),
-          f.env,
-          f.deps,
-        )
-      ).status,
-    ).toBe(200);
+
+    // Act
+    const warning = await billingWebhook(
+      signed({
+        id: 'evt_pack_warning_closed',
+        object: 'event',
+        livemode: true,
+        type: 'charge.dispute.closed',
+        data: { object: { id: 'dp_fixture', charge: 'ch_fixture', payment_intent: 'pi_paid' } },
+      }),
+      f.env,
+      f.deps,
+    );
+
+    // Assert
+    expect(purchased.status).toBe(200);
+    expect(disputed.status).toBe(200);
+    expect(frozen).toEqual({ frozen: 1 });
+    expect(won.status).toBe(200);
+    expect(afterWin).toEqual({ frozen: 0, refunded: 0 });
+    expect(warning.status).toBe(200);
     expect(f.sqlite.prepare('SELECT frozen,refunded FROM review_credit_packs').get()).toEqual({
       frozen: 0,
       refunded: 0,
@@ -631,6 +706,7 @@ describe('stripe webhook authentication and durable processing', () => {
   });
 
   it('serialises dispute state with paid Checkout fulfilment', async () => {
+    // Arrange
     const f = fixture();
     storedAccount(f);
     f.sqlite
@@ -675,31 +751,40 @@ describe('stripe webhook authentication and durable processing', () => {
       type: 'charge.dispute.created',
       data: { object: { id: 'dp_race', charge: 'ch_fixture', payment_intent: 'pi_paid' } },
     };
+
+    // Act
     const results = await Promise.all([
       billingWebhook(signed(purchase), f.env, f.deps),
       billingWebhook(signed(dispute), f.env, f.deps),
     ]);
-    for (const [index, result] of results.entries()) {
-      if (result.status === 503) {
-        expect(
-          (await billingWebhook(signed(index === 0 ? purchase : dispute), f.env, f.deps)).status,
-        ).toBe(200);
-      }
+
+    // Assert
+    const purchaseRetry =
+      results[0]?.status === 503
+        ? await billingWebhook(signed(purchase), f.env, f.deps)
+        : undefined;
+    const disputeRetry =
+      results[1]?.status === 503 ? await billingWebhook(signed(dispute), f.env, f.deps) : undefined;
+    if (purchaseRetry) {
+      expect(purchaseRetry.status).toBe(200);
+    }
+    if (disputeRetry) {
+      expect(disputeRetry.status).toBe(200);
     }
     expect(f.sqlite.prepare('SELECT frozen FROM review_credit_packs').get()).toEqual({ frozen: 1 });
   });
 
   it('does not accept mutated body bytes', async () => {
+    // Arrange
     const original = signed(event);
     const header = original.headers.get('Stripe-Signature')!;
-    await expect(
-      verifyStripeEvent(
-        JSON.stringify({ ...event, id: 'evt_other' }),
-        header,
-        'fixture-signing-secret',
-        now,
-      ),
-    ).rejects.toThrow();
+    const mutated = JSON.stringify({ ...event, id: 'evt_other' });
+
+    // Act
+    const verification = verifyStripeEvent(mutated, header, 'fixture-signing-secret', now);
+
+    // Assert
+    await expect(verification).rejects.toThrow();
   });
 });
 
@@ -766,17 +851,20 @@ function storedAccount(f: ReturnType<typeof fixture>) {
 
 describe('paid periods, renewal grace and payment risk', () => {
   it('grants grace only after a paid period and never extends it on delayed reconciliation', async () => {
+    // Arrange
     const f = fixture();
     const end = now + 30 * 86_400_000;
     setInvoices(f, [invoice('in_due', now, end, 'open')]);
     await reconcileSubscription(f.env.DB, f.stripe, 'owner', subscription('past_due'), now);
-    await expect(paidAccessUntil(f.env.DB, 'owner', now)).resolves.toBeNull();
+    const beforePaidPeriod = await paidAccessUntil(f.env.DB, 'owner', now);
     setInvoices(f, [
       invoice('in_previous', now - 30 * 86_400_000, now),
       invoice('in_due', now, end, 'open'),
     ]);
     await reconcileSubscription(f.env.DB, f.stripe, 'owner', subscription('past_due'), now);
-    await expect(paidAccessUntil(f.env.DB, 'owner', now)).resolves.toBe(now + graceMilliseconds);
+    const duringGrace = await paidAccessUntil(f.env.DB, 'owner', now);
+
+    // Act
     await reconcileSubscription(
       f.env.DB,
       f.stripe,
@@ -784,28 +872,38 @@ describe('paid periods, renewal grace and payment risk', () => {
       subscription('past_due'),
       now + 6 * 86_400_000,
     );
+
+    // Assert
+    expect(beforePaidPeriod).toBeNull();
+    expect(duringGrace).toBe(now + graceMilliseconds);
     await expect(paidAccessUntil(f.env.DB, 'owner', now + 6 * 86400_000)).resolves.toBe(
       now + graceMilliseconds,
     );
   });
 
   it('expires access exactly at the deadline even if provider cancellation fails, then retries', async () => {
+    // Arrange
     const f = fixture();
     setInvoices(f, [
       invoice('in_previous', now - 30 * 86_400_000, now),
       invoice('in_due', now, now + 30 * 86_400_000, 'open'),
     ]);
     vi.mocked(f.stripe.subscriptions.cancel).mockRejectedValueOnce(new Error('offline'));
-    await expect(
-      reconcileSubscription(
+    let failure: unknown;
+    try {
+      await reconcileSubscription(
         f.env.DB,
         f.stripe,
         'owner',
         subscription('past_due'),
         now + graceMilliseconds,
-      ),
-    ).rejects.toThrow('offline');
-    await expect(paidAccessUntil(f.env.DB, 'owner', now + graceMilliseconds)).resolves.toBeNull();
+      );
+    } catch (error) {
+      failure = error;
+    }
+    const accessAtDeadline = await paidAccessUntil(f.env.DB, 'owner', now + graceMilliseconds);
+
+    // Act
     await reconcileSubscription(
       f.env.DB,
       f.stripe,
@@ -813,6 +911,12 @@ describe('paid periods, renewal grace and payment risk', () => {
       subscription('past_due'),
       now + graceMilliseconds + 1,
     );
+
+    // Assert
+    await expect(async () => {
+      throw failure;
+    }).rejects.toThrow('offline');
+    expect(accessAtDeadline).toBeNull();
     expect(f.stripe.subscriptions.cancel).toHaveBeenCalledTimes(2);
     expect(f.sqlite.prepare('SELECT status FROM billing_subscriptions').get()).toEqual({
       status: 'canceled',
@@ -820,6 +924,7 @@ describe('paid periods, renewal grace and payment risk', () => {
   });
 
   it('recovers within grace and starts a later renewal grace from its own invoice period', async () => {
+    // Arrange
     const f = fixture();
     const end = now + 30 * 86_400_000;
     const old = invoice('in_previous', now - 30 * 86_400_000, now);
@@ -827,22 +932,30 @@ describe('paid periods, renewal grace and payment risk', () => {
     await reconcileSubscription(f.env.DB, f.stripe, 'owner', subscription('past_due'), now);
     setInvoices(f, [old, invoice('in_due', now, end, 'paid', now + 86_400_000)]);
     await reconcileSubscription(f.env.DB, f.stripe, 'owner', subscription(), now + 86_400_000);
-    await expect(paidAccessUntil(f.env.DB, 'owner', now + 86400_000)).resolves.toBe(end);
+    const recovered = await paidAccessUntil(f.env.DB, 'owner', now + 86400_000);
     setInvoices(f, [
       old,
       invoice('in_due', now, end, 'paid', now + 86_400_000),
       invoice('in_later', end, end + 30 * 86_400_000, 'open'),
     ]);
+
+    // Act
     await reconcileSubscription(f.env.DB, f.stripe, 'owner', subscription('past_due'), end);
+
+    // Assert
+    expect(recovered).toBe(end);
     await expect(paidAccessUntil(f.env.DB, 'owner', end)).resolves.toBe(end + graceMilliseconds);
   });
 
   it('sends late renewal settlements to manual review rather than restoring access', async () => {
+    // Arrange
     const f = fixture();
     setInvoices(f, [
       invoice('in_previous', now - 30 * 86_400_000, now),
       invoice('in_late', now, now + 30 * 86_400_000, 'paid', now + graceMilliseconds),
     ]);
+
+    // Act
     await reconcileSubscription(
       f.env.DB,
       f.stripe,
@@ -850,6 +963,8 @@ describe('paid periods, renewal grace and payment risk', () => {
       subscription(),
       now + graceMilliseconds,
     );
+
+    // Assert
     await expect(paidAccessUntil(f.env.DB, 'owner', now + graceMilliseconds)).resolves.toBeNull();
     expect(f.sqlite.prepare('SELECT reason FROM billing_review_cases').all()).toEqual([
       { reason: 'late_payment' },
@@ -857,11 +972,14 @@ describe('paid periods, renewal grace and payment risk', () => {
   });
 
   it('cancels an overdue renewal even if Stripe marks its invoice uncollectible', async () => {
+    // Arrange
     const f = fixture();
     setInvoices(f, [
       invoice('in_previous', now - 30 * 86_400_000, now),
       invoice('in_due', now, now + 30 * 86_400_000, 'uncollectible'),
     ]);
+
+    // Act
     await reconcileSubscription(
       f.env.DB,
       f.stripe,
@@ -869,6 +987,8 @@ describe('paid periods, renewal grace and payment risk', () => {
       subscription('unpaid'),
       now + graceMilliseconds,
     );
+
+    // Assert
     expect(f.stripe.subscriptions.cancel).toHaveBeenCalledWith('sub_fixture', {
       prorate: false,
       invoice_now: false,
@@ -877,11 +997,12 @@ describe('paid periods, renewal grace and payment risk', () => {
   });
 
   it('revokes full refunds, preserves partial refunds and restores valid access after a dispute win', async () => {
+    // Arrange
     const f = fixture();
     const end = now + 86_400_000;
     setInvoices(f, [invoice('in_current', now - 86_400_000, end)]);
     await reconcileSubscription(f.env.DB, f.stripe, 'owner', subscription(), now);
-    await expect(paidAccessUntil(f.env.DB, 'owner', now)).resolves.toBe(end);
+    const initialAccess = await paidAccessUntil(f.env.DB, 'owner', now);
     vi.mocked(f.stripe.charges.retrieve).mockResolvedValue({
       id: 'ch_fixture',
       livemode: true,
@@ -890,20 +1011,20 @@ describe('paid periods, renewal grace and payment risk', () => {
       amount_refunded: 100,
     } as never);
     await reconcileSubscription(f.env.DB, f.stripe, 'owner', subscription(), now);
-    await expect(paidAccessUntil(f.env.DB, 'owner', now)).resolves.toBe(end);
+    const partialRefundAccess = await paidAccessUntil(f.env.DB, 'owner', now);
     vi.mocked(f.stripe.disputes.list).mockResolvedValue({
       data: [{ status: 'needs_response' }],
       has_more: false,
     } as never);
     await reconcileSubscription(f.env.DB, f.stripe, 'owner', subscription(), now);
-    await expect(paidAccessUntil(f.env.DB, 'owner', now)).resolves.toBeNull();
+    const disputedAccess = await paidAccessUntil(f.env.DB, 'owner', now);
     vi.mocked(f.stripe.disputes.list).mockResolvedValue({
       data: [{ status: 'won' }],
       has_more: false,
     } as never);
     await reconcileSubscription(f.env.DB, f.stripe, 'owner', subscription(), now);
-    await expect(paidAccessUntil(f.env.DB, 'owner', now)).resolves.toBe(end);
-    await expect(paidAccessUntil(f.env.DB, 'owner', end)).resolves.toBe(end);
+    const restoredAccess = await paidAccessUntil(f.env.DB, 'owner', now);
+    const restoredAtEnd = await paidAccessUntil(f.env.DB, 'owner', end);
     vi.mocked(f.stripe.charges.retrieve).mockResolvedValue({
       id: 'ch_fixture',
       livemode: true,
@@ -911,21 +1032,38 @@ describe('paid periods, renewal grace and payment risk', () => {
       amount: 800,
       amount_refunded: 800,
     } as never);
+
+    // Act
     await reconcileSubscription(f.env.DB, f.stripe, 'owner', subscription(), now);
+
+    // Assert
+    expect(initialAccess).toBe(end);
+    expect(partialRefundAccess).toBe(end);
+    expect(disputedAccess).toBeNull();
+    expect(restoredAccess).toBe(end);
+    expect(restoredAtEnd).toBe(end);
     await expect(paidAccessUntil(f.env.DB, 'owner', now)).resolves.toBeNull();
   });
 
   it('caps a cancelled paid period and never grants paid access during account deletion', async () => {
+    // Arrange
     const f = fixture();
     setInvoices(f, [invoice('in_current', now - 86_400_000, now + 86_400_000)]);
     const cancelled = { ...subscription('canceled'), ended_at: Math.floor(now / 1000) };
     await reconcileSubscription(f.env.DB, f.stripe, 'owner', cancelled, now);
-    await expect(paidAccessUntil(f.env.DB, 'owner', now)).resolves.toBe(now);
+    const capped = await paidAccessUntil(f.env.DB, 'owner', now);
     f.sqlite.prepare("INSERT INTO account_deletions(user_id,requested_at) VALUES('owner',0)").run();
-    await expect(paidAccessUntil(f.env.DB, 'owner', now - 1)).resolves.toBeNull();
+
+    // Act
+    const duringDeletion = paidAccessUntil(f.env.DB, 'owner', now - 1);
+
+    // Assert
+    expect(capped).toBe(now);
+    await expect(duringDeletion).resolves.toBeNull();
   });
 
   it('preserves a newer purchase when an older invoice is refunded', async () => {
+    // Arrange
     const f = fixture();
     const end = now + 86_400_000;
     setInvoices(f, [
@@ -954,7 +1092,11 @@ describe('paid periods, renewal grace and payment risk', () => {
           amount_refunded: id === 'ch_old' ? 800 : 0,
         }) as never,
     );
+
+    // Act
     await reconcileSubscription(f.env.DB, f.stripe, 'owner', subscription(), now);
+
+    // Assert
     await expect(paidAccessUntil(f.env.DB, 'owner', now)).resolves.toBe(end);
     expect(f.sqlite.prepare('SELECT reason FROM billing_review_cases').get()).toEqual({
       reason: 'historical_refund',
@@ -964,6 +1106,7 @@ describe('paid periods, renewal grace and payment risk', () => {
 
 describe('billing cancellation and scheduled reconciliation', () => {
   it('rejects writes from a Checkout worker that has lost its lease', async () => {
+    // Arrange
     const f = fixture();
     f.create.mockImplementationOnce(async () => {
       f.sqlite
@@ -975,7 +1118,12 @@ describe('billing cancellation and scheduled reconciliation', () => {
         url: 'https://checkout.stripe.com/c/pay/uncertain',
       };
     });
-    expect((await billingApi(request(), f.env, 'owner', profile, f.deps)).status).toBe(503);
+
+    // Act
+    const response = await billingApi(request(), f.env, 'owner', profile, f.deps);
+
+    // Assert
+    expect(response.status).toBe(503);
     expect(f.sqlite.prepare('SELECT checkout,lease FROM billing_accounts').get()).toEqual({
       checkout: null,
       lease: 'new-owner',
@@ -983,6 +1131,7 @@ describe('billing cancellation and scheduled reconciliation', () => {
   });
 
   it('detects deletion racing Checkout creation and never returns the payment URL', async () => {
+    // Arrange
     const f = fixture();
     f.create.mockImplementationOnce(async () => {
       f.sqlite
@@ -995,13 +1144,18 @@ describe('billing cancellation and scheduled reconciliation', () => {
         url: 'https://checkout.stripe.com/c/pay/fixture',
       };
     });
+
+    // Act
     const result = await billingApi(request(), f.env, 'owner', profile, f.deps);
+
+    // Assert
     expect(result.status).toBe(403);
     await expect(result.json()).resolves.not.toHaveProperty('url');
     expect(f.stripe.checkout.sessions.expire).toHaveBeenCalledWith('cs_live_fixture');
   });
 
   it('expires open sessions and retries failed cancellation without erasing ownership', async () => {
+    // Arrange
     const f = fixture();
     storedAccount(f);
     f.subscriptions.mockResolvedValue({ data: [subscription()], has_more: false });
@@ -1018,36 +1172,52 @@ describe('billing cancellation and scheduled reconciliation', () => {
       async (id) => ({ id, status: 'open' }) as never,
     );
     vi.mocked(f.stripe.subscriptions.cancel).mockRejectedValueOnce(new Error('offline'));
-    await expect(cancelAccountBilling(f.env, 'owner', f.deps)).rejects.toThrow();
-    expect(f.sqlite.prepare('SELECT customer FROM billing_accounts').get()).toEqual({
-      customer: 'cus_fixture',
-    });
+    let failure: unknown;
+    try {
+      await cancelAccountBilling(f.env, 'owner', f.deps);
+    } catch (error) {
+      failure = error;
+    }
+    const customer = f.sqlite.prepare('SELECT customer FROM billing_accounts').get();
+
+    // Act
     await cancelAccountBilling(f.env, 'owner', f.deps);
+
+    // Assert
+    await expect(async () => {
+      throw failure;
+    }).rejects.toThrow();
+    expect(customer).toEqual({ customer: 'cus_fixture' });
     expect(f.stripe.checkout.sessions.expire).toHaveBeenCalledWith('cs_open');
     expect(f.stripe.checkout.sessions.expire).toHaveBeenCalledWith('cs_pack_open');
     expect(f.stripe.subscriptions.cancel).toHaveBeenCalledTimes(2);
   });
 
   it('reconciles without browser visits and isolates failed accounts for retry', async () => {
+    // Arrange
     const f = fixture();
     storedAccount(f);
     await reconcileBilling(f.env, f.deps);
-    expect(f.sqlite.prepare('SELECT reconciled_at FROM billing_accounts').get()).toEqual({
-      reconciled_at: now,
-    });
+    const reconciled = f.sqlite.prepare('SELECT reconciled_at FROM billing_accounts').get();
     f.subscriptions.mockRejectedValue(new Error('offline'));
     const logger = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // Act
     try {
       await reconcileBilling(f.env, f.deps);
     } finally {
       logger.mockRestore();
     }
+
+    // Assert
+    expect(reconciled).toEqual({ reconciled_at: now });
     expect(f.sqlite.prepare('SELECT reason FROM billing_review_cases').get()).toEqual({
       reason: 'reconciliation_failed',
     });
   });
 
   it('recovers an uncertain Checkout create from its durable attempt reference', async () => {
+    // Arrange
     const f = fixture();
     storedAccount(f);
     f.sqlite
@@ -1059,7 +1229,11 @@ describe('billing cancellation and scheduled reconciliation', () => {
       data: [{ id: 'cs_recovered', client_reference_id: 'generation' }],
       has_more: false,
     } as never);
+
+    // Act
     await reconcileBilling(f.env, f.deps);
+
+    // Assert
     expect(f.sqlite.prepare('SELECT checkout FROM billing_accounts').get()).toEqual({
       checkout: 'cs_recovered',
     });
@@ -1067,10 +1241,13 @@ describe('billing cancellation and scheduled reconciliation', () => {
   });
 
   it('puts early fraud warnings into review without suspending unrelated paid access', async () => {
+    // Arrange
     const f = fixture();
     storedAccount(f);
     f.subscriptions.mockResolvedValue({ data: [subscription()], has_more: false });
     setInvoices(f, [invoice('in_current', now - 86_400_000, now + 86_400_000)]);
+
+    // Act
     const result = await billingWebhook(
       signed({
         id: 'evt_warning',
@@ -1082,6 +1259,8 @@ describe('billing cancellation and scheduled reconciliation', () => {
       f.env,
       f.deps,
     );
+
+    // Assert
     expect(result.status).toBe(200);
     expect(f.sqlite.prepare('SELECT reason FROM billing_review_cases').all()).toEqual([
       { reason: 'early_fraud_warning' },

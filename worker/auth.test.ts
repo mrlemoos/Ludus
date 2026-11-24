@@ -9,6 +9,14 @@ describe('local sign-in boundary', () => {
     ['http://127.0.0.1:5173', undefined, false],
     ['https://localhost.example.com', 'true', false],
   ])('requires explicit local config and a loopback host: %s', (url, flag, expected) => {
-    expect(localDevelopment(new Request(url), { LOCAL_DEV: flag } as Env)).toBe(expected);
+    // Arrange
+    const request = new Request(url);
+    const environment = { LOCAL_DEV: flag } as Env;
+
+    // Act
+    const local = localDevelopment(request, environment);
+
+    // Assert
+    expect(local).toBe(expected);
   });
 });

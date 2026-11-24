@@ -25,6 +25,7 @@ function database(known: { id: string; finished_at: number }[], legacy: { id: st
 
 describe('coach history', () => {
   it('selects only owned finished matches strictly before the reviewed match in SQLite', async () => {
+    // Arrange
     const sqlite = new DatabaseSync(':memory:');
     for (const file of readdirSync('drizzle')
       .filter((name) => name.endsWith('.sql'))
@@ -60,13 +61,19 @@ describe('coach history', () => {
       }),
     } as unknown as D1Database;
     const load = vi.fn(async (_owner: string, id: string) => match(id, id === 'human' ? 450 : 300));
-    const result = await loadCoachHistory(db, 'owner', match('current', 500), load);
+
+    // Act
+    const result = await loadCoachHistory(db, 'owner', match('current', 500), load).finally(() => {
+      sqlite.close();
+    });
+
+    // Assert
     expect(result.matches.map((item) => item.match.id)).toEqual(['human', 'old']);
     expect(load.mock.calls.map((call) => call[1])).toEqual(['human', 'old']);
-    sqlite.close();
   });
 
   it('uses actual completion order across legacy snapshots and excludes later matches', async () => {
+    // Arrange
     const db = database(
       [
         { id: 'a', finished_at: 400 },
@@ -82,48 +89,62 @@ describe('coach history', () => {
       match('legacy', 450),
       match('later', 600),
     ];
+    const owners: string[] = [];
+
+    // Act
     const result = await loadCoachHistory(db, 'owner', match('current', 500), async (owner, id) => {
-      expect(owner).toBe('owner');
+      owners.push(owner);
       return snapshots.find((item) => item.id === id) ?? null;
     });
+
+    // Assert
+    expect(owners.every((owner) => owner === 'owner')).toBe(true);
     expect(result.matches.map((item) => item.match.id)).toEqual(['legacy', 'a', 'b']);
     expect(result.gaps).toBe(0);
   });
 
   it('does not invent gaps for a player with fewer than three previous games', async () => {
-    const result = await loadCoachHistory(
-      database([]),
-      'owner',
-      match('current', 500),
-      async () => null,
-    );
+    // Arrange
+    const db = database([]);
+    const current = match('current', 500);
+
+    // Act
+    const result = await loadCoachHistory(db, 'owner', current, async () => null);
+
+    // Assert
     expect(result).toEqual({ matches: [], gaps: 0 });
   });
 
   it('discloses unavailable history rather than claiming older snapshots are the latest', async () => {
-    const result = await loadCoachHistory(
-      database([
-        { id: 'missing', finished_at: 400 },
-        { id: 'available', finished_at: 300 },
-      ]),
-      'owner',
-      match('current', 500),
-      async (_owner, id) => (id === 'available' ? match(id, 300) : null),
+    // Arrange
+    const db = database([
+      { id: 'missing', finished_at: 400 },
+      { id: 'available', finished_at: 300 },
+    ]);
+    const current = match('current', 500);
+
+    // Act
+    const result = await loadCoachHistory(db, 'owner', current, async (_owner, id) =>
+      id === 'available' ? match(id, 300) : null,
     );
+
+    // Assert
     expect(result).toEqual({ matches: [], gaps: 2 });
   });
 
   it('bounds legacy recovery and performs no unbounded Durable Object reads', async () => {
+    // Arrange
     const load = vi.fn();
-    const result = await loadCoachHistory(
-      database(
-        [],
-        Array.from({ length: 33 }, (_, i) => ({ id: `old-${i}` })),
-      ),
-      'owner',
-      match('current', 500),
-      load,
+    const db = database(
+      [],
+      Array.from({ length: 33 }, (_, i) => ({ id: `old-${i}` })),
     );
+    const current = match('current', 500);
+
+    // Act
+    const result = await loadCoachHistory(db, 'owner', current, load);
+
+    // Assert
     expect(result).toEqual({ matches: [], gaps: 3 });
     expect(load).not.toHaveBeenCalled();
   });

@@ -1,5 +1,5 @@
 import { coachIdentity, computerSettings, suggestDifficulty } from './computer';
-import type { ComputerHistory } from './computer';
+import type { ChessLevel, ComputerHistory, DifficultySuggestion } from './computer';
 import type { Difficulty } from './game';
 import { describe, expect, it } from 'vitest';
 
@@ -16,88 +16,205 @@ function game(
   };
 }
 
+describe('computer constants', () => {
+  it('coachIdentity, named coach, matches the recorded snapshot', () => {
+    // Arrange
+    const identity = coachIdentity;
+
+    // Act
+    const recorded = identity;
+
+    // Assert
+    expect(recorded).toMatchInlineSnapshot(`
+      {
+        "name": "Lucía",
+      }
+    `);
+  });
+
+  it('computerSettings, strength table, matches the recorded snapshot', () => {
+    // Arrange
+    const settings = computerSettings;
+
+    // Act
+    const recorded = settings;
+
+    // Assert
+    expect(recorded).toMatchInlineSnapshot(`
+      {
+        "1": {
+          "depth": 3,
+          "moveTimeMs": 100,
+          "skill": 0,
+        },
+        "2": {
+          "depth": 6,
+          "moveTimeMs": 250,
+          "skill": 4,
+        },
+        "3": {
+          "depth": 10,
+          "moveTimeMs": 500,
+          "skill": 10,
+        },
+        "4": {
+          "depth": 16,
+          "moveTimeMs": 1200,
+          "skill": 20,
+        },
+      }
+    `);
+  });
+
+  it('computerSettings, the four levels, use distinct skills', () => {
+    // Arrange
+    const skills = Object.values(computerSettings).map((setting) => setting.skill);
+
+    // Act
+    const distinct = new Set(skills).size;
+
+    // Assert
+    expect(distinct).toBe(4);
+  });
+
+  it.each([
+    [1, 2],
+    [2, 3],
+    [3, 4],
+  ] as const)(
+    'computerSettings, level %i against level %i, increases depth and move time',
+    (lower, higher) => {
+      // Arrange
+      const weaker = computerSettings[lower];
+      const stronger = computerSettings[higher];
+
+      // Act
+      const strongerSettings =
+        stronger.depth > weaker.depth && stronger.moveTimeMs > weaker.moveTimeMs;
+
+      // Assert
+      expect(strongerSettings).toBe(true);
+    },
+  );
+});
+
 describe('computer strength suggestions', () => {
-  it('shares a named opponent and coach identity without an Elo claim', () => {
-    expect(coachIdentity.name).toBe('Lucía');
-    const settings = Object.values(computerSettings);
-    expect(new Set(settings.map((setting) => setting.skill)).size).toBe(4);
-    expect(
-      settings.every(
-        (setting, i) =>
-          i === 0 ||
-          (setting.depth > settings[i - 1].depth &&
-            setting.moveTimeMs > settings[i - 1].moveTimeMs),
-      ),
-    ).toBe(true);
+  it.each<[ChessLevel, Difficulty, DifficultySuggestion | null]>([
+    ['beginner', 2, { difficulty: 1, reason: 'onboarding' }],
+    ['advanced', 1, { difficulty: 4, reason: 'onboarding' }],
+    ['casual', 2, null],
+  ])(
+    'suggestDifficulty, %s already on %i with no games, returns %j',
+    (level, selected, expected) => {
+      // Arrange
+      const history: ComputerHistory[] = [];
+
+      // Act
+      const suggestion = suggestDifficulty(level, selected, history);
+
+      // Assert
+      expect(suggestion).toEqual(expected);
+    },
+  );
+
+  it('suggestDifficulty, one finished game at the selected strength, makes no suggestion', () => {
+    // Arrange
+    const history = [game('w', 1)];
+
+    // Act
+    const suggestion = suggestDifficulty('advanced', 2, history);
+
+    // Assert
+    expect(suggestion).toBeNull();
   });
 
-  it('suggests an initial strength independently of teaching vocabulary', () => {
-    expect(suggestDifficulty('beginner', 2, [])).toEqual({ difficulty: 1, reason: 'onboarding' });
-    expect(suggestDifficulty('advanced', 1, [])).toEqual({ difficulty: 4, reason: 'onboarding' });
-    expect(suggestDifficulty('casual', 2, [])).toBeNull();
-  });
+  it('suggestDifficulty, five finished games at another strength, makes no suggestion', () => {
+    // Arrange
+    const history = Array.from({ length: 5 }, (_, index) => game('w', index, 1));
 
-  it('requires enough finished games at the selected strength', () => {
-    expect(suggestDifficulty('advanced', 2, [game('w', 1)])).toBeNull();
-    expect(
-      suggestDifficulty(
-        'advanced',
-        2,
-        Array.from({ length: 5 }, (_, i) => game('w', i, 1)),
-      ),
-    ).toBeNull();
+    // Act
+    const suggestion = suggestDifficulty('advanced', 2, history);
+
+    // Assert
+    expect(suggestion).toBeNull();
   });
 
   it('suggests one step up after four wins among five most recent games', () => {
+    // Arrange
     const history = [
       game('b', 0),
-      ...Array.from({ length: 4 }, (_, i) => game('w', i + 1)),
+      ...Array.from({ length: 4 }, (_, index) => game('w', index + 1)),
       game(null, 5),
     ];
-    const snapshot = structuredClone(history);
-    expect(suggestDifficulty('beginner', 2, history)).toEqual({
-      difficulty: 3,
-      reason: 'recentWins',
-    });
-    expect(history).toEqual(snapshot);
+    const before = structuredClone(history);
+
+    // Act
+    const suggestion = suggestDifficulty('beginner', 2, history);
+
+    // Assert
+    expect(suggestion).toEqual({ difficulty: 3, reason: 'recentWins' });
+    expect(history).toEqual(before);
   });
 
-  it('counts player colour, excludes unfinished games and never counts draws as losses', () => {
-    const losses = Array.from({ length: 5 }, (_, i) => ({ ...game('w', i), colour: 'b' as const }));
-    expect(suggestDifficulty('advanced', 2, losses)).toEqual({
-      difficulty: 1,
-      reason: 'recentLosses',
-    });
-    expect(
-      suggestDifficulty(
-        'advanced',
-        2,
-        Array.from({ length: 5 }, (_, i) => game(null, i)),
-      ),
-    ).toBeNull();
-    expect(
-      suggestDifficulty(
-        'advanced',
-        2,
-        losses.map((entry) => ({ ...entry, result: null })),
-      ),
-    ).toEqual({ difficulty: 4, reason: 'onboarding' });
+  it('suggestDifficulty, five losses with the player as black, steps down one strength', () => {
+    // Arrange
+    const history = Array.from({ length: 5 }, (_, index) => ({
+      ...game('w', index),
+      colour: 'b' as const,
+    }));
+
+    // Act
+    const suggestion = suggestDifficulty('advanced', 2, history);
+
+    // Assert
+    expect(suggestion).toEqual({ difficulty: 1, reason: 'recentLosses' });
   });
 
-  it('does not exceed the four available strengths', () => {
-    expect(
-      suggestDifficulty(
-        'advanced',
-        4,
-        Array.from({ length: 5 }, (_, i) => game('w', i, 4)),
-      ),
-    ).toBeNull();
-    expect(
-      suggestDifficulty(
-        'beginner',
-        1,
-        Array.from({ length: 5 }, (_, i) => game('b', i, 1)),
-      ),
-    ).toBeNull();
+  it('suggestDifficulty, five draws, makes no suggestion', () => {
+    // Arrange
+    const history = Array.from({ length: 5 }, (_, index) => game(null, index));
+
+    // Act
+    const suggestion = suggestDifficulty('advanced', 2, history);
+
+    // Assert
+    expect(suggestion).toBeNull();
+  });
+
+  it('suggestDifficulty, unfinished games only, uses the onboarding strength', () => {
+    // Arrange
+    const history = Array.from({ length: 5 }, (_, index) => ({
+      ...game('w', index),
+      colour: 'b' as const,
+      result: null,
+    }));
+
+    // Act
+    const suggestion = suggestDifficulty('advanced', 2, history);
+
+    // Assert
+    expect(suggestion).toEqual({ difficulty: 4, reason: 'onboarding' });
+  });
+
+  it('suggestDifficulty, five wins at the highest strength, makes no suggestion', () => {
+    // Arrange
+    const history = Array.from({ length: 5 }, (_, index) => game('w', index, 4));
+
+    // Act
+    const suggestion = suggestDifficulty('advanced', 4, history);
+
+    // Assert
+    expect(suggestion).toBeNull();
+  });
+
+  it('suggestDifficulty, five losses at the lowest strength, makes no suggestion', () => {
+    // Arrange
+    const history = Array.from({ length: 5 }, (_, index) => game('b', index, 1));
+
+    // Act
+    const suggestion = suggestDifficulty('beginner', 1, history);
+
+    // Assert
+    expect(suggestion).toBeNull();
   });
 });

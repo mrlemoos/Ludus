@@ -76,24 +76,53 @@ afterEach(() => {
 
 describe('parseGuestSessionBody', () => {
   it('rejects requests without adult confirmation', () => {
-    expect(parseGuestSessionBody({ adult: false })).toBeNull();
-    expect(parseGuestSessionBody({})).toBeNull();
-    expect(parseGuestSessionBody(null)).toBeNull();
+    // Arrange
+    const missingAdult = parseGuestSessionBody({ adult: false });
+    const empty = parseGuestSessionBody({});
+
+    // Act
+    const absent = parseGuestSessionBody(null);
+
+    // Assert
+    expect(missingAdult).toBeNull();
+    expect(empty).toBeNull();
+    expect(absent).toBeNull();
   });
 
   it('defaults the language to en-GB when omitted', () => {
-    expect(parseGuestSessionBody({ adult: true })).toEqual({ adult: true, language: 'en-GB' });
+    // Arrange
+    const body = { adult: true };
+
+    // Act
+    const parsed = parseGuestSessionBody(body);
+
+    // Assert
+    expect(parsed).toEqual({ adult: true, language: 'en-GB' });
   });
 
   it('keeps a supported language when provided', () => {
-    expect(parseGuestSessionBody({ adult: true, language: 'fr-FR' })).toEqual({
+    // Arrange
+    const body = { adult: true, language: 'fr-FR' };
+
+    // Act
+    const parsed = parseGuestSessionBody(body);
+
+    // Assert
+    expect(parsed).toEqual({
       adult: true,
       language: 'fr-FR',
     });
   });
 
   it('falls back to en-GB for an unsupported language code', () => {
-    expect(parseGuestSessionBody({ adult: true, language: 'de-DE' })).toEqual({
+    // Arrange
+    const body = { adult: true, language: 'de-DE' };
+
+    // Act
+    const parsed = parseGuestSessionBody(body);
+
+    // Assert
+    expect(parsed).toEqual({
       adult: true,
       language: 'en-GB',
     });
@@ -102,56 +131,72 @@ describe('parseGuestSessionBody', () => {
 
 describe('guestCookieAttributes', () => {
   it('omits Secure on plain HTTP development hosts', () => {
-    expect(guestCookieAttributes(false)).toContain(`Max-Age=${guestSessionDays * 86_400}`);
-    expect(guestCookieAttributes(false)).not.toContain('Secure');
+    // Arrange
+    const secure = false;
+
+    // Act
+    const attributes = guestCookieAttributes(secure);
+
+    // Assert
+    expect(attributes).toContain(`Max-Age=${guestSessionDays * 86_400}`);
+    expect(attributes).not.toContain('Secure');
   });
 
   it('adds Secure on HTTPS hosts', () => {
-    expect(guestCookieAttributes(true)).toContain('Secure');
+    // Arrange
+    const secure = true;
+
+    // Act
+    const attributes = guestCookieAttributes(secure);
+
+    // Assert
+    expect(attributes).toContain('Secure');
   });
 });
 
 describe('guest session cookies', () => {
   it('issues and reads a signed cookie', async () => {
+    // Arrange
     const { d1 } = memoryDb();
-
     const created = await createGuestSession(
       new Request('https://ludus.test/api/guest/session'),
       guestEnv(d1),
       { adult: true, language: 'en-GB' },
     );
-
     const issued = await issueGuestCookie(
       new Response(null, { status: 201 }),
       guestEnv(d1),
       created.identity.id,
       false,
     );
-
     const request = new Request('https://ludus.test/api/me', {
       headers: { Cookie: issued.headers.get('Set-Cookie')!.split(';')[0] },
     });
 
+    // Act
     const guest = await readGuest(request, guestEnv(d1));
 
+    // Assert
     expect(created.status).toBe(201);
     expect(guest).toEqual(created.identity);
   });
 
   it('rejects a tampered signature', async () => {
+    // Arrange
     const { d1 } = memoryDb();
     const { cookie } = await signedGuestCookie(d1);
     const tampered = cookie.replace(/.$/, cookie.at(-1) === 'a' ? 'b' : 'a');
+    const request = new Request('https://ludus.test/api/me', { headers: { Cookie: tampered } });
 
-    const guest = await readGuest(
-      new Request('https://ludus.test/api/me', { headers: { Cookie: tampered } }),
-      guestEnv(d1),
-    );
+    // Act
+    const guest = await readGuest(request, guestEnv(d1));
 
+    // Assert
     expect(guest).toBeNull();
   });
 
   it('rejects an expired cookie', async () => {
+    // Arrange
     const { d1 } = memoryDb();
     const env = guestEnv(d1);
     const created = await createGuestSession(
@@ -167,31 +212,39 @@ describe('guest session cookies', () => {
     );
     const cookie = issued.headers.get('Set-Cookie')!.split(';')[0];
     const now = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 8 * 86_400_000);
+    const request = new Request('https://ludus.test/api/me', { headers: { Cookie: cookie } });
 
-    const guest = await readGuest(
-      new Request('https://ludus.test/api/me', { headers: { Cookie: cookie } }),
-      env,
-    );
+    // Act
+    const guest = await readGuest(request, env).finally(() => {
+      now.mockRestore();
+    });
 
-    now.mockRestore();
+    // Assert
     expect(guest).toBeNull();
   });
 
   it('returns null when the signing secret is missing', async () => {
+    // Arrange
     const { d1 } = memoryDb();
     const { cookie } = await signedGuestCookie(d1);
+    const request = new Request('https://ludus.test/api/me', { headers: { Cookie: cookie } });
+    const environment = { DB: d1 } as unknown as Env;
 
-    const guest = await readGuest(
-      new Request('https://ludus.test/api/me', { headers: { Cookie: cookie } }),
-      { DB: d1 } as unknown as Env,
-    );
+    // Act
+    const guest = await readGuest(request, environment);
 
+    // Assert
     expect(guest).toBeNull();
   });
 
   it('clears guest cookies', () => {
-    const cleared = clearGuestCookie(new Response(null, { status: 204 }), false);
+    // Arrange
+    const response = new Response(null, { status: 204 });
 
+    // Act
+    const cleared = clearGuestCookie(response, false);
+
+    // Assert
     expect(cleared.headers.get('Set-Cookie')).toContain(`${guestCookieName}=`);
     expect(cleared.headers.get('Set-Cookie')).toContain('Max-Age=0');
   });
@@ -199,15 +252,15 @@ describe('guest session cookies', () => {
 
 describe('createGuestSession', () => {
   it('returns rate_limited when the IP limiter rejects the request', async () => {
+    // Arrange
     const { d1 } = memoryDb();
     const env = guestEnv(d1, { limit: async () => ({ success: false }) });
+    const request = new Request('https://ludus.test/api/guest/session');
 
-    const created = await createGuestSession(
-      new Request('https://ludus.test/api/guest/session'),
-      env,
-      { adult: true, language: 'en-GB' },
-    );
+    // Act
+    const created = await createGuestSession(request, env, { adult: true, language: 'en-GB' });
 
+    // Assert
     expect(created).toEqual({
       identity: { id: '', name: '' },
       status: 429,
@@ -216,14 +269,18 @@ describe('createGuestSession', () => {
   });
 
   it('returns unavailable when the signing secret is missing', async () => {
+    // Arrange
     const { d1 } = memoryDb();
+    const env = {
+      DB: d1,
+      GUEST_LIMITER: { limit: async () => ({ success: true }) },
+    } as unknown as Env;
+    const request = new Request('https://ludus.test/api/guest/session');
 
-    const created = await createGuestSession(
-      new Request('https://ludus.test/api/guest/session'),
-      { DB: d1, GUEST_LIMITER: { limit: async () => ({ success: true }) } } as unknown as Env,
-      { adult: true, language: 'en-GB' },
-    );
+    // Act
+    const created = await createGuestSession(request, env, { adult: true, language: 'en-GB' });
 
+    // Assert
     expect(created).toEqual({
       identity: { id: '', name: '' },
       status: 503,
@@ -232,6 +289,7 @@ describe('createGuestSession', () => {
   });
 
   it('reuses an existing guest instead of creating a duplicate row', async () => {
+    // Arrange
     const { d1 } = memoryDb();
     const env = guestEnv(d1);
     const first = await createGuestSession(
@@ -249,8 +307,10 @@ describe('createGuestSession', () => {
       headers: { Cookie: issued.headers.get('Set-Cookie')!.split(';')[0] },
     });
 
+    // Act
     const second = await createGuestSession(request, env, { adult: true, language: 'en-GB' });
 
+    // Assert
     expect(second.status).toBe(200);
     expect(second.identity).toEqual(first.identity);
   });
@@ -258,6 +318,7 @@ describe('createGuestSession', () => {
 
 describe('guest limits and cleanup', () => {
   it('allows guests below the finished-game cap', async () => {
+    // Arrange
     const { database, d1 } = memoryDb();
     const id = 'guest_under_cap';
     database
@@ -271,10 +332,15 @@ describe('guest limits and cleanup', () => {
         .run(`g${index}`, id, 0, 1, '10+5', 1, 'w', '{}');
     }
 
-    expect(await guestWithinGameLimit(d1, id)).toBe(true);
+    // Act
+    const allowed = await guestWithinGameLimit(d1, id);
+
+    // Assert
+    expect(allowed).toBe(true);
   });
 
   it('enforces the finished-game cap', async () => {
+    // Arrange
     const { database, d1 } = memoryDb();
     const id = 'guest_test';
     database
@@ -288,10 +354,15 @@ describe('guest limits and cleanup', () => {
         .run(`g${index}`, id, 0, 1, '10+5', 1, 'w', '{}');
     }
 
-    expect(await guestWithinGameLimit(d1, id)).toBe(false);
+    // Act
+    const allowed = await guestWithinGameLimit(d1, id);
+
+    // Assert
+    expect(allowed).toBe(false);
   });
 
   it('purges stale guest users', async () => {
+    // Arrange
     const { database, d1 } = memoryDb();
     database
       .prepare(
@@ -304,8 +375,10 @@ describe('guest limits and cleanup', () => {
       )
       .run();
 
+    // Act
     await purgeGuestUsers(d1, 30 * 86_400_000 + 1);
 
+    // Assert
     expect(database.prepare('SELECT count(*) AS count FROM user').get()).toEqual({ count: 0 });
   });
 });

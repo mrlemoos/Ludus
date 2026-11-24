@@ -114,9 +114,9 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 describe('sQLite matchmaking assignment races', () => {
   it('reserves both users before awaiting match initialisation; cancellation cannot steal an assignment', async () => {
+    // Arrange
     const f = coordinator();
     const first = await f.coordinator.join('white', '5+3', false, 1500);
-    expect(first.status).toBe('queued');
     if (first.status !== 'queued') {
       throw new Error('queued');
     }
@@ -128,7 +128,12 @@ describe('sQLite matchmaking assignment races', () => {
     const matching = f.coordinator.join('black', '5+3', false, 1500);
     const cancellation = f.coordinator.cancel('white', first.entry.token);
     release();
+
+    // Act
     const [matched, cancelled] = await Promise.all([matching, cancellation]);
+
+    // Assert
+    expect(first.status).toBe('queued');
     expect(matched.status).toBe('assigned');
     expect(cancelled.status).toBe('assigned');
     if (matched.status !== 'assigned' || cancelled.status !== 'assigned') {
@@ -143,66 +148,127 @@ describe('sQLite matchmaking assignment races', () => {
   });
 
   it('cancels before assignment and requires explicit delayed AI acceptance with exact token', async () => {
+    // Arrange
     const f = coordinator();
     const queued = await f.coordinator.join('one', '5+3', false, 1500);
     if (queued.status !== 'queued') {
       throw new Error('queued');
     }
-    await expect(f.coordinator.cancel('one', queued.entry.token, true)).rejects.toThrow(
-      'too_early',
-    );
+    let early: unknown;
+    try {
+      await f.coordinator.cancel('one', queued.entry.token, true);
+    } catch (error) {
+      early = error;
+    }
     vi.setSystemTime(31_000);
-    await expect(f.coordinator.cancel('one', 'stale', true)).rejects.toThrow('stale_queue');
-    await expect(f.coordinator.cancel('one', queued.entry.token, true)).resolves.toEqual({
-      status: 'idle',
-      aiAccepted: true,
-    });
+    let stale: unknown;
+    try {
+      await f.coordinator.cancel('one', 'stale', true);
+    } catch (error) {
+      stale = error;
+    }
+
+    // Act
+    const accepted = await f.coordinator.cancel('one', queued.entry.token, true);
+
+    // Assert
+    await expect(async () => {
+      throw early;
+    }).rejects.toThrow('too_early');
+    await expect(async () => {
+      throw stale;
+    }).rejects.toThrow('stale_queue');
+    expect(accepted).toEqual({ status: 'idle', aiAccepted: true });
     const other = await f.coordinator.join('two', '5+3', false, 1500);
     expect(other.status).toBe('queued');
     expect(f.initialise).not.toHaveBeenCalled();
   });
 
   it('reserves computer matches atomically against queue, invitation and redemption', async () => {
+    // Arrange
     const f = coordinator();
     await f.coordinator.reserveComputer('one', 'computer');
-    await expect(f.coordinator.reserveComputer('one', 'computer')).resolves.toEqual({
-      reserved: true,
-    });
-    await expect(f.coordinator.join('one', '5+3', false, 1500)).rejects.toThrow('computer_active');
-    await expect(f.coordinator.createInvite('one', '5+3')).rejects.toThrow('busy');
+    const second = await f.coordinator.reserveComputer('one', 'computer');
+    let joinError: unknown;
+    try {
+      await f.coordinator.join('one', '5+3', false, 1500);
+    } catch (error) {
+      joinError = error;
+    }
+    let inviteError: unknown;
+    try {
+      await f.coordinator.createInvite('one', '5+3');
+    } catch (error) {
+      inviteError = error;
+    }
     const invite = await f.coordinator.createInvite('friend', '5+3');
-    await expect(f.coordinator.redeem('one', invite.token, 'b')).rejects.toThrow('busy');
+    let redeemError: unknown;
+    try {
+      await f.coordinator.redeem('one', invite.token, 'b');
+    } catch (error) {
+      redeemError = error;
+    }
     await f.coordinator.releaseComputer('one', 'stale');
-    await expect(f.coordinator.status('one')).resolves.toEqual({
-      status: 'computer',
-      id: 'computer',
-    });
+    const duringComputer = await f.coordinator.status('one');
     await f.coordinator.releaseComputer('one', 'computer');
     const queued = await f.coordinator.join('one', '5+3', false, 1500);
-    await expect(f.coordinator.reserveComputer('one', 'another')).rejects.toThrow('busy');
+
+    // Act
+    const reserveWhileQueued = f.coordinator.reserveComputer('one', 'another');
+
+    // Assert
+    expect(second).toEqual({ reserved: true });
+    await expect(async () => {
+      throw joinError;
+    }).rejects.toThrow('computer_active');
+    await expect(async () => {
+      throw inviteError;
+    }).rejects.toThrow('busy');
+    await expect(async () => {
+      throw redeemError;
+    }).rejects.toThrow('busy');
+    expect(duringComputer).toEqual({ status: 'computer', id: 'computer' });
+    await expect(reserveWhileQueued).rejects.toThrow('busy');
     expect(queued.status).toBe('queued');
   });
 
   it('issues a new link when the saved invitation is gone', async () => {
+    // Arrange
     const f = coordinator();
     const invite = await f.coordinator.createInvite('owner', '5+3');
     f.db.prepare('DELETE FROM invites WHERE token=?').run(invite.token);
-    await expect(f.coordinator.status('owner')).resolves.toEqual({ status: 'idle' });
+    const idle = await f.coordinator.status('owner');
+
+    // Act
     const next = await f.coordinator.createInvite('owner', '5+3');
+
+    // Assert
+    expect(idle).toEqual({ status: 'idle' });
     expect(next.token).not.toBe(invite.token);
     const joined = await f.coordinator.redeem('friend', next.token, 'b');
     expect(joined.match.players).toEqual({ w: 'owner', b: 'friend' });
   });
 
   it('redeems invitations only once and keeps the first seats when the guest retries another colour', async () => {
+    // Arrange
     const f = coordinator();
     const invite = await f.coordinator.createInvite('owner', '10+5');
-    expect(invite.expiresAt).toBe(86_401_000);
-    await expect(f.coordinator.redeem('owner', invite.token, 'random')).rejects.toThrow(
-      'invalid_invite',
-    );
+    let ownerError: unknown;
+    try {
+      await f.coordinator.redeem('owner', invite.token, 'random');
+    } catch (error) {
+      ownerError = error;
+    }
     const first = await f.coordinator.redeem('friend', invite.token, 'w');
+
+    // Act
     const retry = await f.coordinator.redeem('friend', invite.token, 'b');
+
+    // Assert
+    expect(invite.expiresAt).toBe(86_401_000);
+    await expect(async () => {
+      throw ownerError;
+    }).rejects.toThrow('invalid_invite');
     expect(first).toEqual(retry);
     expect(first.match.rated).toBe(false);
     expect(first.match.players).toEqual({ w: 'friend', b: 'owner' });
@@ -215,6 +281,7 @@ describe('sQLite matchmaking assignment races', () => {
   });
 
   it('seats the guest on the requested side and keeps friend matches casual', async () => {
+    // Arrange
     const original = crypto.getRandomValues.bind(crypto);
     const spy = vi.spyOn(crypto, 'getRandomValues').mockImplementation((array) => {
       if (array instanceof Uint8Array && array.length === 1) {
@@ -228,8 +295,6 @@ describe('sQLite matchmaking assignment races', () => {
       const white = coordinator();
       const whiteInvite = await white.coordinator.createInvite('host', '5+3');
       const asWhite = await white.coordinator.redeem('guest', whiteInvite.token, 'w');
-      expect(asWhite.match.players).toEqual({ w: 'guest', b: 'host' });
-      expect(asWhite.match.rated).toBe(false);
       spy.mockImplementation((array) => {
         if (array instanceof Uint8Array && array.length === 1) {
           array[0] = 0;
@@ -240,7 +305,13 @@ describe('sQLite matchmaking assignment races', () => {
       });
       const black = coordinator();
       const blackInvite = await black.coordinator.createInvite('host', '10+5');
+
+      // Act
       const asBlack = await black.coordinator.redeem('guest', blackInvite.token, 'b');
+
+      // Assert
+      expect(asWhite.match.players).toEqual({ w: 'guest', b: 'host' });
+      expect(asWhite.match.rated).toBe(false);
       expect(asBlack.match.players).toEqual({ w: 'host', b: 'guest' });
       expect(asBlack.match.rated).toBe(false);
     } finally {
@@ -249,6 +320,7 @@ describe('sQLite matchmaking assignment races', () => {
   });
 
   it('rolls random guest colour once on the server and ignores a later colour', async () => {
+    // Arrange
     const original = crypto.getRandomValues.bind(crypto);
     const spy = vi.spyOn(crypto, 'getRandomValues').mockImplementation((array) => {
       if (array instanceof Uint8Array && array.length === 1) {
@@ -266,12 +338,9 @@ describe('sQLite matchmaking assignment races', () => {
       const low = coordinator();
       const lowInvite = await low.coordinator.createInvite('host', '5+3');
       const lowMatch = await low.coordinator.redeem('guest', lowInvite.token, 'random');
-      expect(lowMatch.match.players).toEqual({ w: 'guest', b: 'host' });
-      expect(rolls()).toBe(1);
+      const rollsAfterLow = rolls();
       const retry = await low.coordinator.redeem('guest', lowInvite.token, 'b');
-      expect(retry.match.id).toBe(lowMatch.match.id);
-      expect(retry.match.players).toEqual(lowMatch.match.players);
-      expect(rolls()).toBe(1);
+      const rollsAfterRetry = rolls();
       spy.mockImplementation((array) => {
         if (array instanceof Uint8Array && array.length === 1) {
           array[0] = 128;
@@ -282,7 +351,16 @@ describe('sQLite matchmaking assignment races', () => {
       });
       const high = coordinator();
       const highInvite = await high.coordinator.createInvite('host', '10+5');
+
+      // Act
       const highMatch = await high.coordinator.redeem('guest', highInvite.token, 'random');
+
+      // Assert
+      expect(lowMatch.match.players).toEqual({ w: 'guest', b: 'host' });
+      expect(rollsAfterLow).toBe(1);
+      expect(retry.match.id).toBe(lowMatch.match.id);
+      expect(retry.match.players).toEqual(lowMatch.match.players);
+      expect(rollsAfterRetry).toBe(1);
       expect(highMatch.match.players).toEqual({ w: 'host', b: 'guest' });
       expect(highMatch.match.rated).toBe(false);
       expect(rolls()).toBe(2);
@@ -292,6 +370,7 @@ describe('sQLite matchmaking assignment races', () => {
   });
 
   it('pushes one assigned match to both players after initialisation', async () => {
+    // Arrange
     const f = coordinator();
     function socket(player: string) {
       return {
@@ -319,13 +398,18 @@ describe('sQLite matchmaking assignment races', () => {
         order.push('joining');
       }
     });
-    expect((await f.coordinator.join('white', '5+3', false, 1500)).status).toBe('queued');
-    const matched = await f.coordinator.join('black', '5+3', false, 1500);
-    if (matched.status !== 'assigned') {
-      throw new Error('assigned');
-    }
     function assigned(send: { mock: { calls: unknown[][] } }) {
       return send.mock.calls.filter((call) => JSON.parse(String(call[0])).status === 'assigned');
+    }
+    const queued = await f.coordinator.join('white', '5+3', false, 1500);
+
+    // Act
+    const matched = await f.coordinator.join('black', '5+3', false, 1500);
+
+    // Assert
+    expect(queued.status).toBe('queued');
+    if (matched.status !== 'assigned') {
+      throw new Error('assigned');
     }
     expect(assigned(waiting.send)).toHaveLength(1);
     expect(assigned(joining.send)).toHaveLength(1);
@@ -341,6 +425,7 @@ describe('sQLite matchmaking assignment races', () => {
   });
 
   it('closes a socket that cannot accept a queue update', async () => {
+    // Arrange
     const f = coordinator();
     const socket = {
       player: 'one',
@@ -352,34 +437,63 @@ describe('sQLite matchmaking assignment races', () => {
       deserializeAttachment: () => ({ player: 'one' }),
     };
     f.sockets.push(socket);
-    expect((await f.coordinator.join('one', '5+3', false, 1500)).status).toBe('queued');
+
+    // Act
+    const joined = await f.coordinator.join('one', '5+3', false, 1500);
+
+    // Assert
+    expect(joined.status).toBe('queued');
     expect(socket.close).toHaveBeenCalledWith(1011, 'Reconnect');
   });
 
   it('rejects a matchmaking socket without a player or a websocket upgrade', async () => {
+    // Arrange
     const f = coordinator();
-    expect((await f.coordinator.fetch(new Request('https://ludus.test'))).status).toBe(404);
-    expect(
-      (
-        await f.coordinator.fetch(
-          new Request('https://ludus.test', { headers: { 'X-Player': 'white' } }),
-        )
-      ).status,
-    ).toBe(426);
+    const missingPlayer = await f.coordinator.fetch(new Request('https://ludus.test'));
+
+    // Act
+    const missingUpgrade = await f.coordinator.fetch(
+      new Request('https://ludus.test', { headers: { 'X-Player': 'white' } }),
+    );
+
+    // Assert
+    expect(missingPlayer.status).toBe(404);
+    expect(missingUpgrade.status).toBe(426);
   });
 
   it('rejects expired invites, mixed queue entry, and repairs interrupted assignment initialisation', async () => {
+    // Arrange
     const f = coordinator();
     const invite = await f.coordinator.createInvite('owner', '5+3');
-    await expect(f.coordinator.join('owner', '5+3', false, 1500)).rejects.toThrow('invite_active');
+    let inviteActive: unknown;
+    try {
+      await f.coordinator.join('owner', '5+3', false, 1500);
+    } catch (error) {
+      inviteActive = error;
+    }
     vi.setSystemTime(invite.expiresAt);
-    await expect(f.coordinator.redeem('other', invite.token, 'random')).rejects.toThrow(
-      'invalid_invite',
-    );
-    await expect(f.coordinator.status('owner')).resolves.toEqual({ status: 'idle' });
+    let expired: unknown;
+    try {
+      await f.coordinator.redeem('other', invite.token, 'random');
+    } catch (error) {
+      expired = error;
+    }
+    const idle = await f.coordinator.status('owner');
     await f.coordinator.join('one', '5+3', false, 1500);
     f.initialise.mockRejectedValueOnce(new Error('network'));
-    await expect(f.coordinator.join('two', '5+3', false, 1500)).rejects.toThrow('network');
+
+    // Act
+    const repair = f.coordinator.join('two', '5+3', false, 1500);
+
+    // Assert
+    await expect(async () => {
+      throw inviteActive;
+    }).rejects.toThrow('invite_active');
+    await expect(async () => {
+      throw expired;
+    }).rejects.toThrow('invalid_invite');
+    expect(idle).toEqual({ status: 'idle' });
+    await expect(repair).rejects.toThrow('network');
     expect((await f.coordinator.status('one')).status).toBe('assigned');
     expect((await f.coordinator.status('two')).status).toBe('assigned');
     expect(f.initialise.mock.calls.at(-1)).toEqual(f.initialise.mock.calls.at(-2));
@@ -416,51 +530,73 @@ async function postOnline(env: Env, path: string, data: Record<string, unknown>)
 }
 describe('online invitation HTTP and matchmaking socket', () => {
   it('accepts an invitation control and rejects a supplied colour', async () => {
+    // Arrange
     const { env, createInvite } = onlineEnv();
     const rejected = await postOnline(env, '/api/online/invitations', {
       control: '5+3',
       colour: 'w',
     });
+    const invalidControl = await postOnline(env, '/api/online/invitations', { control: '3+0' });
+    const callsBeforeCreate = createInvite.mock.calls.length;
+
+    // Act
+    const created = await postOnline(env, '/api/online/invitations', { control: '10+5' });
+
+    // Assert
     expect(rejected.status).toBe(400);
     await expect(rejected.json()).resolves.toEqual({ error: 'invalid' });
-    expect(createInvite).not.toHaveBeenCalled();
-    expect((await postOnline(env, '/api/online/invitations', { control: '3+0' })).status).toBe(400);
-    const created = await postOnline(env, '/api/online/invitations', { control: '10+5' });
+    expect(callsBeforeCreate).toBe(0);
+    expect(invalidControl.status).toBe(400);
     expect(created.status).toBe(200);
     expect(createInvite).toHaveBeenCalledWith('guest', '10+5');
   });
 
   it('reports a missing invitation instead of a generic outage', async () => {
+    // Arrange
     const { env } = onlineEnv();
     env.MATCHMAKING.getByName = (() => ({
       redeem: async () => {
         throw new Error('not_found');
       },
     })) as unknown as typeof env.MATCHMAKING.getByName;
+
+    // Act
     const response = await postOnline(env, '/api/online/invitations/redeem', {
       token: '11111111-1111-4111-8111-111111111111',
       colour: 'w',
     });
+
+    // Assert
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: 'not_found' });
   });
 
   it('requires a guest colour when redeeming an invitation', async () => {
+    // Arrange
     const { env, redeem, revokeInvite } = onlineEnv();
     const token = '11111111-1111-4111-8111-111111111111';
-    expect((await postOnline(env, '/api/online/invitations/redeem', { token })).status).toBe(400);
-    expect(
-      (await postOnline(env, '/api/online/invitations/redeem', { token, colour: 'white' })).status,
-    ).toBe(400);
-    expect(
-      (await postOnline(env, '/api/online/invitations/redeem', { token: 'nope', colour: 'w' }))
-        .status,
-    ).toBe(400);
-    expect(redeem).not.toHaveBeenCalled();
+    const missingColour = await postOnline(env, '/api/online/invitations/redeem', { token });
+    const badColour = await postOnline(env, '/api/online/invitations/redeem', {
+      token,
+      colour: 'white',
+    });
+    const badToken = await postOnline(env, '/api/online/invitations/redeem', {
+      token: 'nope',
+      colour: 'w',
+    });
+    const redeemCalls = redeem.mock.calls.length;
+
+    // Act
     const redeemed = await postOnline(env, '/api/online/invitations/redeem', {
       token,
       colour: 'random',
     });
+
+    // Assert
+    expect(missingColour.status).toBe(400);
+    expect(badColour.status).toBe(400);
+    expect(badToken.status).toBe(400);
+    expect(redeemCalls).toBe(0);
     expect(redeemed.status).toBe(200);
     expect(redeem).toHaveBeenCalledWith('guest', token, 'random');
     const cancelled = await postOnline(env, '/api/online/invitations/cancel', { token });
@@ -469,22 +605,24 @@ describe('online invitation HTTP and matchmaking socket', () => {
   });
 
   it('upgrades the same-origin matchmaking socket with the player header', async () => {
+    // Arrange
     const { env, fetch } = onlineEnv();
     const origin = 'https://ludus.test';
-    expect(
-      (
-        await onlineApi(
-          new Request(`${origin}/api/online/socket`, { headers: { Origin: 'https://evil.test' } }),
-          env,
-          'white',
-        )
-      )?.status,
-    ).toBe(403);
+    const crossSite = await onlineApi(
+      new Request(`${origin}/api/online/socket`, { headers: { Origin: 'https://evil.test' } }),
+      env,
+      'white',
+    );
+
+    // Act
     const response = await onlineApi(
       new Request(`${origin}/api/online/socket`, { headers: { Origin: origin } }),
       env,
       'white',
     );
+
+    // Assert
+    expect(crossSite?.status).toBe(403);
     expect(response?.status).toBe(426);
     expect(fetch).toHaveBeenCalledTimes(1);
     const forwarded = fetch.mock.calls[0][0];
@@ -525,44 +663,74 @@ function active() {
 }
 describe('sQLite human match durability and authorisation', () => {
   it('rejects non-members for reads/actions/socket admission without exposing state', async () => {
+    // Arrange
     const f = humanFixture(active());
-    await expect(f.match.read('stranger')).resolves.toBeNull();
-    await expect(f.match.act('stranger', { type: 'resign', revision: 0 })).resolves.toEqual({
-      error: 'not_found',
-    });
-    expect(
-      (
-        await f.match.fetch(
-          new Request('https://ludus.test', {
-            headers: { Upgrade: 'websocket', 'X-Player': 'stranger' },
-          }),
-        )
-      ).status,
-    ).toBe(404);
-    expect(f.saved()).toEqual(active());
-    await expect(f.match.phrase('stranger', 'hello')).rejects.toThrow('not_found');
-    await expect(f.match.report('stranger', 'other')).rejects.toThrow('not_found');
+    const read = await f.match.read('stranger');
+    const action = await f.match.act('stranger', { type: 'resign', revision: 0 });
+    const admission = await f.match.fetch(
+      new Request('https://ludus.test', {
+        headers: { Upgrade: 'websocket', 'X-Player': 'stranger' },
+      }),
+    );
+    const saved = f.saved();
+    let phraseError: unknown;
+    try {
+      await f.match.phrase('stranger', 'hello');
+    } catch (error) {
+      phraseError = error;
+    }
+
+    // Act
+    const report = f.match.report('stranger', 'other');
+
+    // Assert
+    expect(read).toBeNull();
+    expect(action).toEqual({ error: 'not_found' });
+    expect(admission.status).toBe(404);
+    expect(saved).toEqual(active());
+    await expect(async () => {
+      throw phraseError;
+    }).rejects.toThrow('not_found');
+    await expect(report).rejects.toThrow('not_found');
   });
 
   it('accepts a revision once during simultaneous moves and stale retry', async () => {
+    // Arrange
     const f = humanFixture(active());
     const action = { type: 'move', from: 'e2', to: 'e4', revision: 0 };
+
+    // Act
     const results = await Promise.all([f.match.act('white', action), f.match.act('white', action)]);
+
+    // Assert
     expect(results.filter((result) => 'game' in result)).toHaveLength(1);
     expect(f.saved().moves).toEqual(['e4']);
     expect(f.saved().clocks.w).toBe(302_000);
   });
 
   it('retains a terminal retry alarm when D1 fails and applies finalisation exactly once', async () => {
+    // Arrange
     const f = humanFixture(active());
     f.database.batch.mockRejectedValueOnce(new Error('D1 unavailable'));
-    await expect(f.match.act('white', { type: 'resign', revision: 0 })).rejects.toThrow(
-      'D1 unavailable',
-    );
-    expect(f.saved().result?.reason).toBe('resignation');
-    expect(f.storage.deleteAlarm).not.toHaveBeenCalled();
+    let failure: unknown;
+    try {
+      await f.match.act('white', { type: 'resign', revision: 0 });
+    } catch (error) {
+      failure = error;
+    }
+    const reason = f.saved().result?.reason;
+    const deleteAlarmCalls = f.storage.deleteAlarm.mock.calls.length;
     await f.match.alarm();
+
+    // Act
     await f.match.alarm();
+
+    // Assert
+    await expect(async () => {
+      throw failure;
+    }).rejects.toThrow('D1 unavailable');
+    expect(reason).toBe('resignation');
+    expect(deleteAlarmCalls).toBe(0);
     expect(f.database.db.prepare('SELECT * FROM online_results').all()).toEqual([
       { match_id: 'game', processed: 1 },
     ]);
@@ -576,12 +744,17 @@ describe('sQLite human match durability and authorisation', () => {
   });
 
   it('writes rating changes once under repeated result delivery and restores persisted state', async () => {
+    // Arrange
     // Infrastructure test bypasses entry guard only in fixture. Production rated entry remains disabled.
     const game = { ...active(), rated: true };
     const f = humanFixture(game);
     await f.match.act('white', { type: 'resign', revision: 0 });
     const first = f.database.db.prepare('SELECT * FROM ratings ORDER BY user_id').all();
+
+    // Act
     await Promise.all([f.match.alarm(), f.match.read('white'), f.match.read('black')]);
+
+    // Assert
     expect(f.database.db.prepare('SELECT * FROM ratings ORDER BY user_id').all()).toEqual(first);
     expect(first).toHaveLength(2);
     expect(first.every((row) => row.games === 1 && row.control === '5+3')).toBe(true);
@@ -591,6 +764,7 @@ describe('sQLite human match durability and authorisation', () => {
   });
 
   it('delivers preset IDs only to opposing sockets and keeps duplicate tabs connected', async () => {
+    // Arrange
     const f = humanFixture(active());
     function socket(player: string) {
       return {
@@ -606,27 +780,47 @@ describe('sQLite human match durability and authorisation', () => {
     const opponent = socket('black');
     f.sockets.push(own, duplicate, opponent);
     await f.match.phrase('white', 'hello');
-    expect(own.send).not.toHaveBeenCalled();
-    expect(duplicate.send).not.toHaveBeenCalled();
-    expect(opponent.send).toHaveBeenCalledWith(
-      JSON.stringify({ phrase: 'hello', from: 'w', at: 1000 }),
-    );
+    const ownCalls = own.send.mock.calls.length;
+    const duplicateCalls = duplicate.send.mock.calls.length;
+    const opponentPayloads = opponent.send.mock.calls.map((call) => call[0]);
     await f.match.webSocketClose(own as unknown as WebSocket, 1000);
-    expect(f.saved().disconnected.w).toBe(false);
+    const connectedWhileDuplicateOpen = f.saved().disconnected.w;
     own.readyState = 3;
+
+    // Act
     await f.match.webSocketClose(duplicate as unknown as WebSocket, 1000);
+
+    // Assert
+    expect(ownCalls).toBe(0);
+    expect(duplicateCalls).toBe(0);
+    expect(opponentPayloads).toContain(JSON.stringify({ phrase: 'hello', from: 'w', at: 1000 }));
+    expect(connectedWhileDuplicateOpen).toBe(false);
     expect(f.saved().disconnected.w).toBe(true);
     expect(f.saved().disconnected.b).toBe(false);
   });
 
   it('rate-limits validated preset IDs and deduplicates member reports', async () => {
+    // Arrange
     const f = humanFixture(active());
     await f.match.phrase('white', 'hello');
-    await expect(f.match.phrase('white', 'goodGame')).rejects.toThrow('rate_limited');
+    let limited: unknown;
+    try {
+      await f.match.phrase('white', 'goodGame');
+    } catch (error) {
+      limited = error;
+    }
     vi.setSystemTime(4000);
-    await expect(f.match.phrase('white', 'goodGame')).resolves.toEqual({ ok: true });
+    const allowed = await f.match.phrase('white', 'goodGame');
     await f.match.report('white', 'assistance');
+
+    // Act
     await f.match.report('white', 'assistance');
+
+    // Assert
+    await expect(async () => {
+      throw limited;
+    }).rejects.toThrow('rate_limited');
+    expect(allowed).toEqual({ ok: true });
     expect(f.database.db.prepare('SELECT count(*) AS count FROM match_reports').get()).toEqual({
       count: 1,
     });
@@ -635,6 +829,7 @@ describe('sQLite human match durability and authorisation', () => {
 
 describe('human account erasure', () => {
   it('revokes the deleted seat and preserves opponent replay and cleanup retries', async () => {
+    // Arrange
     const f = humanFixture(active());
     const socket = {
       player: 'white',
@@ -646,13 +841,19 @@ describe('human account erasure', () => {
     f.sockets.push(socket);
     f.database.db.prepare('INSERT INTO account_deletions VALUES(?)').run('white');
     await f.match.anonymise('white');
-    expect(socket.close).toHaveBeenCalledWith(1008, 'Account deleted');
-    expect(f.saved().players.w).toBe('deleted:white');
-    expect(f.saved().result?.reason).toBe('resignation');
     const terminal = f.saved();
-    await expect(f.match.read('white')).resolves.toBeNull();
-    expect((await f.match.read('black'))?.game.moves).toEqual(terminal.moves);
+    const whiteRead = await f.match.read('white');
+    const blackRead = await f.match.read('black');
+
+    // Act
     await f.match.anonymise('white');
+
+    // Assert
+    expect(socket.close).toHaveBeenCalledWith(1008, 'Account deleted');
+    expect(terminal.players.w).toBe('deleted:white');
+    expect(terminal.result?.reason).toBe('resignation');
+    expect(whiteRead).toBeNull();
+    expect(blackRead?.game.moves).toEqual(terminal.moves);
     expect(f.saved()).toEqual(terminal);
     expect(f.database.db.prepare('SELECT white_id FROM online_matches').get()).toEqual({
       white_id: 'deleted:white',
@@ -661,9 +862,15 @@ describe('human account erasure', () => {
   });
 
   it('refuses a late initialisation after a player deleted their account', async () => {
+    // Arrange
     const f = humanFixture();
     f.database.db.prepare('INSERT INTO account_deletions VALUES(?)').run('white');
-    await expect(f.match.initialise(assignment)).rejects.toThrow('account_deleted');
+
+    // Act
+    const initialising = f.match.initialise(assignment);
+
+    // Assert
+    await expect(initialising).rejects.toThrow('account_deleted');
     expect(f.database.db.prepare('SELECT count(*) AS count FROM online_matches').get()).toEqual({
       count: 0,
     });

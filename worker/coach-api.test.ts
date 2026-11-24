@@ -217,8 +217,13 @@ async function generateReview(f: ReturnType<typeof fixture>, body = input()) {
 }
 describe('private engine-grounded coach API', () => {
   it('exposes credit counts, unlimited local-analysis entitlement and five replies per review', async () => {
+    // Arrange
     const f = fixture();
+
+    // Act
     const response = await coachApi(request('/api/coach/status'), f.env, f.dependencies);
+
+    // Assert
     await expect(response.json()).resolves.toMatchObject({
       replyLimit: 5,
       reviewCredits: {
@@ -232,6 +237,7 @@ describe('private engine-grounded coach API', () => {
   });
 
   it('validates and sends the current game plus the three chronologically preceding games, omitting private IDs', async () => {
+    // Arrange
     const f = fixture();
     f.setHistory({
       matches: [
@@ -249,7 +255,12 @@ describe('private engine-grounded coach API', () => {
         { matchId: f.older3.id, analysis: [lineFor(f.older3)] },
       ],
     };
-    await generateReview(f, payload);
+
+    // Act
+    const response = await coachApi(request('/api/coach/reviews', payload), f.env, f.dependencies);
+
+    // Assert
+    expect(response.status).toBe(200);
     const provider = JSON.stringify(f.generate.mock.calls[0][0]);
     expect(provider).toContain('earlierGame');
     expect(provider).toContain('Stockfish 19 lite');
@@ -279,26 +290,32 @@ describe('private engine-grounded coach API', () => {
   });
 
   it('rejects history omitted or reordered by the browser and rejects forged FEN metadata', async () => {
+    // Arrange
     const f = fixture();
     f.setHistory({ matches: [{ match: f.previous, completedAt: now - 10_000 }], gaps: 0 });
-    expect(
-      (await coachApi(request('/api/coach/reviews', input()), f.env, f.dependencies)).status,
-    ).toBe(409);
+    const omitted = await coachApi(request('/api/coach/reviews', input()), f.env, f.dependencies);
     const forged = input('idempotency-key-0002', 'match-1', [
       {
         matchId: f.previous.id,
         analysis: [{ ...lineFor(f.previous), fen: '8/8/8/8/8/8/8/8 w - - 0 1' }],
       },
     ]);
-    expect(
-      (await coachApi(request('/api/coach/reviews', forged), f.env, f.dependencies)).status,
-    ).toBe(400);
+
+    // Act
+    const rejected = await coachApi(request('/api/coach/reviews', forged), f.env, f.dependencies);
+
+    // Assert
+    expect(omitted.status).toBe(409);
+    expect(rejected.status).toBe(400);
     expect(f.generate).not.toHaveBeenCalled();
   });
 
   it('returns a saved review for the same match despite a new key or language and never generates or consumes another credit', async () => {
+    // Arrange
     const f = fixture();
     const saved = await generateReview(f);
+
+    // Act
     const response = await coachApi(
       request('/api/coach/reviews', {
         ...input('different-idempotency-key-02'),
@@ -308,6 +325,8 @@ describe('private engine-grounded coach API', () => {
       f.env,
       f.dependencies,
     );
+
+    // Assert
     expect(response.status).toBe(200);
     expect(
       ((await response.json()) as { review: { id: string; language: string } }).review,
@@ -324,6 +343,7 @@ describe('private engine-grounded coach API', () => {
   });
 
   it('atomically prevents concurrent generation for a match', async () => {
+    // Arrange
     const f = fixture();
     let finish!: (value: unknown) => void;
     f.generate.mockImplementation(
@@ -334,13 +354,20 @@ describe('private engine-grounded coach API', () => {
     );
     const first = coachApi(request('/api/coach/reviews', input()), f.env, f.dependencies);
     await vi.waitFor(() => {
-      expect(f.generate).toHaveBeenCalledTimes(1);
+      if (f.generate.mock.calls.length !== 1) {
+        throw new Error('generate pending');
+      }
     });
+
+    // Act
     const second = await coachApi(
       request('/api/coach/reviews', input('different-idempotency-key-02')),
       f.env,
       f.dependencies,
     );
+
+    // Assert
+    expect(f.generate).toHaveBeenCalledTimes(1);
     expect(second.status).toBe(409);
     await expect(second.json()).resolves.toMatchObject({ error: 'review_pending' });
     finish({ document: f.generated, costMicros: 100 });
@@ -353,15 +380,19 @@ describe('private engine-grounded coach API', () => {
   });
 
   it('restores a failed attempt credit and permits retry without duplicate usage', async () => {
+    // Arrange
     const f = fixture();
     f.generate.mockRejectedValueOnce(new Error('provider outage'));
-    expect(
-      (await coachApi(request('/api/coach/reviews', input()), f.env, f.dependencies)).status,
-    ).toBe(503);
-    expect(f.sqlite.prepare('SELECT state FROM review_credit_reservations').get()?.state).toBe(
-      'restored',
-    );
-    await generateReview(f);
+    const failed = await coachApi(request('/api/coach/reviews', input()), f.env, f.dependencies);
+    const restored = f.sqlite.prepare('SELECT state FROM review_credit_reservations').get()?.state;
+
+    // Act
+    const response = await coachApi(request('/api/coach/reviews', input()), f.env, f.dependencies);
+
+    // Assert
+    expect(failed.status).toBe(503);
+    expect(restored).toBe('restored');
+    expect(response.status).toBe(200);
     expect(f.generate).toHaveBeenCalledTimes(2);
     expect((await new CoachStore(f.db).usage('owner', now)).reviews).toBe(1);
     expect(
@@ -372,14 +403,17 @@ describe('private engine-grounded coach API', () => {
   });
 
   it('releases an orphaned credit reservation after a crash before request reservation', async () => {
+    // Arrange
     const f = fixture();
-    await expect(
-      reserveCoachReviewCredit(f.db, 'owner', 'match-1', 'orphan', now),
-    ).resolves.toMatchObject({
-      source: 'intro',
-    });
-    expect((await reviewCreditStatus(f.db, 'owner', now)).introAvailable).toBe(false);
+    const reserved = await reserveCoachReviewCredit(f.db, 'owner', 'match-1', 'orphan', now);
+    const introBeforeExpiry = (await reviewCreditStatus(f.db, 'owner', now)).introAvailable;
+
+    // Act
     await new CoachStore(f.db).expire(now + 90_000);
+
+    // Assert
+    expect(reserved).toMatchObject({ source: 'intro' });
+    expect(introBeforeExpiry).toBe(false);
     expect(
       f.sqlite.prepare('SELECT state FROM review_credit_reservations WHERE id=?').get('orphan')
         ?.state,
@@ -388,28 +422,21 @@ describe('private engine-grounded coach API', () => {
   });
 
   it('rejects live matches, illegal engine lines, unowned matches and invalid provider suggestions before saving', async () => {
+    // Arrange
     const f = fixture();
     f.current.result = null;
-    expect(
-      (await coachApi(request('/api/coach/reviews', input()), f.env, f.dependencies)).status,
-    ).toBe(409);
+    const live = await coachApi(request('/api/coach/reviews', input()), f.env, f.dependencies);
     f.current.result = { reason: 'resignation' };
-    expect(
-      (
-        await coachApi(
-          request('/api/coach/reviews', {
-            ...input(),
-            analysis: [{ ...lineFor(f.current), moves: ['e2e5'], variations: [['e2e5']] }],
-          }),
-          f.env,
-          f.dependencies,
-        )
-      ).status,
-    ).toBe(400);
+    const illegal = await coachApi(
+      request('/api/coach/reviews', {
+        ...input(),
+        analysis: [{ ...lineFor(f.current), moves: ['e2e5'], variations: [['e2e5']] }],
+      }),
+      f.env,
+      f.dependencies,
+    );
     f.setOwner('other');
-    expect(
-      (await coachApi(request('/api/coach/reviews', input()), f.env, f.dependencies)).status,
-    ).toBe(404);
+    const unowned = await coachApi(request('/api/coach/reviews', input()), f.env, f.dependencies);
     f.setOwner('owner');
     f.generate.mockResolvedValueOnce({
       document: {
@@ -418,24 +445,50 @@ describe('private engine-grounded coach API', () => {
       },
       costMicros: 100,
     });
-    expect(
-      (await coachApi(request('/api/coach/reviews', input()), f.env, f.dependencies)).status,
-    ).toBe(503);
+
+    // Act
+    const invalid = await coachApi(request('/api/coach/reviews', input()), f.env, f.dependencies);
+
+    // Assert
+    expect(live.status).toBe(409);
+    expect(illegal.status).toBe(400);
+    expect(unowned.status).toBe(404);
+    expect(invalid.status).toBe(503);
     await expect(new CoachStore(f.db).reviews('owner')).resolves.toEqual([]);
   });
 
-  it('allows five successful replies per review for non-Plus accounts and does not count failures', async () => {
-    const f = fixture();
-    const saved = await generateReview(f);
-    f.generate.mockRejectedValueOnce(new Error('temporary outage'));
-    const path = `/api/coach/reviews/${saved.id}/replies`;
-    const first = await coachApi(
-      request(path, { key: 'reply-request-key-0001', question: 'Why?', language: 'en-GB' }),
-      f.env,
-      f.dependencies,
-    );
-    expect(first.status).toBe(503);
-    for (let index = 1; index <= 5; index++) {
+  it.each([1, 2, 3, 4, 5])(
+    'records successful reply %i within the five-reply allowance',
+    async (index) => {
+      // Arrange
+      const f = fixture();
+      const saved = await generateReview(f);
+      f.generate.mockRejectedValueOnce(new Error('temporary outage'));
+      const path = `/api/coach/reviews/${saved.id}/replies`;
+      const failed = await coachApi(
+        request(path, { key: 'reply-request-key-0001', question: 'Why?', language: 'en-GB' }),
+        f.env,
+        f.dependencies,
+      );
+      if (failed.status !== 503) {
+        throw new Error(`failure status ${failed.status}`);
+      }
+      for (let earlier = 1; earlier < index; earlier += 1) {
+        const prior = await coachApi(
+          request(path, {
+            key: `reply-request-key-000${earlier + 1}`,
+            question: `Why ${earlier}?`,
+            language: 'en-GB',
+          }),
+          f.env,
+          f.dependencies,
+        );
+        if (prior.status !== 200) {
+          throw new Error(`reply ${earlier} status ${prior.status}`);
+        }
+      }
+
+      // Act
       const result = await coachApi(
         request(path, {
           key: `reply-request-key-000${index + 1}`,
@@ -445,18 +498,53 @@ describe('private engine-grounded coach API', () => {
         f.env,
         f.dependencies,
       );
+
+      // Assert
       expect(result.status).toBe(200);
+    },
+  );
+
+  it('allows five successful replies per review for non-Plus accounts and does not count failures', async () => {
+    // Arrange
+    const f = fixture();
+    const saved = await generateReview(f);
+    f.generate.mockRejectedValueOnce(new Error('temporary outage'));
+    const path = `/api/coach/reviews/${saved.id}/replies`;
+    const first = await coachApi(
+      request(path, { key: 'reply-request-key-0001', question: 'Why?', language: 'en-GB' }),
+      f.env,
+      f.dependencies,
+    );
+    for (let index = 1; index <= 5; index += 1) {
+      const result = await coachApi(
+        request(path, {
+          key: `reply-request-key-000${index + 1}`,
+          question: `Why ${index}?`,
+          language: 'en-GB',
+        }),
+        f.env,
+        f.dependencies,
+      );
+      if (result.status !== 200) {
+        throw new Error(`reply ${index} status ${result.status}`);
+      }
     }
+
+    // Act
     const extra = await coachApi(
       request(path, { key: 'reply-request-key-0007', question: 'One more?', language: 'en-GB' }),
       f.env,
       f.dependencies,
     );
+
+    // Assert
+    expect(first.status).toBe(503);
     expect(extra.status).toBe(429);
     await expect(extra.json()).resolves.toMatchObject({ error: 'reply_limit' });
   });
 
   it('keeps legacy saved reviews conversational without inventing missing engine metadata', async () => {
+    // Arrange
     const f = fixture();
     const reviewId = 'legacy-review';
     const legacyLine = { ply: 0, cp: 20, mate: null, moves: ['e2e4'], depth: 12 };
@@ -475,6 +563,8 @@ describe('private engine-grounded coach API', () => {
         now - 10_000,
       )
       .run();
+
+    // Act
     const response = await coachApi(
       request(`/api/coach/reviews/${reviewId}/replies`, {
         key: 'legacy-reply-key-0001',
@@ -484,6 +574,8 @@ describe('private engine-grounded coach API', () => {
       f.env,
       f.dependencies,
     );
+
+    // Assert
     expect(response.status).toBe(200);
     const prompt = JSON.parse(f.generate.mock.calls[0][0].messages[1].content);
     expect(prompt.currentMatch.engineAnalysis[0]).toMatchObject({
@@ -497,28 +589,39 @@ describe('private engine-grounded coach API', () => {
   });
 
   it('requires only the lifetime intro credit when no trial or purchased pack exists', async () => {
+    // Arrange
     const f = fixture();
     await generateReview(f);
-    await expect(
-      (await coachApi(request('/api/coach/status'), f.env, f.dependencies)).json(),
-    ).resolves.toMatchObject({ reviewCredits: { available: 0, introAvailable: false } });
+    const status = await (
+      await coachApi(request('/api/coach/status'), f.env, f.dependencies)
+    ).json();
     f.matches.set('match-2', { ...f.current, id: 'match-2' });
+
+    // Act
     const exhausted = await coachApi(
       request('/api/coach/reviews', input('another-match-key-0001', 'match-2')),
       f.env,
       f.dependencies,
     );
+
+    // Assert
+    expect(status).toMatchObject({ reviewCredits: { available: 0, introAvailable: false } });
     expect(exhausted.status).toBe(402);
   });
 
   it('serves bounded owned history without exposing unfinished matches', async () => {
+    // Arrange
     const f = fixture();
     f.setHistory({ matches: [{ match: f.previous, completedAt: now - 10_000 }], gaps: 2 });
+
+    // Act
     const response = await coachApi(
       request('/api/coach/matches/match-1/history'),
       f.env,
       f.dependencies,
     );
+
+    // Assert
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       gaps: 2,
@@ -531,6 +634,7 @@ describe('private engine-grounded coach API', () => {
   });
 
   it('loads the three nearest completed matches across computer and human records in completion order', async () => {
+    // Arrange
     const f = fixture();
     f.dependencies.loadHistory = undefined;
     const candidates: SavedCoachMatch[] = [
@@ -573,11 +677,15 @@ describe('private engine-grounded coach API', () => {
         )
         .run();
     }
+
+    // Act
     const response = await coachApi(
       request('/api/coach/matches/match-1/history'),
       f.env,
       f.dependencies,
     );
+
+    // Assert
     expect(
       ((await response.json()) as { matches: { id: string }[]; gaps: number }).matches.map(
         ({ id }) => id,

@@ -68,24 +68,25 @@ afterEach(() => {
 
 describe('guest game API', () => {
   it('requires adult confirmation to start a guest session', async () => {
+    // Arrange
     const { d1 } = memoryDb();
+    const incoming = request('/api/guest/session', {
+      method: 'POST',
+      headers: { Origin: origin, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adult: false, language: 'en-GB' }),
+    });
 
-    const response = await gameApi(
-      request('/api/guest/session', {
-        method: 'POST',
-        headers: { Origin: origin, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adult: false, language: 'en-GB' }),
-      }),
-      guestEnv(d1),
-    );
+    // Act
+    const response = await gameApi(incoming, guestEnv(d1));
 
+    // Assert
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: 'adult_confirmation_required' });
   });
 
   it('issues a guest session cookie and reports guest identity on /api/me', async () => {
+    // Arrange
     const { d1 } = memoryDb();
-
     const created = await gameApi(
       request('/api/guest/session', {
         method: 'POST',
@@ -96,11 +97,13 @@ describe('guest game API', () => {
     );
     const cookie = created.headers.get('Set-Cookie');
 
+    // Act
     const me = await gameApi(
       request('/api/me', { headers: { Cookie: cookie!.split(';')[0] } }),
       guestEnv(d1),
     );
 
+    // Assert
     expect(created.status).toBe(201);
     expect(cookie).toContain('ludus_guest=');
     expect(me.status).toBe(200);
@@ -108,6 +111,7 @@ describe('guest game API', () => {
   });
 
   it('prefers a Better Auth session over a guest cookie', async () => {
+    // Arrange
     const { d1 } = memoryDb();
     auth.session.mockResolvedValue({ user: { id: 'signed-in', name: 'Invited' } });
     const created = await gameApi(
@@ -120,11 +124,13 @@ describe('guest game API', () => {
     );
     const cookie = created.headers.get('Set-Cookie')!;
 
+    // Act
     const me = await gameApi(
       request('/api/me', { headers: { Cookie: cookie.split(';')[0] } }),
       guestEnv(d1),
     );
 
+    // Assert
     await expect(me.json()).resolves.toEqual({
       user: { id: 'signed-in', name: 'Invited' },
       guest: false,
@@ -133,6 +139,7 @@ describe('guest game API', () => {
   });
 
   it('returns guest_limit_reached when creating a game beyond the lifetime cap', async () => {
+    // Arrange
     const { database, d1 } = memoryDb();
     const created = await gameApi(
       request('/api/guest/session', {
@@ -152,6 +159,7 @@ describe('guest game API', () => {
     }
     const cookie = created.headers.get('Set-Cookie')!;
 
+    // Act
     const blocked = await gameApi(
       request('/api/games', {
         method: 'POST',
@@ -165,11 +173,13 @@ describe('guest game API', () => {
       guestEnv(d1),
     );
 
+    // Assert
     expect(blocked.status).toBe(403);
     await expect(blocked.json()).resolves.toEqual({ error: 'guest_limit_reached' });
   });
 
   it('clears the guest cookie on sign-out', async () => {
+    // Arrange
     const { d1 } = memoryDb();
     const created = await gameApi(
       request('/api/guest/session', {
@@ -181,6 +191,7 @@ describe('guest game API', () => {
     );
     const cookie = created.headers.get('Set-Cookie')!;
 
+    // Act
     const signedOut = await gameApi(
       request('/api/guest/sign-out', {
         method: 'POST',
@@ -189,6 +200,7 @@ describe('guest game API', () => {
       guestEnv(d1),
     );
 
+    // Assert
     expect(signedOut.headers.get('Set-Cookie')).toContain('Max-Age=0');
   });
 });

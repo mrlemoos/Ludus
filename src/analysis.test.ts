@@ -1,4 +1,4 @@
-import { analyseMatch } from './analysis';
+import { STOCKFISH_VERSION, analyseMatch } from './analysis';
 import { Chess } from 'chess.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -45,36 +45,101 @@ const match = {
   colour: 'w' as const,
 };
 describe('post-game analysis worker lifecycle', () => {
-  it('analyses server-saved positions, reports progress and terminates on completion', async () => {
+  it('analyses server-saved positions', async () => {
+    // Arrange
+    vi.stubGlobal('Worker', AnalysisWorker);
+
+    // Act
+    const lines = await analyseMatch(match, new AbortController().signal);
+
+    // Assert
+    expect(lines.map((line) => line.ply)).toEqual([0, 1, 2]);
+  });
+
+  it('reports analysis progress', async () => {
+    // Arrange
     vi.stubGlobal('Worker', AnalysisWorker);
     const progress = vi.fn();
-    const lines = await analyseMatch(match, new AbortController().signal, progress);
-    expect(lines.map((line) => line.ply)).toEqual([0, 1, 2]);
+
+    // Act
+    await analyseMatch(match, new AbortController().signal, progress);
+
+    // Assert
     expect(progress).toHaveBeenLastCalledWith(3, 3);
+  });
+
+  it('terminates the worker when analysis completes', async () => {
+    // Arrange
+    vi.stubGlobal('Worker', AnalysisWorker);
+
+    // Act
+    await analyseMatch(match, new AbortController().signal);
+
+    // Assert
     expect(AnalysisWorker.instances[0].terminate).toHaveBeenCalledOnce();
+  });
+
+  it('leaves the saved moves unchanged', async () => {
+    // Arrange
+    vi.stubGlobal('Worker', AnalysisWorker);
+
+    // Act
+    await analyseMatch(match, new AbortController().signal);
+
+    // Assert
     expect(match.moves).toEqual(['e4', 'e5', 'Nf3']);
   });
 
-  it('never launches an analysis worker for live games or an aborted request', async () => {
+  it('never launches an analysis worker for a live game', async () => {
+    // Arrange
     vi.stubGlobal('Worker', AnalysisWorker);
-    await expect(
-      analyseMatch({ ...match, result: null }, new AbortController().signal),
-    ).rejects.toThrow('finished_match_required');
+
+    // Act
+    const pending = analyseMatch({ ...match, result: null }, new AbortController().signal);
+
+    // Assert
+    await expect(pending).rejects.toThrow('finished_match_required');
+    expect(AnalysisWorker.instances).toHaveLength(0);
+  });
+
+  it('never launches an analysis worker for an aborted request', async () => {
+    // Arrange
+    vi.stubGlobal('Worker', AnalysisWorker);
     const abort = new AbortController();
     abort.abort();
-    await expect(analyseMatch(match, abort.signal)).rejects.toThrow('analysis_cancelled');
+
+    // Act
+    const pending = analyseMatch(match, abort.signal);
+
+    // Assert
+    await expect(pending).rejects.toThrow('analysis_cancelled');
     expect(AnalysisWorker.instances).toHaveLength(0);
   });
 
   it('cancels stalled loading and clears timers', async () => {
+    // Arrange
     vi.useFakeTimers();
     vi.stubGlobal('Worker', AnalysisWorker);
     AnalysisWorker.stall = true;
     const abort = new AbortController();
     const pending = analyseMatch(match, abort.signal);
+
+    // Act
     abort.abort();
+
+    // Assert
     await expect(pending).rejects.toThrow('analysis_cancelled');
     expect(AnalysisWorker.instances[0].terminate).toHaveBeenCalledWith();
     expect(vi.getTimerCount()).toBe(0);
   });
+});
+
+it('records the Stockfish version', () => {
+  // Arrange
+
+  // Act
+  const version = STOCKFISH_VERSION;
+
+  // Assert
+  expect(version).toMatchInlineSnapshot(`"Stockfish 19 lite"`);
 });

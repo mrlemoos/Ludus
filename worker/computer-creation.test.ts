@@ -60,24 +60,36 @@ function request(control = '10+5', difficulty = 4) {
 afterEach(() => vi.restoreAllMocks());
 describe('computer creation recovery', () => {
   it('resumes the same persisted creation settings after interrupted durable initialisation', async () => {
+    // Arrange
     const f = fixture();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     f.stub.initialise.mockRejectedValueOnce(new Error('interrupted'));
-    expect((await gameApi(request(), f.env)).status).toBe(503);
+    const interrupted = await gameApi(request(), f.env);
     const persisted = f.db.prepare('SELECT * FROM matches').get()!;
+
+    // Act
     const retry = await gameApi(request('5+3', 1), f.env);
+
+    // Assert
+    expect(interrupted.status).toBe(503);
     expect(retry.status).toBe(200);
     expect(f.stub.initialise).toHaveBeenLastCalledWith(persisted.id, 'owner', '10+5', 4, 'b');
     expect(f.db.prepare('SELECT count(*) AS count FROM matches').get()).toEqual({ count: 1 });
   });
 
   it('blocks a late creation after deletion and releases its coordinator reservation', async () => {
+    // Arrange
     const f = fixture();
     f.reserveComputer.mockImplementation(async () => {
       f.db.prepare("INSERT INTO account_deletions(user_id,requested_at) VALUES('owner',0)").run();
       return { reserved: true };
     });
-    expect((await gameApi(request(), f.env)).status).toBe(403);
+
+    // Act
+    const response = await gameApi(request(), f.env);
+
+    // Assert
+    expect(response.status).toBe(403);
     expect(f.stub.initialise).not.toHaveBeenCalled();
     expect(f.releaseComputer).toHaveBeenCalledTimes(1);
     expect(f.db.prepare('SELECT count(*) AS count FROM matches').get()).toEqual({ count: 0 });

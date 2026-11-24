@@ -13,43 +13,93 @@ function entry(changes: Partial<QueueEntry> = {}): QueueEntry {
     ...changes,
   };
 }
+
 describe('public matchmaking policy', () => {
-  it('widens tolerance at exact fifteen-second boundaries up to six hundred', () => {
-    expect(ratingTolerance(14_999)).toBe(200);
-    expect(ratingTolerance(15_000)).toBe(300);
-    expect(ratingTolerance(90_000)).toBe(600);
+  it.each([
+    [14_999, 200],
+    [15_000, 300],
+    [90_000, 600],
+  ])('ratingTolerance, after %i milliseconds, returns %i', (wait, expected) => {
+    // Arrange
+    const waited = wait;
+
+    // Act
+    const tolerance = ratingTolerance(waited);
+
+    // Assert
+    expect(tolerance).toBe(expected);
   });
 
   it('keeps controls, mode and account identity isolated', () => {
+    // Arrange
     const one = entry();
-    expect(
-      matchingOpponent(
-        one,
-        [entry(), entry({ user: 'two', control: '10+5' }), entry({ user: 'three', rated: false })],
-        30_000,
-      ),
-    ).toBeNull();
+    const candidates = [
+      entry(),
+      entry({ user: 'two', control: '10+5' }),
+      entry({ user: 'three', rated: false }),
+    ];
+
+    // Act
+    const opponent = matchingOpponent(one, candidates, 30_000);
+
+    // Assert
+    expect(opponent).toBeNull();
   });
 
-  it('uses both players’ tolerance and oldest eligible opponent', () => {
+  it('matchingOpponent, a rating outside the shorter tolerance, returns no opponent', () => {
+    // Arrange
     const one = entry({ joinedAt: 15_000 });
-    expect(matchingOpponent(one, [entry({ user: 'two', rating: 1800 })], 15_000)).toBeNull();
-    expect(matchingOpponent(one, [entry({ user: 'two', rating: 1800 })], 30_000)?.user).toBe('two');
-    expect(
-      matchingOpponent(
-        entry({ rated: false }),
-        [
-          entry({ user: 'new', rated: false, joinedAt: 5 }),
-          entry({ user: 'old', rated: false, rating: 9000 }),
-        ],
-        100,
-      )?.user,
-    ).toBe('old');
+    const candidates = [entry({ user: 'two', rating: 1800 })];
+
+    // Act
+    const opponent = matchingOpponent(one, candidates, 15_000);
+
+    // Assert
+    expect(opponent).toBeNull();
   });
 
-  it('never accepts AI before thirty seconds or with a stale queue token', () => {
-    expect(canAcceptAI(entry(), 'token', 29_999)).toBe(false);
-    expect(canAcceptAI(entry(), 'token', 30_000)).toBe(true);
-    expect(canAcceptAI(entry(), 'old-token', 60_000)).toBe(false);
+  it('matchingOpponent, a rating inside both tolerances, returns that opponent', () => {
+    // Arrange
+    const one = entry({ joinedAt: 15_000 });
+    const candidates = [entry({ user: 'two', rating: 1800 })];
+
+    // Act
+    const opponent = matchingOpponent(one, candidates, 30_000);
+
+    // Assert
+    expect(opponent?.user).toBe('two');
   });
+
+  it('matchingOpponent, several eligible opponents, returns the oldest', () => {
+    // Arrange
+    const one = entry({ rated: false });
+    const candidates = [
+      entry({ user: 'new', rated: false, joinedAt: 5 }),
+      entry({ user: 'old', rated: false, rating: 9000 }),
+    ];
+
+    // Act
+    const opponent = matchingOpponent(one, candidates, 100);
+
+    // Assert
+    expect(opponent?.user).toBe('old');
+  });
+
+  it.each([
+    ['token', 29_999, false],
+    ['token', 30_000, true],
+    ['old-token', 60_000, false],
+  ] as const)(
+    'canAcceptAI, token %s at %i milliseconds, returns %s',
+    (token, instant, expected) => {
+      // Arrange
+      const queued = entry();
+
+      // Act
+      const accepted = canAcceptAI(queued, token, instant);
+
+      // Assert
+      expect(accepted).toBe(expected);
+    },
+  );
 });

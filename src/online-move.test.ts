@@ -27,12 +27,114 @@ function sample(revision: number, moves: string[], updatedAt = 10, id = 'id'): H
   };
 }
 
+const promotingFen = '8/4P3/8/8/8/8/4K3/k7 w - - 0 1';
+
+interface SnapshotCase {
+  name: string;
+  latest: HumanGame | null;
+  incoming: HumanGame;
+  prediction: { baseRevision: number; moves: number } | null;
+  apply: boolean;
+}
+
+const snapshotCases: SnapshotCase[] = [
+  {
+    name: 'drops a stale echo of the pre-move position',
+    latest: sample(3, ['e4'], 10),
+    incoming: sample(3, [], 99),
+    prediction: { baseRevision: 3, moves: 1 },
+    apply: false,
+  },
+  {
+    name: 'drops an echo when no game is loaded yet',
+    latest: null,
+    incoming: sample(3, [], 10),
+    prediction: { baseRevision: 3, moves: 1 },
+    apply: false,
+  },
+  {
+    name: 'keeps a newer revision that includes the predicted move',
+    latest: sample(3, ['e4'], 10),
+    incoming: sample(4, ['e4'], 11),
+    prediction: { baseRevision: 3, moves: 1 },
+    apply: true,
+  },
+  {
+    name: 'keeps a newer revision when the move list is empty',
+    latest: sample(3, ['e4'], 10),
+    incoming: sample(4, [], 1),
+    prediction: { baseRevision: 3, moves: 1 },
+    apply: true,
+  },
+  {
+    name: 'keeps the same revision when it already includes the predicted moves',
+    latest: sample(3, ['e4'], 10),
+    incoming: sample(3, ['e4'], 10),
+    prediction: { baseRevision: 3, moves: 1 },
+    apply: true,
+  },
+  {
+    name: 'drops an older revision when nothing is pending',
+    latest: sample(5, ['e4'], 10),
+    incoming: sample(4, ['e4', 'e5'], 99),
+    prediction: null,
+    apply: false,
+  },
+  {
+    name: 'drops an older timestamp at the same revision',
+    latest: sample(4, ['e4'], 20),
+    incoming: sample(4, ['e4'], 19),
+    prediction: null,
+    apply: false,
+  },
+  {
+    name: 'keeps an identical snapshot',
+    latest: sample(4, ['e4'], 20),
+    incoming: sample(4, ['e4'], 20),
+    prediction: null,
+    apply: true,
+  },
+  {
+    name: 'keeps a newer timestamp at the same revision',
+    latest: sample(4, ['e4'], 20),
+    incoming: sample(4, ['e4'], 21),
+    prediction: null,
+    apply: true,
+  },
+  {
+    name: 'keeps a newer revision',
+    latest: sample(4, ['e4'], 20),
+    incoming: sample(5, ['e4', 'e5'], 1),
+    prediction: null,
+    apply: true,
+  },
+  {
+    name: 'accepts the first snapshot',
+    latest: null,
+    incoming: sample(0, []),
+    prediction: null,
+    apply: true,
+  },
+  {
+    name: 'accepts a snapshot for a different game',
+    latest: sample(9, ['e4'], 50, 'a'),
+    incoming: sample(1, [], 1, 'b'),
+    prediction: null,
+    apply: true,
+  },
+];
+
 describe('optimistic online moves', () => {
   it('appends the SAN and position without touching clocks, revision, or the original game', () => {
+    // Arrange
     const game = { ...fresh(), drawOffer: 'b' as const };
     const played = new Chess();
     played.move({ from: 'e2', to: 'e4' });
+
+    // Act
     const next = predictMove(game, 'e2', 'e4');
+
+    // Assert
     expect(next).toMatchObject({
       moves: ['e4'],
       fen: played.fen(),
@@ -50,12 +152,41 @@ describe('optimistic online moves', () => {
     expect(game.fen).toBe(new Chess().fen());
   });
 
-  it('returns null for an illegal move, a missing promotion, or a finished game', () => {
+  it('returns null for an illegal move', () => {
+    // Arrange
     const game = fresh();
-    const promoting = { ...game, fen: '8/4P3/8/8/8/8/4K3/k7 w - - 0 1' };
-    expect(predictMove(game, 'e2', 'e5')).toBeNull();
-    expect(predictMove(promoting, 'e7', 'e8')).toBeNull();
-    expect(predictMove(promoting, 'e7', 'e8', 'q')).toMatchObject({
+
+    // Act
+    const next = predictMove(game, 'e2', 'e5');
+
+    // Assert
+    expect(next).toBeNull();
+    expect(game.moves).toEqual([]);
+  });
+
+  it('returns null when a promotion piece is missing', () => {
+    // Arrange
+    const game = fresh();
+    const promoting = { ...game, fen: promotingFen };
+
+    // Act
+    const next = predictMove(promoting, 'e7', 'e8');
+
+    // Assert
+    expect(next).toBeNull();
+    expect(promoting.moves).toEqual([]);
+  });
+
+  it('predicts a promoting move', () => {
+    // Arrange
+    const game = fresh();
+    const promoting = { ...game, fen: promotingFen };
+
+    // Act
+    const next = predictMove(promoting, 'e7', 'e8', 'q');
+
+    // Assert
+    expect(next).toMatchObject({
       moves: ['e8=Q'],
       drawOffer: null,
       clocks: promoting.clocks,
@@ -65,38 +196,32 @@ describe('optimistic online moves', () => {
       players: promoting.players,
       control: promoting.control,
     });
+    expect(promoting.moves).toEqual([]);
+  });
+
+  it('returns null for a finished game', () => {
+    // Arrange
+    const game = fresh();
     const finished = {
       ...game,
       result: { winner: 'w' as const, reason: 'resignation' as const, at: 2 },
     };
-    expect(predictMove(finished, 'e2', 'e4')).toBeNull();
+
+    // Act
+    const next = predictMove(finished, 'e2', 'e4');
+
+    // Assert
+    expect(next).toBeNull();
     expect(game.moves).toEqual([]);
-    expect(promoting.moves).toEqual([]);
   });
 
-  it('drops a stale echo of the pre-move position and keeps a newer server revision', () => {
-    const baseline = sample(3, ['e4'], 10);
-    expect(shouldApplySnapshot(baseline, sample(3, [], 99), { baseRevision: 3, moves: 1 })).toBe(
-      false,
-    );
-    expect(shouldApplySnapshot(null, sample(3, [], 10), { baseRevision: 3, moves: 1 })).toBe(false);
-    expect(
-      shouldApplySnapshot(baseline, sample(4, ['e4'], 11), { baseRevision: 3, moves: 1 }),
-    ).toBe(true);
-    expect(shouldApplySnapshot(baseline, sample(4, [], 1), { baseRevision: 3, moves: 1 })).toBe(
-      true,
-    );
-    expect(
-      shouldApplySnapshot(baseline, sample(3, ['e4'], 10), { baseRevision: 3, moves: 1 }),
-    ).toBe(true);
-    expect(shouldApplySnapshot(sample(5, ['e4'], 10), sample(4, ['e4', 'e5'], 99), null)).toBe(
-      false,
-    );
-    expect(shouldApplySnapshot(sample(4, ['e4'], 20), sample(4, ['e4'], 19), null)).toBe(false);
-    expect(shouldApplySnapshot(sample(4, ['e4'], 20), sample(4, ['e4'], 20), null)).toBe(true);
-    expect(shouldApplySnapshot(sample(4, ['e4'], 20), sample(4, ['e4'], 21), null)).toBe(true);
-    expect(shouldApplySnapshot(sample(4, ['e4'], 20), sample(5, ['e4', 'e5'], 1), null)).toBe(true);
-    expect(shouldApplySnapshot(null, sample(0, []), null)).toBe(true);
-    expect(shouldApplySnapshot(sample(9, ['e4'], 50, 'a'), sample(1, [], 1, 'b'), null)).toBe(true);
+  it.each(snapshotCases)('$name', ({ latest, incoming, prediction, apply }) => {
+    // Arrange
+
+    // Act
+    const shouldApply = shouldApplySnapshot(latest, incoming, prediction);
+
+    // Assert
+    expect(shouldApply).toBe(apply);
   });
 });

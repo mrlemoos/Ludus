@@ -49,6 +49,7 @@ function fixture() {
 
 describe('review credit accounting', () => {
   it('grants one lifetime intro credit, restores failed reservations, and prefers monthly free credits before paid packs', async () => {
+    // Arrange
     const f = fixture();
     const intro = await reserveCoachReviewCredit(
       f.db,
@@ -57,7 +58,6 @@ describe('review credit accounting', () => {
       'intro-reservation',
       now,
     );
-    expect(intro).toMatchObject({ source: 'intro' });
     await restoreCoachReviewCredit(f.db, intro!.reservationId, now + 1);
     const retried = await reserveCoachReviewCredit(
       f.db,
@@ -66,18 +66,28 @@ describe('review credit accounting', () => {
       'intro-retry',
       now + 2,
     );
-    expect(retried?.source).toBe('intro');
-    await expect(commitCoachReviewCredit(f.db, retried!.reservationId, now + 3)).resolves.toBe(
-      true,
+    const committed = await commitCoachReviewCredit(f.db, retried!.reservationId, now + 3);
+    const beta = await reserveCoachReviewCredit(
+      f.db,
+      'owner',
+      'match-beta',
+      'beta-reservation',
+      now + 4,
     );
-    expect(
-      (await reserveCoachReviewCredit(f.db, 'owner', 'match-beta', 'beta-reservation', now + 4))
-        ?.source,
-    ).toBe('beta');
-    expect((await reviewCreditStatus(f.db, 'owner', now + 4)).monthlyFreeRemaining).toBe(29);
+
+    // Act
+    const status = await reviewCreditStatus(f.db, 'owner', now + 4);
+
+    // Assert
+    expect(intro).toMatchObject({ source: 'intro' });
+    expect(retried?.source).toBe('intro');
+    expect(committed).toBe(true);
+    expect(beta?.source).toBe('beta');
+    expect(status.monthlyFreeRemaining).toBe(29);
   });
 
   it('keeps the monthly free pool at 30 across beta and complimentary access and counts legacy reviews', async () => {
+    // Arrange
     const f = fixture();
     f.sqlite.prepare('UPDATE player_profiles SET trial_expires_at=0 WHERE user_id=?').run('owner');
     f.sqlite
@@ -90,7 +100,6 @@ describe('review credit accounting', () => {
       'intro-consumed',
       now,
     );
-    expect(intro?.source).toBe('intro');
     await commitCoachReviewCredit(f.db, intro!.reservationId, now);
     for (let i = 0; i < 29; i++) {
       const id = `legacy-${i}`;
@@ -100,18 +109,29 @@ describe('review credit accounting', () => {
         )
         .run(id, 'owner', id, id, now, now);
     }
-    expect((await reviewCreditStatus(f.db, 'owner', now)).monthlyFreeRemaining).toBe(1);
-    expect(
-      (await reserveCoachReviewCredit(f.db, 'owner', 'match-free', 'free-reservation', now))
-        ?.source,
-    ).toBe('complimentary');
-    expect((await reviewCreditStatus(f.db, 'owner', now)).monthlyFreeRemaining).toBe(0);
-    await expect(
-      reserveCoachReviewCredit(f.db, 'owner', 'match-extra', 'no-credit', now),
-    ).resolves.toBeNull();
+    const statusBefore = await reviewCreditStatus(f.db, 'owner', now);
+    const free = await reserveCoachReviewCredit(
+      f.db,
+      'owner',
+      'match-free',
+      'free-reservation',
+      now,
+    );
+    const statusAfter = await reviewCreditStatus(f.db, 'owner', now);
+
+    // Act
+    const extra = await reserveCoachReviewCredit(f.db, 'owner', 'match-extra', 'no-credit', now);
+
+    // Assert
+    expect(intro?.source).toBe('intro');
+    expect(statusBefore.monthlyFreeRemaining).toBe(1);
+    expect(free?.source).toBe('complimentary');
+    expect(statusAfter.monthlyFreeRemaining).toBe(0);
+    expect(extra).toBeNull();
   });
 
   it('grants each verified pack once, isolates owners, and freezes only credits tied to a disputed pack', async () => {
+    // Arrange
     const f = fixture();
     const intro = await reserveCoachReviewCredit(
       f.db,
@@ -120,7 +140,6 @@ describe('review credit accounting', () => {
       'intro-consumed',
       now,
     );
-    expect(intro?.source).toBe('intro');
     await commitCoachReviewCredit(f.db, intro!.reservationId, now);
     f.sqlite.prepare('UPDATE player_profiles SET trial_expires_at=0 WHERE user_id=?').run('owner');
     f.sqlite
@@ -154,11 +173,14 @@ describe('review credit accounting', () => {
       charge: 'ch_safe',
       now: now + 1,
     });
-    expect((await reviewCreditStatus(f.db, 'owner', now)).paidRemaining).toBe(20);
-    expect(
-      (await reserveCoachReviewCredit(f.db, 'other', 'match-other', 'other-reservation', now))
-        ?.source,
-    ).toBe('intro');
+    const statusAfterPacks = await reviewCreditStatus(f.db, 'owner', now);
+    const other = await reserveCoachReviewCredit(
+      f.db,
+      'other',
+      'match-other',
+      'other-reservation',
+      now,
+    );
     const reservation = await reserveCoachReviewCredit(
       f.db,
       'owner',
@@ -166,17 +188,18 @@ describe('review credit accounting', () => {
       'paid-reservation',
       now,
     );
-    expect(reservation?.source).toBe('paid');
     await applyReviewPackRisk(f.db, {
       charge: 'ch_paid',
       paymentIntent: 'pi_paid',
       frozen: true,
       now: now + 1,
     });
-    await expect(commitCoachReviewCredit(f.db, reservation!.reservationId, now + 2)).resolves.toBe(
-      false,
+    const committedWhileFrozen = await commitCoachReviewCredit(
+      f.db,
+      reservation!.reservationId,
+      now + 2,
     );
-    expect((await reviewCreditStatus(f.db, 'owner', now + 2)).paidRemaining).toBe(10);
+    const statusWhileFrozen = await reviewCreditStatus(f.db, 'owner', now + 2);
     await restoreCoachReviewCredit(f.db, reservation!.reservationId, now + 2);
     await applyReviewPackRisk(f.db, {
       charge: 'ch_paid',
@@ -185,22 +208,40 @@ describe('review credit accounting', () => {
       refunded: false,
       now: now + 3,
     });
-    expect((await reviewCreditStatus(f.db, 'owner', now + 3)).paidRemaining).toBe(20);
+
+    // Act
+    const statusAfterRelease = await reviewCreditStatus(f.db, 'owner', now + 3);
+
+    // Assert
+    expect(intro?.source).toBe('intro');
+    expect(statusAfterPacks.paidRemaining).toBe(20);
+    expect(other?.source).toBe('intro');
+    expect(reservation?.source).toBe('paid');
+    expect(committedWhileFrozen).toBe(false);
+    expect(statusWhileFrozen.paidRemaining).toBe(10);
+    expect(statusAfterRelease.paidRemaining).toBe(20);
   });
 
   it('serialises duplicate match reservations and does not consume allowance on failure', async () => {
+    // Arrange
     const f = fixture();
     const attempts = await Promise.all([
       reserveCoachReviewCredit(f.db, 'owner', 'same-match', 'reservation-a', now),
       reserveCoachReviewCredit(f.db, 'owner', 'same-match', 'reservation-b', now),
     ]);
-    expect(attempts.filter(Boolean)).toHaveLength(1);
     const reservation = attempts.find(Boolean)!;
     await restoreCoachReviewCredit(f.db, reservation.reservationId, now + 1);
-    expect((await reviewCreditStatus(f.db, 'owner', now + 1)).introAvailable).toBe(true);
+
+    // Act
+    const status = await reviewCreditStatus(f.db, 'owner', now + 1);
+
+    // Assert
+    expect(attempts.filter(Boolean)).toHaveLength(1);
+    expect(status.introAvailable).toBe(true);
   });
 
   it('releases abandoned reservations after the coach request timeout', async () => {
+    // Arrange
     const f = fixture();
     const abandoned = await reserveCoachReviewCredit(
       f.db,
@@ -209,25 +250,27 @@ describe('review credit accounting', () => {
       'abandoned-reservation',
       now,
     );
+    const status = await reviewCreditStatus(f.db, 'owner', now + 90_000);
+    const committed = await commitCoachReviewCredit(f.db, abandoned!.reservationId, now + 90_000);
+
+    // Act
+    const retried = await reserveCoachReviewCredit(
+      f.db,
+      'owner',
+      'abandoned-match',
+      'retry-reservation',
+      now + 90_001,
+    );
+
+    // Assert
     expect(abandoned?.source).toBe('intro');
-    expect((await reviewCreditStatus(f.db, 'owner', now + 90_000)).introAvailable).toBe(true);
-    await expect(
-      commitCoachReviewCredit(f.db, abandoned!.reservationId, now + 90_000),
-    ).resolves.toBe(false);
-    expect(
-      (
-        await reserveCoachReviewCredit(
-          f.db,
-          'owner',
-          'abandoned-match',
-          'retry-reservation',
-          now + 90_001,
-        )
-      )?.source,
-    ).toBe('intro');
+    expect(status.introAvailable).toBe(true);
+    expect(committed).toBe(false);
+    expect(retried?.source).toBe('intro');
   });
 
   it('removes private match IDs on account deletion while retaining paid-credit accounting', async () => {
+    // Arrange
     const f = fixture();
     const intro = await reserveCoachReviewCredit(
       f.db,
@@ -258,7 +301,11 @@ describe('review credit accounting', () => {
       now,
     );
     await commitCoachReviewCredit(f.db, paid!.reservationId, now);
+
+    // Act
     await anonymiseReviewCreditReservations(f.db, 'owner');
+
+    // Assert
     expect(
       f.sqlite
         .prepare('SELECT id,match_id,source FROM review_credit_reservations WHERE owner=?')
