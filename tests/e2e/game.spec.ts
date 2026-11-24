@@ -448,6 +448,39 @@ test('magic links are single use and sign-out revokes the game session', async (
   expect((await request.get('/api/me').then((r) => r.json())).user).toBeNull();
 });
 
+test('sign-in shows a busy button while the link is sending', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('ludus-language', 'en-GB');
+  });
+  await page.goto('/play');
+  await page.getByRole('checkbox', { name: 'I am 18 or older.' }).check();
+  await page.getByLabel('Email address').fill('player@example.com');
+  const latch = {
+    open() {},
+  };
+  const gate = new Promise<void>(function wait(resolve) {
+    latch.open = function open() {
+      resolve();
+    };
+  });
+  await page.route('**/api/auth/sign-in/magic-link', async (route) => {
+    await gate;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({}),
+    });
+  });
+  const button = page.getByRole('button', { name: 'Send sign-in link' });
+  await button.click();
+  await expect(button).toHaveAttribute('aria-busy', 'true');
+  await expect(button).toHaveAttribute('aria-disabled', 'true');
+  latch.open();
+  await expect(
+    page.getByText('If you have an invitation, your sign-in link is on its way.'),
+  ).toBeVisible();
+});
+
 test('guest completes a computer game without an account', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('ludus-language', 'en-GB');

@@ -6,6 +6,12 @@ import type { HTMLMotionProps } from 'motion/react';
 import { useState } from 'react';
 import type { PointerEvent } from 'react';
 
+declare module '@base-ui/react/button' {
+  interface ButtonProps {
+    loading?: boolean;
+  }
+}
+
 function trackPress(
   setPressed: (pressed: boolean) => void,
   event: { type: string; button?: number },
@@ -21,15 +27,18 @@ function buttonClass(className?: string) {
   return ['ui-button', className].filter(Boolean).join(' ');
 }
 
-export function Button({ className, disabled, ref, ...props }: ButtonProps) {
+export function Button({ className, disabled, loading = false, ref, ...props }: ButtonProps) {
   const [pressed, setPressed] = useState(false);
-  const off = Boolean(disabled);
+  const off = Boolean(disabled || loading);
   const { onPointerDown, onPointerUp, onPointerCancel, onPointerLeave, ...rest } = props;
   return (
     <BaseButton
       {...rest}
       ref={ref}
-      disabled={disabled}
+      disabled={off}
+      aria-busy={loading ? true : undefined}
+      aria-disabled={loading ? true : undefined}
+      data-loading={loading ? 'true' : undefined}
       data-pressed={pressed && !off ? 'true' : undefined}
       className={
         typeof className === 'function'

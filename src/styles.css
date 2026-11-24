@@ -1365,6 +1365,9 @@
   .ui-button[data-pressed='true']:not(:disabled):not([aria-disabled='true']) {
     opacity: 0.72;
   }
+  .ui-button[aria-busy='true'] {
+    cursor: progress;
+  }
   button:not(.board-cell),
   [role='button'],
   summary {

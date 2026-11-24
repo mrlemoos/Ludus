@@ -1238,7 +1238,12 @@ export function Play() {
                       className="game-input"
                     />
                   </label>
-                  <Button className="game-secondary" type="submit" disabled={pending || !adult}>
+                  <Button
+                    className="game-secondary"
+                    type="submit"
+                    loading={pending}
+                    disabled={!adult}
+                  >
                     {c.sendLink}
                   </Button>
                 </form>

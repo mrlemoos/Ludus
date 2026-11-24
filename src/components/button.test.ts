@@ -1,6 +1,9 @@
+import { Button } from './button';
 import { pressFromPointer } from './button-press';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it } from 'vitest';
 
 function walk(dir: string): string[] {
@@ -143,6 +146,31 @@ it('suppresses native touch feedback on the shared button', () => {
   expect(button).toMatch(/-webkit-tap-highlight-color:\s*transparent/);
   expect(button).toMatch(/touch-action:\s*manipulation/);
   expect(button).toMatch(/user-select:\s*none/);
+});
+
+it('marks a loading button as busy and unavailable', () => {
+  // Arrange
+  const button = createElement(Button, { loading: true }, 'Send sign-in link');
+
+  // Act
+  const html = renderToStaticMarkup(button);
+
+  // Assert
+  expect(html).toContain('aria-busy="true"');
+  expect(html).toContain('aria-disabled="true"');
+  expect(html).toContain('disabled=""');
+});
+
+it('leaves the loading state off by default', () => {
+  // Arrange
+  const button = createElement(Button, undefined, 'Send sign-in link');
+
+  // Act
+  const html = renderToStaticMarkup(button);
+
+  // Assert
+  expect(html).not.toContain('aria-busy');
+  expect(html).not.toContain('aria-disabled');
 });
 
 it('dims a pressed button', () => {
