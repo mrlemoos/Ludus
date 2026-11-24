@@ -151,7 +151,7 @@ Vitest and Playwright are confirmed. Waitlist and local computer-match validatio
 - Native mobile apps at launch.
 - Explorable café environments or animated character pieces.
 - Coaching, hints or engine assistance during live matches.
-- Guest play, passwords and social sign-in at launch.
+- Passwords and social sign-in at launch. Guest computer play is specified in `guest-play.md`.
 - Free-text opponent chat.
 - Rated friend invitations or rating gains from AI matches.
 - Fine-tuning separate models as the initial coaching approach.

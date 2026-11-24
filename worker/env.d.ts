@@ -1,4 +1,5 @@
 interface Env {
+  GUEST_LIMITER: RateLimit;
   STRIPE_API_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_BILLING_ENABLED?: string;

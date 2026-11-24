@@ -12,6 +12,11 @@ const en = {
   localFriend: 'Sign in as friend',
   localNote: 'Local development account',
   adult: 'I am 18 or older.',
+  guestPlay: 'Play against Lucía',
+  guestHint: 'No account needed. Ten casual games per browser.',
+  guestUpsell: 'Save your games, play online and unlock coach reviews with a free beta account.',
+  guestLimit:
+    'Guest limit reached. Join the waitlist or sign in with an invitation to keep playing.',
   invitation: 'The beta is invitation only. Use your invited email address.',
   setup: 'Take a seat',
   opponent: 'Computer · Lucía',
@@ -100,6 +105,12 @@ const es: Copy = {
   localFriend: 'Entrar como amigo',
   localNote: 'Cuenta de desarrollo local',
   adult: 'Tengo 18 años o más.',
+  guestPlay: 'Jugar contra Lucía',
+  guestHint: 'Sin cuenta. Diez partidas casuales por navegador.',
+  guestUpsell:
+    'Guarda tus partidas, juega en línea y desbloquea análisis del entrenador con una cuenta beta gratuita.',
+  guestLimit:
+    'Has alcanzado el límite de invitado. Apúntate a la lista de espera o inicia sesión con invitación para seguir jugando.',
   invitation: 'La beta es solo por invitación. Usa el correo de tu invitación.',
   setup: 'Toma asiento',
   opponent: 'Ordenador · Lucía',
@@ -188,6 +199,12 @@ const fr: Copy = {
   localFriend: 'Se connecter en tant qu’ami',
   localNote: 'Compte de développement local',
   adult: 'J’ai 18 ans ou plus.',
+  guestPlay: 'Jouer contre Lucía',
+  guestHint: 'Sans compte. Dix parties décontractées par navigateur.',
+  guestUpsell:
+    'Enregistrez vos parties, jouez en ligne et débloquez les analyses du coach avec un compte bêta gratuit.',
+  guestLimit:
+    'Limite invité atteinte. Rejoignez la liste d’attente ou connectez-vous avec une invitation pour continuer.',
   invitation: 'La bêta est sur invitation. Utilisez votre adresse invitée.',
   setup: 'Prenez place',
   opponent: 'Ordinateur · Lucía',

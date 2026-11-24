@@ -174,6 +174,13 @@ export function App() {
             </div>
             <div className="home-invitation">
               <p className="home-intro">{t('detail')}</p>
+              <div className="home-play-cta">
+                <Link to="/play?guest=1" className="game-primary home-play-button">
+                  {t('playNow')}
+                  <Arrow />
+                </Link>
+                <p className="home-play-detail text-sm text-muted">{t('playNowDetail')}</p>
+              </div>
               <div className="waitlist-block" id="waitlist">
                 {state === 'success' ? (
                   <div role="status" className="home-success">

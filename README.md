@@ -7,6 +7,7 @@
   Play chess in a Madrid-inspired café, with wooden pieces and a board you can turn in your hands.
 </p>
 <p align="center">
+  <a href="https://ludus.mrlemoos.dev/play?guest=1">Play now</a> ·
   <a href="https://ludus.mrlemoos.dev">Join the waitlist</a> ·
   <a href="#take-a-seat">Play locally</a> ·
   <a href="#guides">Read the guides</a>
@@ -15,7 +16,7 @@
 <p align="center">
   <img src="docs/media/ludus-demo.gif" width="960" alt="Ludus gameplay demo: selecting a pawn, playing against the computer and looking around the 3D café" />
 </p>
-<p align="center"><sub>Recorded from the local app. Game access is invitation only.</sub></p>
+<p align="center"><sub>Recorded from the local app. Guest computer play is public; accounts stay invitation-only.</sub></p>
 
 ## Chess, with a sense of place
 
@@ -32,7 +33,7 @@ Prefer a flat board? Switch to 2D at any time. Your game, clock and controls car
 - Analyse finished games with the local engine at `/coach/:matchId`, even during model outages.
 - Choose British English, European Spanish or European French.
 
-Ludus is in development. The public site accepts waitlist entries; invited accounts can access the game at [/play](https://ludus.mrlemoos.dev/play). Casual friend games and public matchmaking are implemented, alongside profiles, activity and card-free beta Plus. Post-game engine analysis works locally; generated coaching requires a model that passes the evaluation gate. Rated entry and paid checkout stay disabled. See [beta readiness](docs/beta-readiness.md) for remaining release gates.
+Ludus is in development. Anyone can play a casual computer game against Lucía from [/play](https://ludus.mrlemoos.dev/play) without an account; the waitlist and invitations unlock online play, profiles, coaching and the full beta. Casual friend games and public matchmaking are implemented, alongside profiles, activity and card-free beta Plus. Post-game engine analysis works locally; generated coaching requires a model that passes the evaluation gate. Rated entry and paid checkout stay disabled. See [guest play](docs/specs/guest-play.md) and [beta readiness](docs/beta-readiness.md) for limits and remaining release gates.
 
 ## Take a seat
 

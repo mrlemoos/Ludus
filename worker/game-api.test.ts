@@ -5,6 +5,13 @@ vi.mock('./auth', () => ({
   authFor: () => ({ api: { getSession: auth.session }, handler: auth.handler }),
   localDevelopment: () => false,
 }));
+vi.mock('./guest', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./guest')>();
+  return {
+    ...actual,
+    readGuest: vi.fn(async () => null),
+  };
+});
 import { gameApi } from './game-api';
 
 const id = '12345678-1234-1234-1234-123456789abc';

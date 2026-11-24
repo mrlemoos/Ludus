@@ -447,3 +447,28 @@ test('magic links are single use and sign-out revokes the game session', async (
   ).toBe(true);
   expect((await request.get('/api/me').then((r) => r.json())).user).toBeNull();
 });
+
+test('guest completes a computer game without an account', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('ludus-language', 'en-GB');
+    localStorage.setItem('ludus-board', '2d');
+  });
+  await page.goto('/play?guest=1');
+  await page.getByLabel('Play against Lucía').getByRole('checkbox').check();
+  await page.getByLabel('Play against Lucía').getByRole('button', { name: 'Start game' }).click();
+  await expect(page.getByRole('heading', { name: 'Take a seat.' })).toBeVisible();
+  await page.getByRole('button', { name: 'Start game' }).click();
+  await expect(page.locator('[data-square="e2"]')).toBeVisible();
+  await page.locator('[data-square="e2"]').click();
+  await page.locator('[data-square="e4"]').click();
+  await expect(page.getByRole('heading', { name: 'Your move', exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByRole('button', { name: 'Resign', exact: true }).click();
+  await page.getByRole('button', { name: 'Resign', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Lucía won · Resignation' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Stockfish' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Join the waitlist' })).toBeVisible();
+  expect((await page.request.get('/api/me').then((r) => r.json())).guest).toBe(true);
+  expect((await page.request.get('/api/account')).status()).toBe(401);
+});

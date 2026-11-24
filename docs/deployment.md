@@ -33,7 +33,9 @@ Product specification and dependency-ordered local tickets remain in the project
 
 ## Engine licence
 
-Stockfish.js is GPLv3. The generated engine directory includes its complete licence. Source for the pinned 19.0.1 distribution is available at https://github.com/nmrugg/stockfish.js/tree/v19.0.1. Before public distribution, provide the corresponding source alongside the shipped engine and review the distribution obligations; the current local slice is not a public release. The engine is isolated in its own browser worker and communicates through UCI messages. Project-authored 3D geometry and procedural grain use no external artwork.
+Stockfish.js is GPLv3. The generated engine directory includes `Copying.txt` and `SOURCE.txt` at `/engine/Copying.txt` and `/engine/SOURCE.txt`. Source for the pinned 19.0.1 distribution is available at https://github.com/nmrugg/stockfish.js/tree/v19.0.1. Guest and signed-in play surfaces link to those files in the match UI. Operators should confirm their hosting practice satisfies GPLv3 offer-before-convey for their distribution channel. The engine is isolated in its own browser worker and communicates through UCI messages. Project-authored 3D geometry and procedural grain use no external artwork.
+
+Guest computer play uses signed HttpOnly cookies (`ludus_guest`), IP rate limits (`GUEST_LIMITER`, 10 requests per 60 seconds per location) and a per-guest cap of ten finished games. Synthetic guest rows purge after 30 days. Online play, coaching, rated queues and billing remain invitation-gated.
 
 ## Beta configuration and release gates
 

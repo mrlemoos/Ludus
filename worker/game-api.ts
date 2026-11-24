@@ -1,16 +1,49 @@
 import { playReturnPath } from '../shared/navigation';
 import { authFor, localDevelopment } from './auth';
+import {
+  clearGuestCookie,
+  createGuestSession,
+  guestWithinGameLimit,
+  issueGuestCookie,
+  parseGuestSessionBody,
+  readGuest,
+} from './guest';
 import { invitations, matches } from './schema';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 
-function json(data: unknown, status = 200) {
-  return Response.json(data, { status, headers: { 'Cache-Control': 'no-store' } });
+async function resolvePlayer(request: Request, env: Env) {
+  const session = await authFor(request, env).api.getSession({ headers: request.headers });
+  if (session) {
+    return { id: session.user.id, name: session.user.name, guest: false as const };
+  }
+  const guest = await readGuest(request, env);
+  if (guest) {
+    return { ...guest, guest: true as const };
+  }
+  return null;
+}
+
+function secureCookies(request: Request) {
+  return new URL(request.url).protocol === 'https:';
+}
+
+function json(data: unknown, status = 200, headers: Record<string, string> = {}) {
+  return Response.json(data, {
+    status,
+    headers: { 'Cache-Control': 'no-store', ...headers },
+  });
 }
 export async function gameApi(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   if (
-    !['/api/me', '/api/dev/sign-in', '/api/games'].includes(url.pathname) &&
+    ![
+      '/api/me',
+      '/api/dev/sign-in',
+      '/api/games',
+      '/api/guest/session',
+      '/api/guest/sign-out',
+    ].includes(url.pathname) &&
     !url.pathname.startsWith('/api/auth/') &&
     !/^\/api\/games\/[0-9a-f-]{36}(\/socket)?$/.test(url.pathname)
   ) {
@@ -29,11 +62,35 @@ export async function gameApi(request: Request, env: Env): Promise<Response> {
   }
   try {
     if (url.pathname === '/api/me' && request.method === 'GET') {
-      const session = await authFor(request, env).api.getSession({ headers: request.headers });
+      const player = await resolvePlayer(request, env);
       return json({
-        user: session ? { id: session.user.id, name: session.user.name } : null,
+        user: player ? { id: player.id, name: player.name } : null,
+        guest: player?.guest ?? false,
         local: localDevelopment(request, env),
       });
+    }
+    if (url.pathname === '/api/guest/session' && request.method === 'POST') {
+      const body = parseGuestSessionBody(await boundedJson(request));
+      if (!body) {
+        return json({ error: 'adult_confirmation_required' }, 400);
+      }
+      const created = await createGuestSession(request, env, body);
+      if (created.error) {
+        return json(
+          { error: created.error },
+          created.status,
+          created.status === 429 ? { 'Retry-After': '60' } : {},
+        );
+      }
+      return await issueGuestCookie(
+        json({ user: created.identity, guest: true }, created.status),
+        env,
+        created.identity.id,
+        secureCookies(request),
+      );
+    }
+    if (url.pathname === '/api/guest/sign-out' && request.method === 'POST') {
+      return clearGuestCookie(json({ ok: true }), secureCookies(request));
     }
     if (url.pathname === '/api/dev/sign-in' && request.method === 'POST') {
       if (!localDevelopment(request, env)) {
@@ -88,11 +145,11 @@ export async function gameApi(request: Request, env: Env): Promise<Response> {
       }
       return authFor(request, env).handler(request);
     }
-    const session = await authFor(request, env).api.getSession({ headers: request.headers });
-    if (!session) {
+    const player = await resolvePlayer(request, env);
+    if (!player) {
       return json({ error: 'unauthorised' }, 401);
     }
-    const owner = session.user.id;
+    const owner = player.id;
     if (
       await env.DB.prepare('SELECT user_id FROM account_deletions WHERE user_id=?')
         .bind(owner)
@@ -114,6 +171,19 @@ export async function gameApi(request: Request, env: Env): Promise<Response> {
       }
       if (request.method !== 'POST') {
         return json({ error: 'method' }, 405);
+      }
+      if (player.guest) {
+        if (env.GUEST_LIMITER) {
+          const { success } = await env.GUEST_LIMITER.limit({
+            key: `guest-game:${request.headers.get('CF-Connecting-IP') ?? 'local'}`,
+          });
+          if (!success) {
+            return json({ error: 'rate_limited' }, 429, { 'Retry-After': '60' });
+          }
+        }
+        if (!(await guestWithinGameLimit(env.DB, owner))) {
+          return json({ error: 'guest_limit_reached' }, 403);
+        }
       }
       const profile = await env.DB.prepare('SELECT user_id FROM player_profiles WHERE user_id=?')
         .bind(owner)

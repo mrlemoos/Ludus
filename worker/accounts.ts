@@ -263,6 +263,8 @@ async function saveProfile(db: D1Database, owner: string, body: unknown, now: nu
   return response({ profile: await loadPlayerProfile(db, owner, now) });
 }
 export async function purgeExpiredPersonalData(db: D1Database, now = Date.now()) {
+  const { purgeGuestUsers } = await import('./guest');
+  await purgeGuestUsers(db, now);
   await db.batch([
     db
       .prepare(

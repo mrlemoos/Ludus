@@ -15,6 +15,7 @@ import { AppleMailTabs } from './components/apple-mail-tabs';
 import { Button } from './components/button';
 import { ControlIcon } from './components/control-icon';
 import { SlidingPanel } from './components/sliding-panel';
+import { EngineCredit } from './engine-credit';
 import { gameCopy } from './game-copy';
 import { replayCopy } from './replay-copy';
 import { Dialog } from '@base-ui/react/dialog';
@@ -78,8 +79,10 @@ export function Play() {
   const gameId = params.get('game');
   const [identity, setIdentity] = useState<{
     user: { id: string; name: string } | null;
+    guest: boolean;
     local: boolean;
   } | null>(null);
+  const [guestLimit, setGuestLimit] = useState(false);
   const appearanceState = useAppearance(Boolean(identity?.user));
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
@@ -140,7 +143,12 @@ export function Play() {
   );
   useEffect(() => {
     void api<NonNullable<typeof identity>>('/api/me')
-      .then(setIdentity)
+      .then((data) => {
+        setIdentity(data);
+        if (data.guest) {
+          setProfileLoaded(true);
+        }
+      })
       .catch(() => {
         setError(true);
       });
@@ -152,7 +160,10 @@ export function Play() {
     }
   }, [identity?.user?.id, loadHistory, completedGameKey]);
   useEffect(() => {
-    if (!identity?.user) {
+    if (!identity?.user || identity.guest) {
+      if (identity?.guest) {
+        setProfileLoaded(true);
+      }
       return;
     }
     let disposed = false;
@@ -381,11 +392,52 @@ export function Play() {
   async function start() {
     setPending(true);
     setError(false);
+    setGuestLimit(false);
     try {
-      const snapshot = await api<Snapshot>('/api/games', { colour, control, difficulty });
+      const response = await fetch('/api/games', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ colour, control, difficulty }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!response.ok) {
+        if (response.status === 403) {
+          const body: unknown = await response.json().catch(() => null);
+          if (
+            body &&
+            typeof body === 'object' &&
+            'error' in body &&
+            body.error === 'guest_limit_reached'
+          ) {
+            setGuestLimit(true);
+            return;
+          }
+        }
+        throw new Error(String(response.status));
+      }
+      const snapshot = (await response.json()) as Snapshot;
       accept(snapshot);
       setFlipped(snapshot.game.colour === 'b');
       setParams({ game: snapshot.game.id });
+    } catch {
+      setError(true);
+    } finally {
+      setPending(false);
+    }
+  }
+  async function beginGuest() {
+    setPending(true);
+    setError(false);
+    try {
+      const data = await api<{ user: { id: string; name: string }; guest: boolean }>(
+        '/api/guest/session',
+        { adult: true, language: isLanguage(i18n.language) ? i18n.language : 'en-GB' },
+      );
+      setIdentity({ user: data.user, guest: true, local: false });
+      setProfileLoaded(true);
+      const next = new URLSearchParams(params);
+      next.delete('guest');
+      setParams(next);
     } catch {
       setError(true);
     } finally {
@@ -540,7 +592,7 @@ export function Play() {
         )}
         {identity ? (
           identity.user ? (
-            profileLoaded && !profile ? (
+            !identity.guest && profileLoaded && !profile ? (
               <section className="setup-card">
                 <Link
                   className="game-primary"
@@ -826,15 +878,24 @@ export function Play() {
                           <Button className="game-secondary" onClick={download}>
                             {c.download}
                           </Button>
-                          <Link className="game-secondary" to={`/coach/${game.id}`}>
-                            {
+                          {identity.guest ? (
+                            <p className="text-sm text-muted">
+                              {c.guestUpsell}{' '}
+                              <Link className="underline" to="/">
+                                {c.waitlist}
+                              </Link>
+                            </p>
+                          ) : (
+                            <Link className="game-secondary" to={`/coach/${game.id}`}>
                               {
-                                'en-GB': 'Review with Lucía',
-                                'es-ES': 'Analizar con Lucía',
-                                'fr-FR': 'Analyser avec Lucía',
-                              }[isLanguage(i18n.language) ? i18n.language : 'en-GB']
-                            }
-                          </Link>
+                                {
+                                  'en-GB': 'Review with Lucía',
+                                  'es-ES': 'Analizar con Lucía',
+                                  'fr-FR': 'Analyser avec Lucía',
+                                }[isLanguage(i18n.language) ? i18n.language : 'en-GB']
+                              }
+                            </Link>
+                          )}
                           <Link to="/play" className="game-primary text-center">
                             {c.newGame}
                           </Link>
@@ -874,6 +935,7 @@ export function Play() {
                           {c.resign}
                         </Button>
                       )}
+                      <EngineCredit />
                     </aside>
                   </div>
                   {promotion && (
@@ -936,7 +998,11 @@ export function Play() {
                   <Button
                     className="py-3 text-xs underline"
                     onClick={() =>
-                      void api('/api/auth/sign-out', {}).then(() => {
+                      void (
+                        identity.guest
+                          ? api('/api/guest/sign-out', {})
+                          : api('/api/auth/sign-out', {})
+                      ).then(() => {
                         location.assign('/play');
                       })
                     }
@@ -944,24 +1010,34 @@ export function Play() {
                     {c.signOut}
                   </Button>
                 </div>
-                <nav className="lobby-navigation" aria-label="Ludus">
-                  <Link to="/online">
-                    {
+                {!identity.guest && (
+                  <nav className="lobby-navigation" aria-label="Ludus">
+                    <Link to="/online">
                       {
-                        'en-GB': 'Play online',
-                        'es-ES': 'Jugar en línea',
-                        'fr-FR': 'Jouer en ligne',
-                      }[isLanguage(i18n.language) ? i18n.language : 'en-GB']
-                    }
-                  </Link>
-                  <Link to="/account">
-                    {
-                      { 'en-GB': 'Your profile', 'es-ES': 'Tu perfil', 'fr-FR': 'Votre profil' }[
-                        isLanguage(i18n.language) ? i18n.language : 'en-GB'
-                      ]
-                    }
-                  </Link>
-                </nav>
+                        {
+                          'en-GB': 'Play online',
+                          'es-ES': 'Jugar en línea',
+                          'fr-FR': 'Jouer en ligne',
+                        }[isLanguage(i18n.language) ? i18n.language : 'en-GB']
+                      }
+                    </Link>
+                    <Link to="/account">
+                      {
+                        { 'en-GB': 'Your profile', 'es-ES': 'Tu perfil', 'fr-FR': 'Votre profil' }[
+                          isLanguage(i18n.language) ? i18n.language : 'en-GB'
+                        ]
+                      }
+                    </Link>
+                  </nav>
+                )}
+                {guestLimit && (
+                  <div role="alert" className="game-notice mb-5">
+                    {c.guestLimit}{' '}
+                    <Link className="underline" to="/">
+                      {c.waitlist}
+                    </Link>
+                  </div>
+                )}
                 <div className="lobby-grid">
                   <div className="lobby-controls">
                     <AppleMailTabs
@@ -1106,8 +1182,33 @@ export function Play() {
                 <p className="eyebrow">Ludus · Madrid</p>
                 <h1 className="font-display text-6xl sm:text-7xl">{c.title}</h1>
                 <p className="text-muted">{c.subtitle}</p>
+                <section
+                  className="mt-8 rounded-2xl border border-ink/10 p-5"
+                  aria-label={c.guestPlay}
+                >
+                  <h2 className="font-display text-3xl">{c.guestPlay}</h2>
+                  <p className="mt-2 text-sm text-muted">{c.guestHint}</p>
+                  <label className="mt-4 flex items-center gap-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={adult}
+                      onChange={(e) => {
+                        setAdult(e.target.checked);
+                      }}
+                    />
+                    {c.adult}
+                  </label>
+                  <Button
+                    className="game-primary mt-4 w-full"
+                    disabled={pending || !adult}
+                    onClick={() => void beginGuest()}
+                  >
+                    {c.start}
+                  </Button>
+                  <EngineCredit />
+                </section>
                 <form
-                  className="mt-8 grid gap-5"
+                  className="mt-8 grid gap-5 border-t border-ink/10 pt-8"
                   onSubmit={(e) => {
                     e.preventDefault();
                     if (adult) {
@@ -1115,6 +1216,7 @@ export function Play() {
                     }
                   }}
                 >
+                  <h2 className="font-display text-2xl">{c.signIn}</h2>
                   <label className="grid gap-2 text-sm">
                     {c.email}
                     <Input
@@ -1129,18 +1231,7 @@ export function Play() {
                       className="game-input"
                     />
                   </label>
-                  <label className="flex items-center gap-3 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={adult}
-                      onChange={(e) => {
-                        setAdult(e.target.checked);
-                      }}
-                      required
-                    />
-                    {c.adult}
-                  </label>
-                  <Button className="game-primary" type="submit" disabled={pending || !adult}>
+                  <Button className="game-secondary" type="submit" disabled={pending || !adult}>
                     {c.sendLink}
                   </Button>
                 </form>

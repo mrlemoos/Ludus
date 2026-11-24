@@ -6,6 +6,7 @@ The 2026-11-01 review-pack policy supersedes this page's earlier Plus wording. S
 
 ## Implemented
 
+- Public guest computer play against Lucía with signed cookies, IP rate limits and a ten-game cap per guest identity. Online play, coaching, rated queues and billing remain invitation-gated. See `specs/guest-play.md`.
 - Invitation-gated magic-link authentication, adult attestation, onboarding and immutable 30-day card-free Plus.
 - Verified operator allowlist, private waitlist, ten-member invitation preview/send batches, stable retry identifiers, seven-day expiry and explicit reissue.
 - Computer games with four explicit provisional strengths, advisory recommendations, authoritative moves/clocks, 2D/3D, finished replay/alternative branches and PGN.

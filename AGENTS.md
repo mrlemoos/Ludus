@@ -49,7 +49,7 @@ A browser chess platform with a 3D board and chess pieces.
 
 - Default to 3D; provide an optional 2D board for accessibility and weaker devices, sharing matches, controls and reviews.
 
-- Require an account before any play, including computer matches.
+- Require an account before online play, coaching and saved profiles. Guest computer play against Lucía is public with rate and per-browser game limits (see `docs/specs/guest-play.md`).
 
 - Launch sign-in uses email magic links only.
 
