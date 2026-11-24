@@ -472,3 +472,27 @@ test('guest completes a computer game without an account', async ({ page }) => {
   expect((await page.request.get('/api/me').then((r) => r.json())).guest).toBe(true);
   expect((await page.request.get('/api/account')).status()).toBe(401);
 });
+
+test('guest sees the lifetime limit when a new game is refused', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('ludus-language', 'en-GB');
+    localStorage.setItem('ludus-board', '2d');
+  });
+  await page.goto('/play?guest=1');
+  await page.getByLabel('Play against Lucía').getByRole('checkbox').check();
+  await page.getByLabel('Play against Lucía').getByRole('button', { name: 'Start game' }).click();
+  await expect(page.getByRole('heading', { name: 'Take a seat.' })).toBeVisible();
+  await page.route('**/api/games', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      status: 403,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'guest_limit_reached' }),
+    });
+  });
+  await page.getByRole('button', { name: 'Start game' }).click();
+  await expect(page.getByRole('alert')).toContainText('Guest limit reached.');
+});

@@ -193,6 +193,9 @@ importers:
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(@cloudflare/workers-types@5.20261026.1)(kysely@0.29.7)
+      grabkit:
+        specifier: ^2.1.0
+        version: 2.1.0
       i18next:
         specifier: ^26.5.11
         version: 26.5.11(typescript@7.0.2)
@@ -2184,6 +2187,9 @@ packages:
   glsl-noise@0.0.0:
     resolution: {integrity: sha512-b/ZCF6amfAUb7dJM/MxRs7AetQEahYzJ8PtgfrmEdtw6uyGOr+ZSGtgjFm6mfsBkxJ4d2W7kg+Nlqzqvn3Bc0w==}
 
+  grabkit@2.1.0:
+    resolution: {integrity: sha512-GUuNQtpAg4MjF7EfTf233g4U2l2Vg3iTyqEfHvxE+WbtrpacSqpWHLdPqa8TLXnPOqdbVgnkN+qqd8BwmXNnxw==}
+
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
@@ -4150,6 +4156,8 @@ snapshots:
       resolve-pkg-maps: 1.0.0
 
   glsl-noise@0.0.0: {}
+
+  grabkit@2.1.0: {}
 
   graceful-fs@4.2.11: {}
 

@@ -17,12 +17,14 @@ import { ControlIcon } from './components/control-icon';
 import { SlidingPanel } from './components/sliding-panel';
 import { EngineCredit } from './engine-credit';
 import { gameCopy } from './game-copy';
+import { isGuestLimitError } from './game-start';
 import { replayCopy } from './replay-copy';
 import { Dialog } from '@base-ui/react/dialog';
 import { Input } from '@base-ui/react/input';
 import { Tabs } from '@base-ui/react/tabs';
 import { Chess } from 'chess.js';
 import type { Square } from 'chess.js';
+import grabkit from 'grabkit';
 import {
   Component,
   Suspense,
@@ -38,6 +40,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 
 const Board3D = lazy(() => import('./board-3d'));
+const grab = grabkit('', { format: 'json' });
 interface Snapshot {
   game: Game;
   serverNow: number;
@@ -394,28 +397,21 @@ export function Play() {
     setError(false);
     setGuestLimit(false);
     try {
-      const response = await fetch('/api/games', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ colour, control, difficulty }),
-        signal: AbortSignal.timeout(15_000),
+      const [snapshot, error] = await grab<Snapshot>('POST /api/games', {
+        body: { colour, control, difficulty },
       });
-      if (!response.ok) {
-        if (response.status === 403) {
-          const body: unknown = await response.json().catch(() => null);
-          if (
-            body &&
-            typeof body === 'object' &&
-            'error' in body &&
-            body.error === 'guest_limit_reached'
-          ) {
-            setGuestLimit(true);
-            return;
-          }
+      if (error) {
+        if (isGuestLimitError(error)) {
+          setGuestLimit(true);
+          return;
         }
-        throw new Error(String(response.status));
+        setError(true);
+        return;
       }
-      const snapshot = (await response.json()) as Snapshot;
+      if (!snapshot) {
+        setError(true);
+        return;
+      }
       accept(snapshot);
       setFlipped(snapshot.game.colour === 'b');
       setParams({ game: snapshot.game.id });
