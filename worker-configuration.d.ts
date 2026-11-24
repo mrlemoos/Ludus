@@ -5,6 +5,9 @@ interface __BaseEnv_Env {
 	WAITLIST_LIMITER: RateLimit;
 	GUEST_LIMITER: RateLimit;
 	ASSETS: Fetcher;
+	LOCAL_DEV: string;
+	BETTER_AUTH_SECRET: string;
+	OPERATOR_IDS: string;
 	STRIPE_REVIEW_PACK_PRICE_ID: "price_1UWweXBVWchHmktzXDsCNIaA";
 	STRIPE_BILLING_ENABLED: "false";
 	STRIPE_TAX_READY: "false";
@@ -25,7 +28,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "STRIPE_REVIEW_PACK_PRICE_ID" | "STRIPE_BILLING_ENABLED" | "STRIPE_TAX_READY" | "STRIPE_LIFECYCLE_READY">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "LOCAL_DEV" | "BETTER_AUTH_SECRET" | "OPERATOR_IDS" | "STRIPE_REVIEW_PACK_PRICE_ID" | "STRIPE_BILLING_ENABLED" | "STRIPE_TAX_READY" | "STRIPE_LIFECYCLE_READY">> {}
 }
 declare module "*.txt" {
 	const value: string;
