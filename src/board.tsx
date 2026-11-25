@@ -17,6 +17,7 @@ export interface BoardPosition {
   selected: Square | null;
   destinations: string[];
   lastMove: string[];
+  interactive?: boolean;
 }
 export interface BoardProps {
   position: BoardPosition;
@@ -25,8 +26,16 @@ export interface BoardProps {
   concealed?: boolean;
   appearance?: Appearance;
 }
+export function boardIsInteractive(input: {
+  finished: boolean;
+  connected: boolean;
+  pending: boolean;
+}) {
+  return input.finished || (input.connected && !input.pending);
+}
 export function Board({ position, onSquare, copy: c, concealed, appearance }: BoardProps) {
   const { fen, flipped, selected, destinations, lastMove } = position;
+  const locked = position.interactive === false;
   const chess = new Chess(fen);
   const refs = useRef<(HTMLElement | null)[]>([]);
   const squares = Array.from(
@@ -63,6 +72,7 @@ export function Board({ position, onSquare, copy: c, concealed, appearance }: Bo
                 refs.current[i] = el;
               }}
               type="button"
+              disabled={locked}
               data-square={square}
               style={
                 appearance && selected !== square && !lastMove.includes(square)

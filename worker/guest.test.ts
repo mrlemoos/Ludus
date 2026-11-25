@@ -185,7 +185,12 @@ describe('guest session cookies', () => {
     // Arrange
     const { d1 } = memoryDb();
     const { cookie } = await signedGuestCookie(d1);
-    const tampered = cookie.replace(/.$/, cookie.at(-1) === 'a' ? 'b' : 'a');
+    const separator = cookie.indexOf('=');
+    const token = decodeURIComponent(cookie.slice(separator + 1));
+    const dot = token.indexOf('.');
+    const signature = token.slice(dot + 1);
+    const flipped = signature.startsWith('A') ? `B${signature.slice(1)}` : `A${signature.slice(1)}`;
+    const tampered = `${cookie.slice(0, separator)}=${encodeURIComponent(`${token.slice(0, dot)}.${flipped}`)}`;
     const request = new Request('https://ludus.test/api/me', { headers: { Cookie: tampered } });
 
     // Act
