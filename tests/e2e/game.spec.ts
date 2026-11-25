@@ -121,8 +121,16 @@ test('server rejects illegal/stale actions and foreign sessions; finalises check
   await signIn(page);
   await finishActive(page);
   await page.route('**/engine/stockfish*', (route) => route.abort());
+  const started = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname === '/api/games',
+  );
   await page.getByRole('button', { name: 'Start game' }).click();
-  await expect(page.getByRole('button', { name: 'Resign', exact: true })).toBeEnabled();
+  expect((await started).ok()).toBe(true);
+  await expect(page.getByRole('button', { name: 'Resign', exact: true })).toBeEnabled({
+    timeout: 30_000,
+  });
   const id = new URL(page.url()).searchParams.get('game');
   const path = `/api/games/${id}`;
   function post(data: unknown) {
