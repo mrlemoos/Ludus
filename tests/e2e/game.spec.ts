@@ -123,8 +123,7 @@ test('server rejects illegal/stale actions and foreign sessions; finalises check
   await page.route('**/engine/stockfish*', (route) => route.abort());
   const started = page.waitForResponse(
     (response) =>
-      response.request().method() === 'POST' &&
-      new URL(response.url()).pathname === '/api/games',
+      response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/games',
   );
   await page.getByRole('button', { name: 'Start game' }).click();
   expect((await started).ok()).toBe(true);
