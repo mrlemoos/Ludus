@@ -9,7 +9,7 @@ import type { Replay } from '../shared/replay';
 import { isLanguage } from '../shared/waitlist';
 import { Header } from './app';
 import { AppearanceControls, useAppearance } from './appearance';
-import { Board } from './board';
+import { Board, boardIsInteractive } from './board';
 import { capturedPieces } from './captured-pieces';
 import { AppleMailTabs } from './components/apple-mail-tabs';
 import { Button } from './components/button';
@@ -529,6 +529,11 @@ export function Play() {
       flipped,
       lastMove: lastShown ? [lastShown.from, lastShown.to] : [],
       selected,
+      interactive: boardIsInteractive({
+        finished: Boolean(game?.result),
+        connected,
+        pending,
+      }),
     },
   };
   const resultTitle = game?.result
