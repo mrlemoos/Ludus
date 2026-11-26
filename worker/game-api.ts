@@ -8,6 +8,7 @@ import {
   parseGuestSessionBody,
   readGuest,
 } from './guest';
+import { forwardUpgrade } from './http';
 import { invitations, matches } from './schema';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
@@ -265,9 +266,7 @@ export async function gameApi(request: Request, env: Env): Promise<Response> {
       if (request.headers.get('Origin') !== url.origin) {
         return json({ error: 'forbidden' }, 403);
       }
-      return stub.fetch(
-        new Request(request.url, { headers: { Upgrade: 'websocket', 'X-Player': owner } }),
-      );
+      return stub.fetch(forwardUpgrade(request, owner));
     }
     if (request.method === 'GET') {
       const current = await stub.read(owner);

@@ -25,14 +25,24 @@ export class Match extends DurableObject<Env> {
       JSON.stringify(game),
     );
   }
-  private async publish(game: Game) {
+  private async publish(game: Game, upgrading?: WebSocket) {
     this.save(game);
     const message = JSON.stringify({ game, serverNow: Date.now() });
     for (const socket of this.ctx.getWebSockets()) {
+      if (socket === upgrading) {
+        continue;
+      }
       try {
         socket.send(message);
       } catch {
         socket.close(1011, 'Reconnect');
+      }
+    }
+    if (upgrading) {
+      try {
+        upgrading.send(message);
+      } catch {
+        // A failed greeting must not close the socket that is still being upgraded.
       }
     }
     if (game.result) {
@@ -147,7 +157,7 @@ export class Match extends DurableObject<Env> {
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1]);
     const next = connection(game, true, Date.now());
-    await this.publish(next);
+    await this.publish(next, pair[1]);
     return new Response(null, { status: 101, webSocket: pair[0] });
   }
   async anonymise(owner: string) {
@@ -171,7 +181,11 @@ export class Match extends DurableObject<Env> {
       .where(eq(matches.id, game.id));
   }
   async webSocketClose(socket: WebSocket, code: number) {
-    socket.close(code, 'Closed');
+    try {
+      socket.close(code, 'Closed');
+    } catch {
+      // Compatibility dates from 2026-04-07 complete the close handshake automatically.
+    }
     if (
       this.ctx
         .getWebSockets()

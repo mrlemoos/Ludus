@@ -88,7 +88,7 @@ export function Play() {
     local: boolean;
   } | null>(null);
   const [guestLimit, setGuestLimit] = useState(false);
-  const appearanceState = useAppearance(Boolean(identity?.user));
+  const appearanceState = useAppearance(Boolean(identity?.user) && !identity?.guest);
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [computerHistory, setComputerHistory] = useState<ComputerHistory[]>([]);
@@ -257,20 +257,21 @@ export function Play() {
       return;
     }
     let disposed = false;
-    let socket: WebSocket;
-    let timer: ReturnType<typeof setTimeout>;
+    let socket: WebSocket | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     function connect() {
-      socket = new WebSocket(
+      const current = new WebSocket(
         `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/api/games/${gameId}/socket`,
       );
-      socket.onopen = () => {
-        if (!disposed) {
+      socket = current;
+      current.onopen = () => {
+        if (!disposed && socket === current) {
           setConnected(true);
           setError(false);
         }
       };
-      socket.onmessage = (event) => {
-        if (!disposed) {
+      current.onmessage = (event) => {
+        if (!disposed && socket === current) {
           try {
             accept(JSON.parse(event.data));
           } catch {
@@ -278,21 +279,24 @@ export function Play() {
           }
         }
       };
-      socket.onclose = () => {
-        if (!disposed) {
-          setConnected(false);
-          timer = setTimeout(connect, 1500);
+      current.onclose = () => {
+        if (disposed || socket !== current) {
+          return;
         }
+        setConnected(false);
+        timer = setTimeout(connect, 1500);
       };
-      socket.onerror = () => {
-        socket.close();
+      current.onerror = () => {
+        if (socket === current && current.readyState !== WebSocket.CLOSED) {
+          current.close();
+        }
       };
     }
     connect();
     return () => {
       disposed = true;
       clearTimeout(timer);
-      socket.close();
+      socket?.close();
       setConnected(false);
     };
   }, [gameId, identity?.user?.id, accept]);

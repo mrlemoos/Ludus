@@ -2,6 +2,7 @@ import type { Control } from '../shared/game';
 import { RATED_ENABLED, RATED_GATE, phraseIds, reportCategories } from '../shared/human-game';
 import type { PhraseId } from '../shared/human-game';
 import { initialRating } from '../shared/rating';
+import { forwardUpgrade } from './http';
 
 function json(data: unknown, status = 200) {
   return Response.json(data, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -83,9 +84,7 @@ export async function onlineApi(
       if (request.headers.get('Origin') !== url.origin) {
         return json({ error: 'forbidden' }, 403);
       }
-      return coordinator.fetch(
-        new Request(request.url, { headers: { Upgrade: 'websocket', 'X-Player': user } }),
-      );
+      return coordinator.fetch(forwardUpgrade(request, user));
     }
     const match = /^\/api\/online\/games\/([0-9a-f-]{36})(?:\/(socket|phrase|report))?$/.exec(
       url.pathname,
@@ -96,9 +95,7 @@ export async function onlineApi(
         if (request.headers.get('Origin') !== url.origin) {
           return json({ error: 'forbidden' }, 403);
         }
-        return stub.fetch(
-          new Request(request.url, { headers: { Upgrade: 'websocket', 'X-Player': user } }),
-        );
+        return stub.fetch(forwardUpgrade(request, user));
       }
       if (!match[2] && request.method === 'GET') {
         const snapshot = await stub.read(user);

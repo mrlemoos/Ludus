@@ -320,7 +320,7 @@ export class Matchmaking extends DurableObject<Env> {
     try {
       pair[1].send(JSON.stringify(state));
     } catch {
-      pair[1].close(1011, 'Reconnect');
+      // A failed greeting must not close the socket that is still being upgraded.
     }
     return new Response(null, { status: 101, webSocket: pair[0] });
   }
