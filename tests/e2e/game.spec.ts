@@ -489,6 +489,19 @@ test('sign-in shows a busy button while the link is sending', async ({ page }) =
 });
 
 test('guest completes a computer game without an account', async ({ page }) => {
+  test.setTimeout(60_000);
+  const socketCloses: number[] = [];
+  const appearance: string[] = [];
+  page.on('websocket', (socket) => {
+    socket.on('close', () => {
+      socketCloses.push(socketCloses.length);
+    });
+  });
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/appearance') {
+      appearance.push(request.url());
+    }
+  });
   await page.addInitScript(() => {
     localStorage.setItem('ludus-language', 'en-GB');
     localStorage.setItem('ludus-board', '2d');
@@ -498,9 +511,14 @@ test('guest completes a computer game without an account', async ({ page }) => {
   await page.getByLabel('Play against Lucía').getByRole('button', { name: 'Start game' }).click();
   await expect(page.getByRole('heading', { name: 'Take a seat.' })).toBeVisible();
   await page.getByRole('button', { name: 'Start game' }).click();
-  await expect(page.locator('[data-square="e2"]')).toBeVisible();
+  await expect(page.locator('[data-square="e2"]')).toBeEnabled();
+  await expect(page.getByText('Reconnecting… Your moves are saved.')).toHaveCount(0);
   await page.locator('[data-square="e2"]').click();
   await page.locator('[data-square="e4"]').click();
+  await expect(page.getByLabel('Moves')).toContainText('e4');
+  await page.waitForTimeout(3500);
+  expect(socketCloses).toEqual([]);
+  expect(appearance).toEqual([]);
   await expect(page.getByRole('heading', { name: 'Your move', exact: true })).toBeVisible({
     timeout: 30_000,
   });

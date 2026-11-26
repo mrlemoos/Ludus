@@ -110,6 +110,72 @@ describe('match ownership', () => {
   });
 });
 
+describe('socket admission', () => {
+  it('delivers the resumed snapshot on the upgrading socket without closing it', async () => {
+    // Arrange
+    const sent: string[] = [];
+    const close = vi.fn();
+    class Pair {
+      0 = { send: vi.fn(), close: vi.fn() };
+      1 = {
+        send: vi.fn((data: string) => {
+          sent.push(data);
+        }),
+        close,
+      };
+    }
+    class AllowedResponse {
+      status: number;
+      webSocket: unknown;
+      constructor(_body: unknown, init?: { status?: number; webSocket?: unknown }) {
+        this.status = init?.status ?? 200;
+        this.webSocket = init?.webSocket ?? null;
+      }
+    }
+    vi.stubGlobal('WebSocketPair', Pair);
+    vi.stubGlobal('Response', AllowedResponse);
+    const { match, ctx, saved } = fixture(createGame('match', 'owner', '5+3', 1, 'w', 1000));
+
+    // Act
+    const response = await match.fetch(
+      new Request('https://example.com', {
+        headers: { 'X-Player': 'owner', Upgrade: 'websocket' },
+      }),
+    );
+
+    // Assert
+    try {
+      expect(response.status).toBe(101);
+      expect(ctx.acceptWebSocket).toHaveBeenCalledTimes(1);
+      expect(sent).toHaveLength(1);
+      expect(JSON.parse(sent[0]).game.pauseStarted).toBeNull();
+      expect(saved().pauseStarted).toBeNull();
+      expect(close).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('still pauses the clock when the closing socket rejects another close', async () => {
+    // Arrange
+    const { match, sockets, saved } = fixture();
+    const socket = {
+      send: vi.fn(),
+      close: vi.fn(() => {
+        throw new Error('already closed');
+      }),
+      readyState: 1,
+    };
+    sockets.push(socket);
+
+    // Act
+    await match.webSocketClose(socket as unknown as WebSocket, 1006);
+
+    // Assert
+    expect(saved().pauseStarted).not.toBeNull();
+  });
+});
+
 describe('durable finalisation', () => {
   it('retries terminal persistence after D1 failure without accepting another action', async () => {
     // Arrange

@@ -616,7 +616,15 @@ describe('online invitation HTTP and matchmaking socket', () => {
 
     // Act
     const response = await onlineApi(
-      new Request(`${origin}/api/online/socket`, { headers: { Origin: origin } }),
+      new Request(`${origin}/api/online/socket`, {
+        headers: {
+          Origin: origin,
+          Upgrade: 'websocket',
+          Connection: 'Upgrade',
+          'Sec-WebSocket-Key': 'dGhlIHNhbXBsZSBub25jZQ==',
+          'Sec-WebSocket-Version': '13',
+        },
+      }),
       env,
       'white',
     );
@@ -625,8 +633,9 @@ describe('online invitation HTTP and matchmaking socket', () => {
     expect(crossSite?.status).toBe(403);
     expect(response?.status).toBe(426);
     expect(fetch).toHaveBeenCalledTimes(1);
-    const forwarded = fetch.mock.calls[0][0];
+    const forwarded = fetch.mock.calls[0][0] as Request;
     expect(forwarded.headers.get('Upgrade')).toBe('websocket');
+    expect(forwarded.headers.get('Sec-WebSocket-Key')).toBe('dGhlIHNhbXBsZSBub25jZQ==');
     expect(forwarded.headers.get('X-Player')).toBe('white');
   });
 });

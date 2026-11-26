@@ -100,14 +100,24 @@ export class HumanMatch extends DurableObject<Env> {
     });
     await this.env.MATCHMAKING.getByName('beta').release(game.id, Object.values(game.players));
   }
-  private async publish(game: HumanGame) {
+  private async publish(game: HumanGame, upgrading?: WebSocket) {
     this.save(game);
     const snapshot = JSON.stringify({ game, serverNow: Date.now() });
     for (const socket of this.ctx.getWebSockets()) {
+      if (socket === upgrading) {
+        continue;
+      }
       try {
         socket.send(snapshot);
       } catch {
         socket.close(1011, 'Reconnect');
+      }
+    }
+    if (upgrading) {
+      try {
+        upgrading.send(snapshot);
+      } catch {
+        // A failed greeting must not close the socket that is still being upgraded.
       }
     }
     if (game.result) {
@@ -334,12 +344,16 @@ export class HumanMatch extends DurableObject<Env> {
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1], [player]);
     pair[1].serializeAttachment({ player });
-    await this.publish(humanConnection(game, colour, true, Date.now()));
+    await this.publish(humanConnection(game, colour, true, Date.now()), pair[1]);
     return new Response(null, { status: 101, webSocket: pair[0] });
   }
   async webSocketClose(socket: WebSocket, code: number) {
     const player = (socket.deserializeAttachment() as { player?: string } | null)?.player;
-    socket.close(code, 'Closed');
+    try {
+      socket.close(code, 'Closed');
+    } catch {
+      // Compatibility dates from 2026-04-07 complete the close handshake automatically.
+    }
     if (
       !player ||
       this.ctx

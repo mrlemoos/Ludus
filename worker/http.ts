@@ -1,3 +1,20 @@
+export function forwardUpgrade(request: Request, player: string) {
+  const headers = new Headers(request.headers);
+  headers.set('Upgrade', 'websocket');
+  headers.set('X-Player', player);
+  const internal: string[] = [];
+  for (const name of headers.keys()) {
+    if (name.toLowerCase().startsWith('x-') && name.toLowerCase() !== 'x-player') {
+      internal.push(name);
+    }
+  }
+  for (const name of internal) {
+    headers.delete(name);
+  }
+  // Built from the incoming request so the runtime adopts that WebSocket.
+  // A fresh request with only Upgrade opens a second socket and the browser one drops.
+  return new Request(request, { headers });
+}
 export function apiJson(value: unknown, status = 200) {
   return Response.json(value, {
     status,

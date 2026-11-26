@@ -92,10 +92,11 @@ describe('game API identity boundary', () => {
     });
   });
 
-  it('replaces forged socket identity and strips caller-controlled internal headers', async () => {
+  it('forwards the browser websocket handshake instead of opening a separate socket', async () => {
     // Arrange
     const { env, stub } = fixture();
     stub.fetch.mockResolvedValue(new Response(null, { status: 404 }));
+    const key = 'dGhlIHNhbXBsZSBub25jZQ==';
 
     // Act
     const result = await gameApi(
@@ -103,6 +104,10 @@ describe('game API identity boundary', () => {
         headers: {
           Origin: origin,
           Upgrade: 'websocket',
+          Connection: 'Upgrade',
+          Cookie: 'ludus_guest=signed-session',
+          'Sec-WebSocket-Key': key,
+          'Sec-WebSocket-Version': '13',
           'X-Player': 'victim',
           'X-Other': 'untrusted',
         },
@@ -113,6 +118,11 @@ describe('game API identity boundary', () => {
     // Assert
     expect(result.status).toBe(404);
     const forwarded = stub.fetch.mock.calls[0][0] as Request;
+    expect(forwarded.headers.get('Upgrade')).toBe('websocket');
+    expect(forwarded.headers.get('Connection')).toBe('Upgrade');
+    expect(forwarded.headers.get('Sec-WebSocket-Key')).toBe(key);
+    expect(forwarded.headers.get('Sec-WebSocket-Version')).toBe('13');
+    expect(forwarded.headers.get('Cookie')).toBe('ludus_guest=signed-session');
     expect(forwarded.headers.get('X-Player')).toBe('signed-in-owner');
     expect(forwarded.headers.get('X-Other')).toBeNull();
   });
