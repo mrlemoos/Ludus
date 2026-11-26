@@ -84,7 +84,7 @@ export async function onlineApi(
       if (request.headers.get('Origin') !== url.origin) {
         return json({ error: 'forbidden' }, 403);
       }
-      return coordinator.fetch(forwardUpgrade(request, user));
+      return coordinator.fetch(request, forwardUpgrade(request, user));
     }
     const match = /^\/api\/online\/games\/([0-9a-f-]{36})(?:\/(socket|phrase|report))?$/.exec(
       url.pathname,
@@ -95,7 +95,7 @@ export async function onlineApi(
         if (request.headers.get('Origin') !== url.origin) {
           return json({ error: 'forbidden' }, 403);
         }
-        return stub.fetch(forwardUpgrade(request, user));
+        return stub.fetch(request, forwardUpgrade(request, user));
       }
       if (!match[2] && request.method === 'GET') {
         const snapshot = await stub.read(user);

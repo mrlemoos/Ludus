@@ -99,32 +99,31 @@ describe('game API identity boundary', () => {
     const key = 'dGhlIHNhbXBsZSBub25jZQ==';
 
     // Act
-    const result = await gameApi(
-      request(`/api/games/${id}/socket`, {
-        headers: {
-          Origin: origin,
-          Upgrade: 'websocket',
-          Connection: 'Upgrade',
-          Cookie: 'ludus_guest=signed-session',
-          'Sec-WebSocket-Key': key,
-          'Sec-WebSocket-Version': '13',
-          'X-Player': 'victim',
-          'X-Other': 'untrusted',
-        },
-      }),
-      env,
-    );
+    const incoming = request(`/api/games/${id}/socket`, {
+      headers: {
+        Origin: origin,
+        Upgrade: 'websocket',
+        Connection: 'Upgrade',
+        Cookie: 'ludus_guest=signed-session',
+        'Sec-WebSocket-Key': key,
+        'Sec-WebSocket-Version': '13',
+        'X-Player': 'victim',
+        'X-Other': 'untrusted',
+      },
+    });
+    const result = await gameApi(incoming, env);
 
     // Assert
     expect(result.status).toBe(404);
-    const forwarded = stub.fetch.mock.calls[0][0] as Request;
-    expect(forwarded.headers.get('Upgrade')).toBe('websocket');
-    expect(forwarded.headers.get('Connection')).toBe('Upgrade');
-    expect(forwarded.headers.get('Sec-WebSocket-Key')).toBe(key);
-    expect(forwarded.headers.get('Sec-WebSocket-Version')).toBe('13');
-    expect(forwarded.headers.get('Cookie')).toBe('ludus_guest=signed-session');
-    expect(forwarded.headers.get('X-Player')).toBe('signed-in-owner');
-    expect(forwarded.headers.get('X-Other')).toBeNull();
+    expect(stub.fetch.mock.calls[0][0]).toBe(incoming);
+    const headers = new Headers((stub.fetch.mock.calls[0][1] as RequestInit).headers);
+    expect(headers.get('Upgrade')).toBe('websocket');
+    expect(headers.get('Connection')).toBe('Upgrade');
+    expect(headers.get('Sec-WebSocket-Key')).toBe(key);
+    expect(headers.get('Sec-WebSocket-Version')).toBe('13');
+    expect(headers.get('Cookie')).toBe('ludus_guest=signed-session');
+    expect(headers.get('X-Player')).toBe('signed-in-owner');
+    expect(headers.get('X-Other')).toBeNull();
   });
 
   it.each<Record<string, string>>([

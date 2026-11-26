@@ -506,7 +506,9 @@ function onlineEnv() {
   }));
   const redeem = vi.fn(async () => ({ status: 'assigned' as const, match: assignment }));
   const revokeInvite = vi.fn(async () => ({ status: 'idle' as const }));
-  const fetch = vi.fn(async (_request: Request) => new Response(null, { status: 426 }));
+  const fetch = vi.fn(
+    async (_request: Request, _init?: RequestInit) => new Response(null, { status: 426 }),
+  );
   const env = {
     MATCHMAKING: { getByName: () => ({ createInvite, redeem, revokeInvite, fetch }) },
   } as unknown as Env;
@@ -615,28 +617,26 @@ describe('online invitation HTTP and matchmaking socket', () => {
     );
 
     // Act
-    const response = await onlineApi(
-      new Request(`${origin}/api/online/socket`, {
-        headers: {
-          Origin: origin,
-          Upgrade: 'websocket',
-          Connection: 'Upgrade',
-          'Sec-WebSocket-Key': 'dGhlIHNhbXBsZSBub25jZQ==',
-          'Sec-WebSocket-Version': '13',
-        },
-      }),
-      env,
-      'white',
-    );
+    const incoming = new Request(`${origin}/api/online/socket`, {
+      headers: {
+        Origin: origin,
+        Upgrade: 'websocket',
+        Connection: 'Upgrade',
+        'Sec-WebSocket-Key': 'dGhlIHNhbXBsZSBub25jZQ==',
+        'Sec-WebSocket-Version': '13',
+      },
+    });
+    const response = await onlineApi(incoming, env, 'white');
 
     // Assert
     expect(crossSite?.status).toBe(403);
     expect(response?.status).toBe(426);
     expect(fetch).toHaveBeenCalledTimes(1);
-    const forwarded = fetch.mock.calls[0][0] as Request;
-    expect(forwarded.headers.get('Upgrade')).toBe('websocket');
-    expect(forwarded.headers.get('Sec-WebSocket-Key')).toBe('dGhlIHNhbXBsZSBub25jZQ==');
-    expect(forwarded.headers.get('X-Player')).toBe('white');
+    expect(fetch.mock.calls[0][0]).toBe(incoming);
+    const headers = new Headers((fetch.mock.calls[0][1] as RequestInit).headers);
+    expect(headers.get('Upgrade')).toBe('websocket');
+    expect(headers.get('Sec-WebSocket-Key')).toBe('dGhlIHNhbXBsZSBub25jZQ==');
+    expect(headers.get('X-Player')).toBe('white');
   });
 });
 function humanFixture(initial?: HumanGame) {

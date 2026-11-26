@@ -1,4 +1,4 @@
-export function forwardUpgrade(request: Request, player: string) {
+export function forwardUpgrade(request: Request, player: string): RequestInit {
   const headers = new Headers(request.headers);
   headers.set('Upgrade', 'websocket');
   headers.set('X-Player', player);
@@ -11,9 +11,26 @@ export function forwardUpgrade(request: Request, player: string) {
   for (const name of internal) {
     headers.delete(name);
   }
-  // Built from the incoming request so the runtime adopts that WebSocket.
-  // A fresh request with only Upgrade opens a second socket and the browser one drops.
-  return new Request(request, { headers });
+  // Returned as fetch init so the caller can pass the original Request through.
+  // Replacing that Request drops the browser WebSocket and the Durable Object
+  // ends up talking to a different socket.
+  return { headers };
+}
+export function acknowledgeClose(socket: WebSocket, code: number) {
+  const legal = code >= 1000 && code < 5000 && ![1004, 1005, 1006, 1015].includes(code);
+  if (legal) {
+    try {
+      socket.close(code, 'Closed');
+      return;
+    } catch {
+      /* A coded reply was refused. Reply without a status code. */
+    }
+  }
+  try {
+    socket.close();
+  } catch {
+    /* The handshake is already complete. */
+  }
 }
 export function apiJson(value: unknown, status = 200) {
   return Response.json(value, {

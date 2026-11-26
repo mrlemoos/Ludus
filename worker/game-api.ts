@@ -266,7 +266,7 @@ export async function gameApi(request: Request, env: Env): Promise<Response> {
       if (request.headers.get('Origin') !== url.origin) {
         return json({ error: 'forbidden' }, 403);
       }
-      return stub.fetch(forwardUpgrade(request, owner));
+      return stub.fetch(request, forwardUpgrade(request, owner));
     }
     if (request.method === 'GET') {
       const current = await stub.read(owner);

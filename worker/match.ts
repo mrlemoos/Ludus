@@ -1,6 +1,7 @@
 import { applyAction, connection, createGame, parseAction, settle } from '../shared/game';
 import type { Control, Difficulty, Game } from '../shared/game';
 import { recordActivity } from './accounts';
+import { acknowledgeClose } from './http';
 import { matches } from './schema';
 import { DurableObject } from 'cloudflare:workers';
 import { eq } from 'drizzle-orm';
@@ -35,7 +36,8 @@ export class Match extends DurableObject<Env> {
       try {
         socket.send(message);
       } catch {
-        socket.close(1011, 'Reconnect');
+        // Closing here forces the browser to reconnect, and the next snapshot
+        // can fail on the replacement socket in the same way.
       }
     }
     if (upgrading) {
@@ -124,15 +126,21 @@ export class Match extends DurableObject<Env> {
     if (!action) {
       return { error: 'invalid' };
     }
-    const current = settle(game, Date.now());
-    if (current.result) {
-      await this.publish(current);
-      return { game: current, serverNow: Date.now() };
+    const settled = settle(game, Date.now());
+    if (settled.result) {
+      await this.publish(settled);
+      return { game: settled, serverNow: Date.now() };
     }
+    // The authenticated request is the player being present, including when the
+    // live socket has dropped and left the clock paused.
+    const current = connection(settled, true, Date.now());
     let next: Game;
     try {
       next = applyAction(current, action, Date.now());
     } catch {
+      if (current !== settled) {
+        await this.publish(current);
+      }
       return { error: 'invalid_action', game: current, serverNow: Date.now() };
     }
     await this.publish(next);
@@ -181,11 +189,7 @@ export class Match extends DurableObject<Env> {
       .where(eq(matches.id, game.id));
   }
   async webSocketClose(socket: WebSocket, code: number) {
-    try {
-      socket.close(code, 'Closed');
-    } catch {
-      // Compatibility dates from 2026-04-07 complete the close handshake automatically.
-    }
+    acknowledgeClose(socket, code);
     if (
       this.ctx
         .getWebSockets()
