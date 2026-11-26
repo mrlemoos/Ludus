@@ -1,5 +1,5 @@
-import { boundedRequest } from './http';
-import { describe, expect, it } from 'vitest';
+import { acknowledgeClose, boundedRequest } from './http';
+import { describe, expect, it, vi } from 'vitest';
 
 const origin = 'https://ludus.test';
 describe('integrated mutation boundary', () => {
@@ -48,6 +48,39 @@ describe('integrated mutation boundary', () => {
     // Assert
     expect(request).toBeInstanceOf(Request);
     await expect((request as Request).json()).resolves.toEqual({ adult: true });
+  });
+
+  it('replies to a statusless close without sending an illegal code', () => {
+    // Arrange
+    const socket = { close: vi.fn() };
+
+    // Act
+    acknowledgeClose(socket as unknown as WebSocket, 1006);
+
+    // Assert
+    expect(socket.close).toHaveBeenCalledTimes(1);
+    expect(socket.close).toHaveBeenCalledWith();
+  });
+
+  it('keeps a normal close code and falls back when that reply throws', () => {
+    // Arrange
+    const normal = { close: vi.fn() };
+    const refused = {
+      close: vi.fn((code?: number) => {
+        if (code !== undefined) {
+          throw new Error('refused');
+        }
+      }),
+    };
+
+    // Act
+    acknowledgeClose(normal as unknown as WebSocket, 1000);
+    acknowledgeClose(refused as unknown as WebSocket, 1000);
+
+    // Assert
+    expect(normal.close).toHaveBeenCalledWith(1000, 'Closed');
+    expect(refused.close).toHaveBeenNthCalledWith(1, 1000, 'Closed');
+    expect(refused.close).toHaveBeenNthCalledWith(2);
   });
 
   it('allows public read requests without demanding an Origin header', async () => {

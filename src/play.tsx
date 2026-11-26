@@ -287,9 +287,8 @@ export function Play() {
         timer = setTimeout(connect, 1500);
       };
       current.onerror = () => {
-        if (socket === current && current.readyState !== WebSocket.CLOSED) {
-          current.close();
-        }
+        // A failed handshake also emits close. Closing here aborts a socket that
+        // is still opening and the browser reconnects again.
       };
     }
     connect();

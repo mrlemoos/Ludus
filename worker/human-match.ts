@@ -14,6 +14,7 @@ import type { Assignment } from '../shared/matchmaking';
 import { initialRating, rateMatch } from '../shared/rating';
 import type { Rating } from '../shared/rating';
 import { recordActivity } from './accounts';
+import { acknowledgeClose } from './http';
 import { DurableObject } from 'cloudflare:workers';
 
 type RatingRow = Rating & { user_id: string };
@@ -110,7 +111,8 @@ export class HumanMatch extends DurableObject<Env> {
       try {
         socket.send(snapshot);
       } catch {
-        socket.close(1011, 'Reconnect');
+        // Closing here forces the browser to reconnect, and the next snapshot
+        // can fail on the replacement socket in the same way.
       }
     }
     if (upgrading) {
@@ -349,11 +351,7 @@ export class HumanMatch extends DurableObject<Env> {
   }
   async webSocketClose(socket: WebSocket, code: number) {
     const player = (socket.deserializeAttachment() as { player?: string } | null)?.player;
-    try {
-      socket.close(code, 'Closed');
-    } catch {
-      // Compatibility dates from 2026-04-07 complete the close handshake automatically.
-    }
+    acknowledgeClose(socket, code);
     if (
       !player ||
       this.ctx

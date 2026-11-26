@@ -176,6 +176,40 @@ describe('socket admission', () => {
   });
 });
 
+describe('paused play', () => {
+  it('accepts a move while the clock is paused because the request is presence', async () => {
+    // Arrange
+    const { match, saved } = fixture(createGame('match', 'owner', '5+3', 1, 'w', 1000));
+
+    // Act
+    const result = await match.act('owner', { type: 'move', from: 'e2', to: 'e4', revision: 0 });
+
+    // Assert
+    expect(result).toMatchObject({ game: { moves: ['e4'], pauseStarted: null } });
+    expect(saved().moves).toEqual(['e4']);
+    expect(saved().pauseStarted).toBeNull();
+  });
+
+  it('does not close a socket that cannot take the snapshot', async () => {
+    // Arrange
+    const { match, sockets } = fixture();
+    const socket = {
+      send: vi.fn(() => {
+        throw new Error('not open');
+      }),
+      close: vi.fn(),
+    };
+    sockets.push(socket);
+
+    // Act
+    await match.act('owner', { type: 'resign', revision: 0 });
+
+    // Assert
+    expect(socket.send).toHaveBeenCalled();
+    expect(socket.close).not.toHaveBeenCalled();
+  });
+});
+
 describe('durable finalisation', () => {
   it('retries terminal persistence after D1 failure without accepting another action', async () => {
     // Arrange
